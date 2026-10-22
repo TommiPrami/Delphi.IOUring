@@ -53,10 +53,10 @@ Source/
 
 ### Phase 0 – Groundwork
 
-- [ ] `Delphi.IOUring.inc` (`{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}`, shared switches) and include it in all units.
-- [ ] DUnitX console test project (Win32 + Win64 platforms), referencing `Source/3rdParty/DUnitX` by relative path.
-- [ ] `TestFileHelpers`: create temp files of given size where byte *i* = a cheap function of *i* (e.g. `(i * 2654435761) shr 24`), so any read at any offset can be verified without keeping a copy.
-- [ ] One trivial passing test to prove the runner works on both platforms.
+- [x] `Delphi.IOUring.inc` (`{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}`, shared switches) and include it in all units.
+- [x] DUnitX console test project (Win32 + Win64 platforms), referencing `Source/3rdParty/DUnitX` by relative path.
+- [x] `TestFileHelpers`: create temp files of given size where every 8-byte word is a hash of its word index (SplitMix64), so any read at any offset can be verified without keeping a copy.
+- [x] Tests for the helpers themselves prove the runner works on both platforms (14 tests, Win32 + Win64).
 
 **Done when:** test runner builds and runs for Win32 and Win64.
 
