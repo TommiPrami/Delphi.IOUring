@@ -1,4 +1,4 @@
-unit Tests.TestFileHelpers;
+﻿unit Tests.TestFileHelpers;
 
 {
   Tests for the test-file helpers themselves. If these fail, every later test

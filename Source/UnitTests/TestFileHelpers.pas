@@ -1,4 +1,4 @@
-unit TestFileHelpers;
+﻿unit TestFileHelpers;
 
 {
   Deterministic test files.

@@ -1,4 +1,4 @@
-// Delphi.IOUring.inc - shared compiler switches.
+﻿// Delphi.IOUring.inc - shared compiler switches.
 //
 // Included by every unit of the library, right after the "unit" line:
 //
