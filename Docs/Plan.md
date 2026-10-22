@@ -41,7 +41,7 @@ Source/
     Tests.Backend.Windows.API.pas            live API calls
     Tests.Ring.pas                           the core ring (TIORing)
     Tests.SequentialReader.pas               the read-ahead reader
-    Tests.Streams.pas
+    Tests.Streams.pas                        TSequentialReadOnlyFileStream
     TestFileHelpers.pas                      generates deterministic test files
     TestPlatformHelpers.pas                  files, pipes, page memory for tests
   Benchmarks/
@@ -126,14 +126,16 @@ Source/
 
 ### Phase 4 – `TSequentialReadOnlyFileStream` (Layer 3)
 
-- [ ] `EIORingStreamError = class(EStreamError)`.
-- [ ] `TSequentialReadOnlyFileStream` per Design §8.1 (reader embedded as a record field).
-- [ ] Tests (`Tests.Streams`):
-  - [ ] Content equals `TFileStream` content for the file-size matrix above.
-  - [ ] `Position` getter and `Size` work at all times.
-  - [ ] `Seek(0, soCurrent)`, seek to current position, `Position := Position` → no exception.
-  - [ ] Seek backward / forward / `soEnd`, `Position := 0` after reading, `Write`, `WriteBuffer`, `Size := …` → `EIORingStreamError`.
-  - [ ] Interop: `TMemoryStream.CopyFrom(Stream, 0)`, `TStreamReader` line reading over a text file, `TBytesStream.LoadFromStream`.
+- [x] `EIORingStreamError = class(EStreamError)`.
+- [x] `TSequentialReadOnlyFileStream` per Design §8.1 (reader embedded as a record field); a file that cannot be opened raises `EFOpenError` like `TFileStream`.
+- [x] Tests (`Tests.Streams`, 17 tests):
+  - [x] Content equals `TFileStream` content for the file-size matrix above (and unbuffered).
+  - [x] `Position` getter and `Size` work at all times.
+  - [x] `Seek(0, soCurrent)`, seek to current position, `Position := Position` → no exception.
+  - [x] Seek backward / forward / `soEnd`, `Position := 0` after reading, old 32-bit `Seek`, `Write` (all overloads), `WriteBuffer`, `Size := …` → `EIORingStreamError` (an `EStreamError`).
+  - [x] Interop: `TMemoryStream.CopyFrom(Stream, 0)` and in parts, `TStreamReader` line reading over a text file, `TBytesStream.LoadFromStream`; `ReadBuffer` past the end raises `EReadError`.
+
+**Done 2026-10-22** – 115 tests pass on Win32 and Win64; the stream unit also compiles with FPC 3.2.2 (i386). With this the code of Milestone 1 is complete; Phase 5 (benchmarks) remains.
 
 ### Phase 5 – Benchmarks
 

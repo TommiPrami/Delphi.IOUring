@@ -20,13 +20,15 @@ uses
   Delphi.IOUring.Backend.Windows in '..\Units\Delphi.IOUring.Backend.Windows.pas',
   Delphi.IOUring in '..\Units\Delphi.IOUring.pas',
   Delphi.IOUring.SequentialReader in '..\Units\Delphi.IOUring.SequentialReader.pas',
+  Delphi.IOUring.Streams in '..\Units\Delphi.IOUring.Streams.pas',
   TestFileHelpers in 'TestFileHelpers.pas',
   TestPlatformHelpers in 'TestPlatformHelpers.pas',
   Tests.TestFileHelpers in 'Tests.TestFileHelpers.pas',
   Tests.Backend.Windows.API.Layout in 'Tests.Backend.Windows.API.Layout.pas',
   Tests.Backend.Windows.API in 'Tests.Backend.Windows.API.pas',
   Tests.Ring in 'Tests.Ring.pas',
-  Tests.SequentialReader in 'Tests.SequentialReader.pas';
+  Tests.SequentialReader in 'Tests.SequentialReader.pas',
+  Tests.Streams in 'Tests.Streams.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

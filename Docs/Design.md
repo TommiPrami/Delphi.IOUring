@@ -1,12 +1,12 @@
 # Delphi.IOUring – Design Specification
 
-Status: **Draft v0.6** (2026-10-22) – Phases 1–3 implemented: complete Windows
+Status: **Draft v0.7** (2026-10-22) – Phases 1–4 implemented: complete Windows
 API unit, core ring (implementation notes in §5.2), sequential reader
-(implementation notes in §7). Things
-marked **[DECIDE]** need an answer from the project owner; things marked
-**[VERIFY]** must be proven by a spike or unit test before building on them,
-and become **[VERIFIED]** with the answer once a test proves them. Decisions
-already made are listed in §15.
+(notes in §7), read-only stream (notes in §8.1). Things marked **[DECIDE]**
+need an answer from the project owner; things marked **[VERIFY]** must be
+proven by a spike or unit test before building on them, and become
+**[VERIFIED]** with the answer once a test proves them. Decisions already made
+are listed in §15.
 
 ---
 
@@ -942,6 +942,28 @@ sequential-scan hint).
 
 Exception class: `EIORingStreamError = class(EStreamError)` so that existing
 code catching `EStreamError` keeps working.
+
+#### Implementation notes (Phase 4)
+
+- `Delphi.IOUring.Streams`. The stream overrides `Read`/`Write` for `Longint`
+  and, in Delphi on 64-bit, the new `NativeInt` overloads of Delphi 13 (so
+  big reads go straight to the reader instead of being split by `TStream`).
+  The `TBytes`, `Read64`/`Write64` and `ReadData` overloads all end up there.
+- `SetSize` is overridden in both forms (`Int64` and the deprecated `Longint`
+  one), so no path changes the size silently.
+- Only the 64-bit `Seek` is overridden; the old `Seek(Longint, Word)` is routed
+  to it by `TStream` (tested).
+- **Open errors:** a file that cannot be opened raises **`EFOpenError`** with
+  the same message format as `TFileStream` ("Cannot open file "…". <reason>"),
+  so it is a drop-in for code that catches that. Wrong buffer arguments raise
+  `EIORingError`. The stream opens the handle itself and hands it to the
+  reader, which then owns it (also if the reader's `Open` fails – tested by an
+  exclusive open right after the failed constructor).
+- Extra properties: `FileName`, and `Stats` (the reader's statistics, for
+  benchmarks). No zero-copy API on the stream – that stays on the reader.
+- Tested with `TMemoryStream.CopyFrom(S, 0)` and in parts, `TBytesStream.LoadFromStream`
+  and `TStreamReader.ReadLine` (20 000 lines). A second `CopyFrom(S, 0)` after
+  reading raises (it would need a rewind).
 
 ### 8.2 Later stream classes (each its own specific class)
 
