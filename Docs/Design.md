@@ -1,8 +1,9 @@
 # Delphi.IOUring – Design Specification
 
-Status: **Draft v0.7** (2026-10-22) – Phases 1–4 implemented: complete Windows
-API unit, core ring (implementation notes in §5.2), sequential reader
-(notes in §7), read-only stream (notes in §8.1). Things marked **[DECIDE]**
+Status: **Draft v0.8** (2026-10-22) – Milestone 1 complete (Phases 1–5):
+complete Windows API unit, core ring (implementation notes in §5.2),
+sequential reader (notes in §7), read-only stream (notes in §8.1),
+benchmarks ([Benchmarks.md](Benchmarks.md)). Things marked **[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
 **[VERIFIED]** with the answer once a test proves them. Decisions already made
@@ -895,10 +896,13 @@ differs from the sketch above:
   `TIORingPlatform` – the reader itself has no Windows code.
 - `Close` closes the ring first (which waits for the reads in flight), then
   frees the buffers, then closes the file if the reader owns it.
-- **First measurements** (test log, NVMe, 100 MB, 1 MiB × 8, 64 KiB reads with
-  a byte-by-byte pattern check as "work"): buffered ~140–190 ms with
-  **0 stalls**; unbuffered ~110 ms with 1 stall (240 µs, at the start) and
-  read-ahead growing to 4. Real benchmarks are Phase 5.
+- **Benchmarks (Phase 5, [Benchmarks.md](Benchmarks.md)):** a cold 10 GiB file is
+  read at disk speed (~6.75 GiB/s, 2.7–4× `TFileStream`), the same as
+  overlapped `ReadFile` with the same read-ahead; no gain when the file is in
+  the cache. The tuning sweep confirmed the **defaults** (1 MiB × 8, adaptive
+  read-ahead, sequential-scan hint, registration): within 1 % of the best in
+  both buffered and unbuffered mode. Unbuffered reading needs ~4 reads and
+  2–4 MiB in flight on that disk, buffered ~8 MiB.
 
 ---
 

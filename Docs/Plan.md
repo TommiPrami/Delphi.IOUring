@@ -20,7 +20,7 @@ against both compilers from day one.
 ## Target folder layout
 
 ```
-Docs/                      Design.md, Plan.md, Benchmarks.md (later)
+Docs/                      Design.md, Plan.md, Benchmarks.md, BenchmarkResults/ (raw CSV)
 Source/
   Units/
     Delphi.IOUring.inc                       shared compiler switches (FPC mode etc.)
@@ -45,7 +45,9 @@ Source/
     TestFileHelpers.pas                      generates deterministic test files
     TestPlatformHelpers.pas                  files, pipes, page memory for tests
   Benchmarks/
-    Delphi.IOUring.Benchmarks.dpr            console app, CSV output
+    Delphi.IOUring.Benchmarks.dpr/.dproj     console app, CSV output
+    Bench.Common.pas                         consumer, timing, cache purge, test files
+    Bench.Contenders.pas                     the ways of reading that are compared
   3rdParty/DUnitX
 ```
 
@@ -139,13 +141,13 @@ Source/
 
 ### Phase 5 – Benchmarks
 
-- [ ] Console app; files of 1 GB and 10 GB (generated once, outside the repo).
-- [ ] Contenders: `TFileStream` (various `Read` sizes), `TBufferedFileStream`, plain `ReadFile` with `FILE_FLAG_SEQUENTIAL_SCAN`, **N threads doing synchronous `ReadFile` on separate ranges** (the PostgreSQL "sync + more workers" baseline), IoRing stream buffered, IoRing stream unbuffered, IoRing zero-copy API.
-- [ ] Scenarios: (a) pure read-through (I/O bound), (b) read + simulated CPU work per MB (shows "data for free" overlap; report `Stats.Stalls`), (c) cold cache vs warm cache.
-- [ ] Measure **MB/s and CPU time** (user + kernel) for each, Win32 and Win64. Output CSV; write results + machine description to `Docs/Benchmarks.md`.
-- [ ] Tune defaults (BufferSize, BufferCount, adaptive vs fixed read-ahead) from the results.
+- [x] Console app; files of 1 GiB and 10 GiB (created in `%TEMP%`, deleted afterwards).
+- [x] Contenders: `TFileStream` (64 KiB and 1 MiB reads), `TBufferedFileStream`, plain `ReadFile` with and without `FILE_FLAG_SEQUENTIAL_SCAN`, **overlapped `ReadFile` 1 MiB × 8** (classic async I/O, buffered and unbuffered – added as the fair async baseline), **4 threads doing synchronous `ReadFile` on separate ranges**, IoRing stream buffered/unbuffered, IoRing zero-copy reader (with/without hint, unbuffered).
+- [x] Scenarios: (a) read-through, (b) read + 200 µs CPU work per MiB (stalls reported), (c) cold cache (purged before each run, checked) vs warm cache.
+- [x] Measure **MiB/s and CPU time** (user + kernel) for each, Win32 and Win64. CSV output; results + machine description in `Docs/Benchmarks.md`, raw data in `Docs/BenchmarkResults/`.
+- [x] Tune defaults (BufferSize, BufferCount, adaptive vs fixed read-ahead, registration) from the results: **defaults kept** (1 MiB × 8 is within 1 % of the best).
 
-**Done when:** we know where the IoRing stream wins and loses; defaults updated; README gets a short usage + results section.
+**Done 2026-10-22** – the IoRing stream reads a cold 10 GiB file at disk speed (~6.75 GiB/s): 2.7× `TFileStream` with 1 MiB reads, ~4× with 64 KiB reads; same speed as well-made overlapped I/O; no gain (−6 to −16 %) when the file is already in the cache; 14–18 % faster when the program does CPU work on the data. README has a usage + results section. **Milestone 1 is complete.**
 
 ---
 

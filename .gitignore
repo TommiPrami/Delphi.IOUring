@@ -82,3 +82,9 @@ __recovery/
 Source/UnitTests/Win32/
 Source/UnitTests/Win64/
 Source/UnitTests/*.res
+
+# Delphi.IOUring: benchmark build output, generated resource file and results
+Source/Benchmarks/Win32/
+Source/Benchmarks/Win64/
+Source/Benchmarks/*.res
+Source/Benchmarks/*.csv
