@@ -138,6 +138,30 @@ type
     property PendingCount: Cardinal read FPendingCount;
   end;
 
+  // File, memory and clock services the higher layers need. Every platform
+  // has a record with these names; Delphi.IOUring exports it as TIORingPlatform.
+  // Failures raise EIORingError (NativeCode = HRESULT).
+  TWindowsIORingPlatform = record
+  public
+    // Read-only, shared for reading and writing (so a file being written by
+    // someone else can be read), overlapped. AUnbuffered = FILE_FLAG_NO_BUFFERING,
+    // ASequentialHint = FILE_FLAG_SEQUENTIAL_SCAN.
+    class function OpenFileForRead(const AFileName: string; const AUnbuffered,
+      ASequentialHint: Boolean): THandle; static;
+    class procedure CloseFile(const AHandle: THandle); static;
+    class function GetFileSize(const AHandle: THandle): Int64; static;
+    // Logical sector size of the file's volume: unbuffered I/O must use
+    // offsets, sizes and buffer addresses that are multiples of it. 4096 if
+    // the system does not tell.
+    class function GetSectorSize(const AHandle: THandle): Cardinal; static;
+    class function PageSize: Cardinal; static;
+    // Page-aligned memory (VirtualAlloc); FreePages(nil) does nothing
+    class function AllocPages(const ASize: NativeUInt): Pointer; static;
+    class procedure FreePages(const AMemory: Pointer); static;
+    // Monotonic clock for statistics
+    class function TimestampMicroseconds: UInt64; static;
+  end;
+
 implementation
 
 const
@@ -665,6 +689,113 @@ begin
     Result.SupportedOps := Result.SupportedOps + [ioWrite, ioFlush];
   if LCapabilities.MaxVersion >= IORING_VERSION_4 then
     Result.SupportedOps := Result.SupportedOps + [ioReadScatter, ioWriteGather];
+end;
+
+{ TWindowsIORingPlatform }
+
+type
+  // fileapi.h / minwinbase.h; not in the RTL
+  FILE_STORAGE_INFO = record
+    LogicalBytesPerSector: ULONG;
+    PhysicalBytesPerSectorForAtomicity: ULONG;
+    PhysicalBytesPerSectorForPerformance: ULONG;
+    FileSystemEffectivePhysicalBytesPerSectorForAtomicity: ULONG;
+    Flags: ULONG;
+    ByteOffsetForSectorAlignment: ULONG;
+    ByteOffsetForPartitionAlignment: ULONG;
+  end;
+
+const
+  FILE_INFO_CLASS_STORAGE_INFO = 16;  // FILE_INFO_BY_HANDLE_CLASS.FileStorageInfo
+  DEFAULT_SECTOR_SIZE = 4096;
+
+function GetFileInformationByHandleEx(hFile: THandle; FileInformationClass: Integer;
+  lpFileInformation: Pointer; dwBufferSize: DWORD): BOOL; stdcall; external kernel32;
+
+// Own import: FPC's Windows unit does not declare GetFileSizeEx
+function IORingGetFileSizeEx(hFile: THandle; out lpFileSize: Int64): BOOL; stdcall;
+  external kernel32 name 'GetFileSizeEx';
+
+function LastErrorAsHResult: HRESULT;
+var
+  LError: DWORD;
+begin
+  LError := GetLastError;
+  if LError = 0 then
+    Result := E_FAIL
+  else
+    Result := HRESULT((LError and $0000FFFF) or $80070000);
+end;
+
+class function TWindowsIORingPlatform.OpenFileForRead(const AFileName: string; const AUnbuffered,
+  ASequentialHint: Boolean): THandle;
+var
+  LFlags: DWORD;
+begin
+  LFlags := FILE_ATTRIBUTE_NORMAL or FILE_FLAG_OVERLAPPED;
+  if AUnbuffered then
+    LFlags := LFlags or FILE_FLAG_NO_BUFFERING;
+  if ASequentialHint then
+    LFlags := LFlags or FILE_FLAG_SEQUENTIAL_SCAN;
+
+  Result := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, nil,
+    OPEN_EXISTING, LFlags, 0);
+  if Result = INVALID_HANDLE_VALUE then
+    raise EIORingError.CreateNative(LastErrorAsHResult, 'Open "' + AFileName + '"');
+end;
+
+class procedure TWindowsIORingPlatform.CloseFile(const AHandle: THandle);
+begin
+  CloseHandle(AHandle);
+end;
+
+class function TWindowsIORingPlatform.GetFileSize(const AHandle: THandle): Int64;
+begin
+  if not IORingGetFileSizeEx(AHandle, Result) then
+    raise EIORingError.CreateNative(LastErrorAsHResult, 'GetFileSizeEx');
+end;
+
+class function TWindowsIORingPlatform.GetSectorSize(const AHandle: THandle): Cardinal;
+var
+  LInfo: FILE_STORAGE_INFO;
+begin
+  FillChar(LInfo, SizeOf(LInfo), 0);
+  if GetFileInformationByHandleEx(AHandle, FILE_INFO_CLASS_STORAGE_INFO, @LInfo, SizeOf(LInfo))
+    and (LInfo.LogicalBytesPerSector > 0) then
+    Result := LInfo.LogicalBytesPerSector
+  else
+    Result := DEFAULT_SECTOR_SIZE;
+end;
+
+class function TWindowsIORingPlatform.PageSize: Cardinal;
+var
+  LInfo: TSystemInfo;
+begin
+  GetSystemInfo(LInfo);
+  Result := LInfo.dwPageSize;
+end;
+
+class function TWindowsIORingPlatform.AllocPages(const ASize: NativeUInt): Pointer;
+begin
+  Result := VirtualAlloc(nil, ASize, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
+  if Result = nil then
+    raise EIORingError.CreateNative(LastErrorAsHResult, 'VirtualAlloc');
+end;
+
+class procedure TWindowsIORingPlatform.FreePages(const AMemory: Pointer);
+begin
+  if AMemory <> nil then
+    VirtualFree(AMemory, 0, MEM_RELEASE);
+end;
+
+class function TWindowsIORingPlatform.TimestampMicroseconds: UInt64;
+var
+  LCounter: Int64;
+  LFrequency: Int64;
+begin
+  QueryPerformanceCounter(LCounter);
+  QueryPerformanceFrequency(LFrequency);
+  Result := UInt64(LCounter div LFrequency) * 1000000 + UInt64((LCounter mod LFrequency) * 1000000 div LFrequency);
 end;
 
 end.

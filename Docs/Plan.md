@@ -40,7 +40,7 @@ Source/
     Tests.Backend.Windows.API.Layout.pas     record layouts + helpers
     Tests.Backend.Windows.API.pas            live API calls
     Tests.Ring.pas                           the core ring (TIORing)
-    Tests.SequentialReader.pas
+    Tests.SequentialReader.pas               the read-ahead reader
     Tests.Streams.pas
     TestFileHelpers.pas                      generates deterministic test files
     TestPlatformHelpers.pas                  files, pipes, page memory for tests
@@ -109,16 +109,20 @@ Source/
 
 ### Phase 3 – Sequential reader (Layer 2)
 
-- [ ] `TIORingSequentialReader` managed record per Design §7: options set, slot table (plain records), priming, re-queue batching, copying `Read`, zero-copy `TryAcquireChunk`/`ReleaseChunk`, `DataReady`, `Stats`.
-- [ ] Adaptive read-ahead distance (Design §7.6), switchable off for benchmarking.
-- [ ] Unbuffered mode with sector-size query and page-aligned buffers.
-- [ ] Tests (`Tests.SequentialReader`) – each run for buffered and unbuffered mode and for BufferCount 1, 2, 8:
-  - [ ] File sizes: 0, 1, BufferSize−1, BufferSize, BufferSize+1, BufferSize×BufferCount, ×BufferCount+1, ~100 MB.
-  - [ ] Read chunk sizes: 1, 7, 4095, 4096, BufferSize, BufferSize+1, larger than file.
-  - [ ] Data verified against generator; total == file size; `Eof` correct; reads after EOF return 0.
-  - [ ] Zero-copy API delivers identical content.
-  - [ ] File appended to while reading: reader stops at the size taken at open.
-  - [ ] `Close` in the middle of a file (in-flight reads) is clean.
+- [x] `TIORingSequentialReader` managed record per Design §7: options set, slot table (plain records), priming, re-queue batching, copying `Read`, zero-copy `TryAcquireChunk`/`ReleaseChunk`, `DataReady`, `Stats`.
+- [x] Adaptive read-ahead distance (Design §7.6), switchable off for benchmarking (`sroFixedReadAhead`; also `sroNoRegistration`).
+- [x] Unbuffered mode with sector-size query and page-aligned buffers.
+- [x] Platform file/memory/clock helpers in the backend (`TIORingPlatform`), so the reader has no Windows code.
+- [x] Tests (`Tests.SequentialReader`, 21 tests) – size × chunk matrix for buffered and unbuffered mode and for BufferCount 1, 2, 8 (plus a fixed/no-registration run):
+  - [x] File sizes: 0, 1, BufferSize−1, BufferSize, BufferSize+1, BufferSize×BufferCount, ×BufferCount+1, 100 MB.
+  - [x] Read chunk sizes: 1, 7, 4095, 4096, BufferSize, BufferSize+1, larger than file.
+  - [x] Data verified against generator; total == file size; `Eof` correct; reads after EOF return 0.
+  - [x] Zero-copy API delivers identical content; `Read` and chunks can be mixed.
+  - [x] File appended to while reading: reader stops at the size taken at open.
+  - [x] File shortened while reading: reader ends at the new end.
+  - [x] `Close` in the middle of a file (in-flight reads) is clean; end of scope closes the file.
+
+**Done 2026-10-22** – 98 tests pass on Win32 and Win64; the reader also compiles with FPC 3.2.2 (i386).
 
 ### Phase 4 – `TSequentialReadOnlyFileStream` (Layer 3)
 

@@ -1,7 +1,8 @@
 # Delphi.IOUring – Design Specification
 
-Status: **Draft v0.5** (2026-10-22) – Phase 1 (complete Windows API unit) and
-Phase 2 (core ring, see the implementation notes in §5.2) implemented. Things
+Status: **Draft v0.6** (2026-10-22) – Phases 1–3 implemented: complete Windows
+API unit, core ring (implementation notes in §5.2), sequential reader
+(implementation notes in §7). Things
 marked **[DECIDE]** need an answer from the project owner; things marked
 **[VERIFY]** must be proven by a spike or unit test before building on them,
 and become **[VERIFIED]** with the answer once a test proves them. Decisions
@@ -793,7 +794,9 @@ handle, the ring and the buffer memory; not copyable, §4.1).
 type
   TIORingSequentialReaderOption = (
     sroUnbuffered,          // FILE_FLAG_NO_BUFFERING / O_DIRECT
-    sroNoSequentialScanHint // default sends FILE_FLAG_SEQUENTIAL_SCAN / posix_fadvise
+    sroNoSequentialScanHint,// default sends FILE_FLAG_SEQUENTIAL_SCAN / posix_fadvise
+    sroFixedReadAhead,      // benchmarks: no adaptive ramp-up
+    sroNoRegistration       // benchmarks: no registered file/buffers
   );
   TIORingSequentialReaderOptions = set of TIORingSequentialReaderOption;
 
@@ -802,10 +805,10 @@ type
     // Initialize / Finalize / Assign operators per §4.1
     procedure Open(const AFileName: string;
       const AOptions: TIORingSequentialReaderOptions = [];
-      const ABufferSize: Cardinal = 1024 * 1024;   // multiple of 64 KiB
+      const ABufferSize: Cardinal = 1024 * 1024;   // multiple of 4096
       const ABufferCount: Cardinal = 8); overload; // = max read-ahead depth
     procedure Open(const AHandle: THandle; const AOwnsHandle: Boolean; ...); overload;
-    procedure Close;   // cancels + drains in-flight reads
+    procedure Close;   // waits for the reads in flight, then releases everything
 
     // Copying API (used by the stream)
     function Read(var ABuffer; const ACount: NativeInt): NativeInt;
@@ -861,6 +864,41 @@ Algorithm:
 "Data for free": after priming, as long as the caller processes data slower
 than the disk delivers it, `DataReady` is always `True` and `Read` is just a
 `Move`. `Stats.Stalls` shows how often that was *not* the case.
+
+### Implementation notes (Phase 3)
+
+The code (`Delphi.IOUring.SequentialReader.pas`) is the reference; where it
+differs from the sketch above:
+
+- **Options:** `sroUnbuffered`, `sroNoSequentialScanHint`, plus two for
+  benchmarking: `sroFixedReadAhead` (all buffers in flight from the start)
+  and `sroNoRegistration` (raw handle and buffer pointers instead of
+  registered ones).
+- **Buffer size** must be a multiple of 4096 (not 64 KiB): that is the page
+  size and covers the sector size of usual disks. With `sroUnbuffered` the
+  reader also checks it against the volume's logical sector size.
+  Buffer count: 1–1024. Defaults: 1 MiB × 8.
+- **Slot states** are `Free → InFlight → Ready`; "in use" is simply the head
+  slot. Errors are delivered in order: a failed read raises `EIORingError`
+  when `Read` reaches that buffer, not when the completion arrives.
+- **Registration:** the file and the whole buffer block are registered with
+  the ring and submitted together with the first reads (a registration is a
+  barrier for the entries after it). Skipped above 4 GiB of buffers (32-bit
+  offsets in a registered buffer reference).
+- **Data appended after Open is never delivered:** each read's byte count is
+  cut to what the size at open allows (the last read asks for a whole buffer,
+  so it could return appended bytes otherwise). Tested.
+- **File shorter than at Open:** a short read moves the end; `Size` keeps the
+  size at open, `Eof` becomes True at the new end. Tested.
+- **OS-specific file calls** (open with flags, size, sector size, page memory,
+  clock) are in the backend unit as `TWindowsIORingPlatform`, exported as
+  `TIORingPlatform` – the reader itself has no Windows code.
+- `Close` closes the ring first (which waits for the reads in flight), then
+  frees the buffers, then closes the file if the reader owns it.
+- **First measurements** (test log, NVMe, 100 MB, 1 MiB × 8, 64 KiB reads with
+  a byte-by-byte pattern check as "work"): buffered ~140–190 ms with
+  **0 stalls**; unbuffered ~110 ms with 1 stall (240 µs, at the start) and
+  read-ahead growing to 4. Real benchmarks are Phase 5.
 
 ---
 

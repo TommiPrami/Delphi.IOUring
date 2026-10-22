@@ -50,6 +50,7 @@ type
 
 {$IFDEF MSWINDOWS}
   TIORing = Delphi.IOUring.Backend.Windows.TWindowsIORing;
+  TIORingPlatform = Delphi.IOUring.Backend.Windows.TWindowsIORingPlatform;
   TIORingSegment = Delphi.IOUring.Backend.Windows.TIORingSegment;
   PIORingSegment = Delphi.IOUring.Backend.Windows.PIORingSegment;
 {$ENDIF}
