@@ -9,9 +9,10 @@
 
       Tests       Source\UnitTests\FPC\Delphi.IOUring.UnitTests.FPC.lpr  (debug info)
       Benchmarks  Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.FPC.lpr (optimized)
+      Structures  Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.Structures.FPC.lpr (optimized)
 
 .PARAMETER Project
-    Tests or Benchmarks. Default Tests.
+    Tests, Benchmarks or Structures. Default Tests.
 
 .PARAMETER Platform
     Win32 or Win64. Default Win32.
@@ -40,7 +41,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Tests', 'Benchmarks')]
+    [ValidateSet('Tests', 'Benchmarks', 'Structures')]
     [string] $Project = 'Tests',
     [ValidateSet('Win32', 'Win64')]
     [string] $Platform = 'Win32',
@@ -86,8 +87,12 @@ if ($Project -eq 'Tests') {
     }
 } else {
     $projectDir = Join-Path $sourceDir 'Benchmarks\FPC'
-    $programFile = 'Delphi.IOUring.Benchmarks.FPC.lpr'
-    $extraUnits = @(Join-Path $sourceDir 'Benchmarks')      # Bench.Common, Bench.Readers
+    if ($Project -eq 'Benchmarks') {
+        $programFile = 'Delphi.IOUring.Benchmarks.FPC.lpr'
+    } else {
+        $programFile = 'Delphi.IOUring.Benchmarks.Structures.FPC.lpr'
+    }
+    $extraUnits = @(Join-Path $sourceDir 'Benchmarks')      # Bench.Common, Bench.Readers, Bench.Structures
     $codeOptions = @('-O3', '-CX', '-XX', '-Xs')             # optimized, smart linking, stripped
 }
 

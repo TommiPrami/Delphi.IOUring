@@ -22,6 +22,7 @@ uses
   Delphi.IOUring.SequentialReader in '..\Units\Delphi.IOUring.SequentialReader.pas',
   Delphi.IOUring.Streams in '..\Units\Delphi.IOUring.Streams.pas',
   Delphi.IOUring.Atomics in '..\Units\Delphi.IOUring.Atomics.pas',
+  Delphi.IOUring.RequestPool in '..\Units\Delphi.IOUring.RequestPool.pas',
   TestFileHelpers in 'TestFileHelpers.pas',
   TestPlatformHelpers in 'TestPlatformHelpers.pas',
   Tests.TestFileHelpers in 'Tests.TestFileHelpers.pas',
@@ -30,7 +31,9 @@ uses
   Tests.Ring in 'Tests.Ring.pas',
   Tests.SequentialReader in 'Tests.SequentialReader.pas',
   Tests.Streams in 'Tests.Streams.pas',
-  Tests.Atomics in 'Tests.Atomics.pas';
+  TestThreadHelpers in 'TestThreadHelpers.pas',
+  Tests.Atomics in 'Tests.Atomics.pas',
+  Tests.RequestPool in 'Tests.RequestPool.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

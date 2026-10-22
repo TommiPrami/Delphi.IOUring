@@ -2,6 +2,8 @@
 
 Measured 2026-10-22 (Plan, Phase 5) with `Source/Benchmarks/Delphi.IOUring.Benchmarks`,
 Release builds, Delphi 13. Raw data (every single run): [BenchmarkResults/](BenchmarkResults/).
+The engine's data structures (Phase 11 and later) have a benchmark of their
+own: [Engine structures](#engine-structures-phase-11).
 
 ## Short version
 
@@ -29,6 +31,10 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
 - **Defaults confirmed:** 1 MiB × 8 buffers is within 1 % of the best setting,
   buffered and unbuffered. The sequential-scan hint and adaptive read-ahead
   make no measurable difference here; registering the buffers gives ~1–2 %.
+- **Engine structures (Phase 11):** the lock-free free list of the request
+  pool is as fast as an SRW lock or faster in every case measured – 1.1–6.7×
+  faster with several threads in a tight loop – but only with backoff;
+  without it, the lock was up to 4.8× faster.
 
 ## Machine
 
@@ -226,6 +232,90 @@ Two things learned on the way:
   the stream's extra copy when the data comes from the cache, not for the
   zero-copy reader.
 
+## Engine structures (Phase 11)
+
+Measured 2026-10-22 with `Source/Benchmarks/Delphi.IOUring.Benchmarks.Structures`
+(Delphi, Release) and its Free Pascal build (`Build-FPC.ps1 -Project Structures`,
+`-O3`), on an Intel Core i7-14700: 8 performance cores with 2 threads each and
+12 efficiency cores, 28 logical processors. Raw data:
+[2026-10-22-structures.csv](BenchmarkResults/2026-10-22-structures.csv), backoff
+tuning: [2026-10-22-structures-backoff.csv](BenchmarkResults/2026-10-22-structures-backoff.csv).
+
+The rule (Design §10.5): a lock-free structure stays only if it beats the same
+structure behind a lock. If the lock wins or ties, the lock stays.
+
+### Free list of the request pool
+
+Each thread takes one slot index, (works,) and gives it back, again and again.
+
+- **lock-free**: `TIORingFreeList` – a Treiber stack: one 64-bit
+  compare-exchange per take or give, with a tag against the ABA problem, and
+  backoff (below).
+- **SRW lock**: the same stack (an array) behind a Windows SRW lock, the
+  lightest lock Windows has.
+- **tight**: no work in between – the worst case: all threads fight for the
+  stack all the time.
+- **work 1 µs**: ~1 µs of busy work while holding the index – closer to real
+  use, where a request is held while it is prepared and waited for.
+
+Million take+give pairs per second, all threads together, median of 3 runs;
+CPU = CPU time of all threads in one run. Delphi, Win64:
+
+| Threads | tight: lock-free | tight: SRW lock | CPU (lock-free / SRW) | work 1 µs: lock-free | work 1 µs: SRW lock |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | **62.2** | 45.1 | 0.06 / 0.06 s | 0.97 | 0.97 |
+| 2 | **47.7** | 42.8 | 0.14 / 0.17 s | 1.85 | 1.79 |
+| 4 | **35.1** | 27.6 | 0.39 / 0.53 s | 3.54 | 3.56 |
+| 8 | **27.7** | 14.4 | 0.9 / 2.2 s | **5.52** | 3.35 |
+| 16 | **30.1** | 7.0 | 1.7 / 8.9 s | **3.78** | 2.34 |
+| 28 | **13.1** | 2.8 | 6.3 / 31 s | **3.26** | 1.75 |
+
+Lock-free ÷ SRW lock in all four builds:
+
+| Build | tight, 1 thread | tight, 2–28 threads | work 1 µs, 1–4 threads | work 1 µs, 8–28 threads |
+| --- | ---: | ---: | ---: | ---: |
+| Delphi Win64 | 1.38 | 1.12–4.68 | 0.99–1.03 | 1.61–1.86 |
+| FPC Win64 | 1.38 | 1.62–3.21 | 0.99–1.05 | 1.64–1.90 |
+| Delphi Win32 | 1.19 | 1.37–6.72 | 1.00–1.03 | 1.61–2.00 |
+| FPC Win32 | 1.21 | 1.32–4.29 | 0.99–1.04 | 1.61–1.86 |
+
+**Result: the lock-free free list wins or ties everywhere, so it stays.**
+
+What was learned on the way:
+
+- **Without backoff, lock-free lost badly.** With 2 or more threads in the
+  tight loop, all threads retried the same compare-exchange at once, the cache
+  line jumped from core to core, and almost every try failed: the SRW lock was
+  1.7–4.8× faster. *Backoff* fixes this: after a failed compare-exchange the
+  thread waits 1, 2, 4, … CPU pauses (up to a limit) before it tries again.
+- **The limit of the backoff** (Delphi Win64, tight, lock-free, million
+  pairs/s, median of 3 runs; each limit was measured at a different moment,
+  so allow ±20 % noise):
+
+  | Threads | no backoff | 64 | 256 | **1024** | 4096 |
+  | ---: | ---: | ---: | ---: | ---: | ---: |
+  | 1 | 61.9 | 62.6 | 60.1 | 61.4 | 60.7 |
+  | 2 | 9.1 | 42.3 | 49.7 | 52.2 | 55.9 |
+  | 4 | 5.3 | 26.3 | 36.8 | 41.1 | 49.4 |
+  | 8 | 3.5 | 14.4 | 22.4 | 27.3 | 42.0 |
+  | 16 | 2.5 | 3.4 | 12.6 | 20.2 | 44.0 |
+  | 28 | 2.4 | 2.5 | 3.2 | 15.9 | 40.5 |
+
+  **1024 was chosen.** 4096 is faster still in this tight loop (the threads
+  take turns, almost like with a lock), but then a single wait could take
+  4096 pauses × 34 ns ≈ 140 µs on this CPU – longer than a whole NVMe read.
+  With 1024 it is at most ≈ 35 µs, and only after 10 failed tries in a row.
+  (One `PAUSE` takes ~34 ns on the performance cores and ~16 ns on the
+  efficiency cores, measured; CPUs older than Intel Skylake pause much
+  shorter, so there the same limit means less time.)
+- **With real work, both are the same up to 4 threads**: the stack is then
+  rarely contended, and a take+give costs ~16 ns (lock-free) or ~22 ns (SRW
+  lock), lost in the 1 µs. The engine holds a request much longer than 1 µs,
+  so in real use the free list will rarely be the limit either way.
+- **The SRW lock is not cheap on CPU under contention**: it spins before it
+  sleeps, so with 28 threads it used 31 s of CPU time against 6 s for the
+  lock-free stack.
+
 ## Known limits of these measurements
 
 - **One machine, one very fast disk.** The NVMe drive has low latency, so
@@ -275,3 +365,10 @@ work scenario, default 200), `--threads` (default 4), `--csv`, `--tune`,
 `--keep` (keep the test files). The 10 GiB set takes about 10 minutes per
 platform. Close other programs first – background disk or CPU work changes
 the results a lot.
+
+Engine structures (about 30 s per build; options `--runs`, `--threads`, `--csv`):
+
+```
+Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Structures.exe --runs 3 --csv structures.csv
+Source\Build-FPC.ps1 -Project Structures -Platform Win64 -Run
+```

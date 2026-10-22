@@ -5,7 +5,8 @@ Free Pascal 3.2.2 on Windows, Win32 and Win64 (§12.1). Milestone 1 (Phases 1–
 complete Windows API unit, core ring (implementation notes in §5.2),
 sequential reader (notes in §7), read-only stream (notes in §8.1),
 benchmarks ([Benchmarks.md](Benchmarks.md)). Milestone 3 started: the
-atomics unit (Phase 10, notes in §10.6). Things marked **[DECIDE]**
+atomics unit (Phase 10, notes in §10.6) and the request pool (Phase 11, notes
+in §10.7). Things marked **[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
 **[VERIFIED]** with the answer once a test proves them. Decisions already made
@@ -236,6 +237,7 @@ barrier. That is the shape of the core API. Everything outside the subset
  │   later: Delphi.IOUring.Engine     I/O thread(s), request pool,        │
  │                                    read streams, overlap handling      │
  │   Delphi.IOUring.Atomics           CAS / fences / wait-on-address      │
+ │   Delphi.IOUring.RequestPool       request slots, lock-free free list  │
  ├────────────────────────────────────────────────────────────────────────┤
  │ Layer 1 – Core abstraction (OS independent, records)                   │
  │   Delphi.IOUring.Backend.Custom    shared types, constants, errors     │
@@ -262,7 +264,8 @@ Unit responsibilities:
 | `Delphi.IOUring.SequentialReader` *(new)* | Read-ahead engine, usable without streams | `Delphi.IOUring` |
 | `Delphi.IOUring.Streams` | `TStream` descendants | SequentialReader |
 | `Delphi.IOUring.Atomics` *(new)* | `TAtomic`: one place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5, §10.6) | RTL only |
-| `Delphi.IOUring.Engine` *(later)* | §10, §11 | `Delphi.IOUring`, Atomics |
+| `Delphi.IOUring.RequestPool` *(new)* | `TIORingRequestPool` (request slots, states, handles, waiting) and `TIORingFreeList` (lock-free stack) (§10.3, §10.7) | `Delphi.IOUring`, Atomics |
+| `Delphi.IOUring.Engine` *(later)* | §10, §11 | `Delphi.IOUring`, Atomics, RequestPool |
 
 The "all OS-specific code lives in the `Backend.<OS>` units" rule still holds:
 the `.API` units are the raw translation, the `Backend.<OS>` unit next to it
@@ -1047,10 +1050,11 @@ collect requests from all threads into a few rings. That is the engine.
 - Fixed-size array of plain request records (no allocation per request).
 - States: `Free → Defined → Queued → Submitted → Completed → Free`.
 - `UserData` = `slot index` + `generation` packed into a `NativeUInt`
-  (Win32: e.g. 20 bits index + 12 bits generation). A stale completion or a
-  late `Wait` on a reused slot is detected.
-- A request handle is a small plain record `(Index, Generation)` the caller
+  (Win32: the index bits follow the capacity, the generation gets the rest).
+  A stale completion or a late `Wait` on a reused slot is detected.
+- A request handle is a small plain record (one `NativeUInt`) the caller
   can `Wait` on, poll, or cancel.
+- Built in Phase 11 (`Delphi.IOUring.RequestPool`); details in §10.7.
 
 ### 10.4 Engine APIs (sketch)
 
@@ -1073,7 +1077,7 @@ shutdown). On the hot path:
 | Where | Technique |
 | --- | --- |
 | Producers → I/O thread | **Bounded MPSC/MPMC array queue** with a sequence number per cell (Vyukov style): producers claim a cell with one CAS on the tail counter, the I/O thread reads without CAS. No allocation, fixed memory. |
-| Request pool free list | **Lock-free stack** (Treiber) of slot indices. ABA problem solved with a tag/generation in the same word as the index, swapped with one CAS (64-bit CAS on Win32 = `CMPXCHG8B`). Optional per-thread small cache of free slots to avoid contention. |
+| Request pool free list | **Lock-free stack** (Treiber) of slot indices. ABA problem solved with a tag/generation in the same word as the index, swapped with one CAS (64-bit CAS on Win32 = `CMPXCHG8B`). Optional per-thread small cache of free slots to avoid contention. **Built in Phase 11, with exponential backoff; it wins or ties against an SRW lock in every case measured** (§10.7, [Benchmarks.md](Benchmarks.md#engine-structures-phase-11)). The per-thread cache is not needed so far. |
 | I/O thread → waiting producer | Per-request **state word**. The waiter spins briefly, then sleeps with `WaitOnAddress` (Windows) / `futex` (Linux). The I/O thread calls `WakeByAddressSingle` only if the "someone is waiting" bit is set – no syscall when nobody sleeps. |
 | I/O thread sleeping | Waits on {request-queue signal, ring completion event}. Producers signal only when the I/O thread has announced it is going to sleep (a flag set with CAS), so a busy engine costs producers no syscall. |
 | Counters / stats | Owned by one thread where possible; otherwise atomic increments on counters padded to their own **cache line** (64 bytes) to avoid false sharing. Queue head/tail counters are padded the same way. |
@@ -1153,6 +1157,79 @@ test; release/acquire hand-over of data 100 000 times; the spin-loop test;
 wait timeout, wake one, wake all; ping-pong without lost wake-ups. They pass
 with Delphi Debug and Release, and with FPC with and without `-O3`
 (`Build-FPC.ps1 -Optimize`), Win32 and Win64.
+
+### 10.7 Request pool – implementation notes (Phase 11)
+
+`Delphi.IOUring.RequestPool` has two managed records (copying one raises,
+like `TIORing`):
+
+- **`TIORingFreeList`** – a lock-free stack (Treiber) of the indices
+  0..Capacity-1. The top index and a 32-bit tag share one 64-bit word on a
+  cache line of its own. Every take and give changes the tag in the same
+  compare-exchange, so a thread that read an old top always fails and tries
+  again (no ABA problem). The links stay in memory until `Close`, so reading
+  the link of an index that another thread has just taken is harmless.
+  After a failed compare-exchange the thread waits 1, 2, 4 … up to 1024 CPU
+  pauses (**exponential backoff**); without it the stack lost to an SRW lock
+  by up to 4.8× (benchmark below).
+- **`TIORingRequestPool`** – the slots. A slot is a 32-bit **state word**
+  plus room for the engine's own request data (the *payload*: its size is
+  given to `Open`; the pool does not look at it). Slots are padded to whole
+  cache lines, so two requests never share one.
+
+State word: generation (bits 4–31) | "someone is waiting" flag (bit 3) |
+state (bits 0–2: Free, Defined, Queued, Submitted, Completed).
+
+Handle (`TIORingRequestHandle`, also the ring's `UserData`):
+`generation shl IndexBits or index`. IndexBits follows the capacity (at
+least 4). The generation has 28 bits on Win64; on Win32 it has the rest of
+the 32 bits, at most 28 (1024 slots: 22 bits; the biggest pool, 2^20 slots:
+12 bits). Generation 0 is never used, so a handle is never 0 – 0 means "no
+request".
+
+| Method | What it does |
+| --- | --- |
+| `TryAcquire` | Takes a free slot: Free → Defined. False if all slots are in use. |
+| `TryChangeState(H, From, To)` | One compare-exchange; False if the handle is stale or the request is not in `From`. Any change among Defined, Queued, Submitted and Completed; a change to Completed also wakes the waiters. |
+| `WaitFor(H, Timeout)` | Checks `SpinCount` times (default 100, with a CPU pause), then sets the waiting flag and sleeps on the state word (`TAtomic.WaitWhileEqual`). Timeout 0 only checks. |
+| `Release(H)` | Defined or Completed → Free with the next generation: the old handle becomes stale at once; wakes waiters; gives the index back to the free list. |
+| `State`, `IndexOf`, `Payload` | The state (or `rsStale`), the slot index, the payload address. |
+
+Why it is safe:
+
+- **One 32-bit word decides everything about a slot**, so every check and
+  change is a single atomic operation. A stale handle can never change a
+  slot that has been reused: its generation no longer matches.
+- **No lost wake-ups, and no wake-up calls when nobody sleeps.** A waiter
+  sets the waiting flag with a compare-exchange and then sleeps with the
+  flagged value as the "expected" value. The thread that completes the
+  request calls the wake function only if the word it replaced had the flag.
+  If the completion comes between the two steps of the waiter, the
+  compare-exchange fails or `WaitOnAddress` returns at once (the value
+  differs).
+- `Release` wakes waiters too: a thread waiting on a request that its owner
+  released gets `wrStale` instead of sleeping until its timeout.
+- Generations wrap around after 2^GenerationBits − 1 releases of the same
+  slot; a handle that old is not recognised as stale (Win32 with 2^20 slots:
+  4095 releases; with 1024 slots: about 4 million).
+
+Tests: `Tests.RequestPool` (DUnitX) and `Tests.FPC.RequestPool` (FPCUnit),
+23 each – free list order, capacity and errors; every slot once, handles and
+generations (also the wrap-around on Win32), stale and out-of-range handles,
+the state rules, payload alignment and separation, `WaitFor` (at once,
+timeout 0, timeout, woken by completion, woken by release); 4 threads that
+must never hold the same index or slot at once; and an **engine simulation**:
+4 producers and one "I/O thread" pass 80 000 requests through a pool that is
+smaller than the number of producers, with and without spinning in `WaitFor`.
+All pass with Delphi Debug and Release and FPC with and without `-O3`, Win32
+and Win64.
+
+Benchmark (Design rule §10.5, details in
+[Benchmarks.md](Benchmarks.md#engine-structures-phase-11)): against the same
+stack behind an SRW lock, the lock-free free list **wins or ties in every
+case** – 1.2–1.4× with one thread, 1.1–6.7× with 2–28 threads in a tight
+loop, the same with 1 µs of work and up to 4 threads, 1.6–2.0× with 8–28
+threads – in Delphi and FPC, Win32 and Win64. **It stays.**
 
 ---
 

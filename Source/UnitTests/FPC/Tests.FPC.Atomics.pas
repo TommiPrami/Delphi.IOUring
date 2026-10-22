@@ -21,8 +21,6 @@ uses
   Tests.FPC.Support;
 
 type
-  TWorkMethod = procedure(AIndex: Integer) of object;
-
   TAtomicTests = class(TIORingTestCase)
   private
     // Shared by the threads of a test. Object fields: aligned to their size.
@@ -32,9 +30,6 @@ type
     FData: Int64;
     FFailures: Integer;
     FWoken: Integer;
-    // Runs AWork(Index) in ACount threads that start at the same moment;
-    // returns when all are done. Fails if a thread raised an exception.
-    procedure RunThreads(const ACount: Integer; const AWork: TWorkMethod);
     // Thread bodies
     procedure WorkIncrement32(AIndex: Integer);
     procedure WorkFetchAdd64(AIndex: Integer);
@@ -76,7 +71,6 @@ implementation
 
 uses
   SysUtils,
-  Windows,
   testregistry,
   Delphi.IOUring.Atomics;
 
@@ -99,82 +93,7 @@ const
   PATTERN_A = Int64($00000000FFFFFFFF);
   PATTERN_B = Int64(-4294967296); // $FFFFFFFF00000000
 
-type
-  // Waits until all threads of its group have started (when AReady is not
-  // nil), then runs FWork
-  TWorkerThread = class(TThread)
-  private
-    FIndex: Integer;
-    FCount: Integer;
-    FReady: PInteger;
-    FWork: TWorkMethod;
-  protected
-    procedure Execute; override;
-  public
-    constructor Create(const AIndex, ACount: Integer; const AReady: PInteger; const AWork: TWorkMethod);
-  end;
-
-constructor TWorkerThread.Create(const AIndex, ACount: Integer; const AReady: PInteger; const AWork: TWorkMethod);
-begin
-  FIndex := AIndex;
-  FCount := ACount;
-  FReady := AReady;
-  FWork := AWork;
-  inherited Create(True);
-end;
-
-procedure TWorkerThread.Execute;
-begin
-  if FReady <> nil then
-  begin
-    TAtomic.Increment(FReady^);
-    while TAtomic.LoadAcquire(FReady^) < FCount do
-      TThread.Yield;
-  end;
-  FWork(FIndex);
-end;
-
-// Busy for AMicroseconds, without giving up the CPU
-procedure SpinMicroseconds(const AMicroseconds: Int64);
-var
-  LFrequency: TLargeInteger;
-  LStart: TLargeInteger;
-  LNow: TLargeInteger;
-begin
-  LNow := 0;
-  QueryPerformanceFrequency(LFrequency);
-  QueryPerformanceCounter(LStart);
-  repeat
-    TAtomic.CpuPause;
-    QueryPerformanceCounter(LNow);
-  until (LNow - LStart) * 1000000 >= AMicroseconds * LFrequency;
-end;
-
 { TAtomicTests }
-
-procedure TAtomicTests.RunThreads(const ACount: Integer; const AWork: TWorkMethod);
-var
-  LThreads: array of TWorkerThread;
-  LReady: Integer;
-  LIndex: Integer;
-begin
-  LReady := 0;
-  SetLength(LThreads, ACount);
-  for LIndex := 0 to ACount - 1 do
-    LThreads[LIndex] := TWorkerThread.Create(LIndex, ACount, @LReady, AWork);
-  try
-    for LIndex := 0 to ACount - 1 do
-      LThreads[LIndex].Start;
-    for LIndex := 0 to ACount - 1 do
-      LThreads[LIndex].WaitFor;
-    for LIndex := 0 to ACount - 1 do
-      if LThreads[LIndex].FatalException <> nil then
-        Fail(Format('Thread %d: %s', [LIndex, Exception(LThreads[LIndex].FatalException).Message]));
-  finally
-    for LIndex := 0 to ACount - 1 do
-      LThreads[LIndex].Free;
-  end;
-end;
 
 procedure TAtomicTests.SetUp;
 begin

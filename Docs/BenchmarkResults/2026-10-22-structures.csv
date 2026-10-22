@@ -1,0 +1,289 @@
+timestamp,compiler,platform,structure,variant,scenario,threads,run,pairs_per_s,cpu_ms
+2026-10-22 14:44:59,Delphi,Win64,free list,lock-free,tight,1,1,60592290,62.5
+2026-10-22 14:44:59,Delphi,Win64,free list,SRW lock,tight,1,1,45060776,93.8
+2026-10-22 14:44:59,Delphi,Win64,free list,lock-free,tight,1,2,62273286,62.5
+2026-10-22 14:44:59,Delphi,Win64,free list,SRW lock,tight,1,2,45612635,62.5
+2026-10-22 14:44:59,Delphi,Win64,free list,lock-free,tight,1,3,62209366,78.1
+2026-10-22 14:44:59,Delphi,Win64,free list,SRW lock,tight,1,3,43687677,62.5
+2026-10-22 14:44:59,Delphi,Win64,free list,lock-free,tight,2,1,47741242,187.5
+2026-10-22 14:44:59,Delphi,Win64,free list,SRW lock,tight,2,1,41689683,171.9
+2026-10-22 14:44:59,Delphi,Win64,free list,lock-free,tight,2,2,45539933,140.6
+2026-10-22 14:44:59,Delphi,Win64,free list,SRW lock,tight,2,2,42762912,171.9
+2026-10-22 14:45:00,Delphi,Win64,free list,lock-free,tight,2,3,50867287,125.0
+2026-10-22 14:45:00,Delphi,Win64,free list,SRW lock,tight,2,3,43657637,171.9
+2026-10-22 14:45:00,Delphi,Win64,free list,lock-free,tight,4,1,34846848,390.6
+2026-10-22 14:45:00,Delphi,Win64,free list,SRW lock,tight,4,1,30537382,484.4
+2026-10-22 14:45:00,Delphi,Win64,free list,lock-free,tight,4,2,35092337,359.4
+2026-10-22 14:45:00,Delphi,Win64,free list,SRW lock,tight,4,2,27067079,531.3
+2026-10-22 14:45:00,Delphi,Win64,free list,lock-free,tight,4,3,37195462,390.6
+2026-10-22 14:45:00,Delphi,Win64,free list,SRW lock,tight,4,3,27582593,578.1
+2026-10-22 14:45:01,Delphi,Win64,free list,lock-free,tight,8,1,27689326,968.8
+2026-10-22 14:45:01,Delphi,Win64,free list,SRW lock,tight,8,1,14325929,2171.9
+2026-10-22 14:45:01,Delphi,Win64,free list,lock-free,tight,8,2,28186879,906.3
+2026-10-22 14:45:01,Delphi,Win64,free list,SRW lock,tight,8,2,14360749,2156.3
+2026-10-22 14:45:01,Delphi,Win64,free list,lock-free,tight,8,3,26614325,937.5
+2026-10-22 14:45:02,Delphi,Win64,free list,SRW lock,tight,8,3,14812291,2125.0
+2026-10-22 14:45:02,Delphi,Win64,free list,lock-free,tight,16,1,30737547,1531.3
+2026-10-22 14:45:02,Delphi,Win64,free list,SRW lock,tight,16,1,6976286,8968.8
+2026-10-22 14:45:03,Delphi,Win64,free list,lock-free,tight,16,2,30101895,1796.9
+2026-10-22 14:45:03,Delphi,Win64,free list,SRW lock,tight,16,2,6917256,8890.6
+2026-10-22 14:45:03,Delphi,Win64,free list,lock-free,tight,16,3,28816575,1687.5
+2026-10-22 14:45:04,Delphi,Win64,free list,SRW lock,tight,16,3,6969953,8703.1
+2026-10-22 14:45:04,Delphi,Win64,free list,lock-free,tight,28,1,21395273,3500.0
+2026-10-22 14:45:05,Delphi,Win64,free list,SRW lock,tight,28,1,3170647,29937.5
+2026-10-22 14:45:06,Delphi,Win64,free list,lock-free,tight,28,2,13073549,6296.9
+2026-10-22 14:45:07,Delphi,Win64,free list,SRW lock,tight,28,2,2795007,30953.1
+2026-10-22 14:45:07,Delphi,Win64,free list,lock-free,tight,28,3,12734299,6375.0
+2026-10-22 14:45:09,Delphi,Win64,free list,SRW lock,tight,28,3,2792792,32109.4
+2026-10-22 14:45:09,Delphi,Win64,free list,lock-free,work 1 us,1,1,983744,406.3
+2026-10-22 14:45:10,Delphi,Win64,free list,SRW lock,work 1 us,1,1,965209,390.6
+2026-10-22 14:45:10,Delphi,Win64,free list,lock-free,work 1 us,1,2,966328,390.6
+2026-10-22 14:45:10,Delphi,Win64,free list,SRW lock,work 1 us,1,2,972448,390.6
+2026-10-22 14:45:11,Delphi,Win64,free list,lock-free,work 1 us,1,3,943298,437.5
+2026-10-22 14:45:11,Delphi,Win64,free list,SRW lock,work 1 us,1,3,968851,390.6
+2026-10-22 14:45:11,Delphi,Win64,free list,lock-free,work 1 us,2,1,1818670,437.5
+2026-10-22 14:45:12,Delphi,Win64,free list,SRW lock,work 1 us,2,1,1789933,437.5
+2026-10-22 14:45:12,Delphi,Win64,free list,lock-free,work 1 us,2,2,1854427,437.5
+2026-10-22 14:45:12,Delphi,Win64,free list,SRW lock,work 1 us,2,2,1793625,468.8
+2026-10-22 14:45:12,Delphi,Win64,free list,lock-free,work 1 us,2,3,1845793,390.6
+2026-10-22 14:45:13,Delphi,Win64,free list,SRW lock,work 1 us,2,3,1798432,453.1
+2026-10-22 14:45:13,Delphi,Win64,free list,lock-free,work 1 us,4,1,3421084,375.0
+2026-10-22 14:45:13,Delphi,Win64,free list,SRW lock,work 1 us,4,1,3561761,437.5
+2026-10-22 14:45:13,Delphi,Win64,free list,lock-free,work 1 us,4,2,3543680,453.1
+2026-10-22 14:45:13,Delphi,Win64,free list,SRW lock,work 1 us,4,2,3578746,437.5
+2026-10-22 14:45:13,Delphi,Win64,free list,lock-free,work 1 us,4,3,3555050,421.9
+2026-10-22 14:45:13,Delphi,Win64,free list,SRW lock,work 1 us,4,3,3555334,406.3
+2026-10-22 14:45:13,Delphi,Win64,free list,lock-free,work 1 us,8,1,5577089,625.0
+2026-10-22 14:45:13,Delphi,Win64,free list,SRW lock,work 1 us,8,1,3301910,890.6
+2026-10-22 14:45:14,Delphi,Win64,free list,lock-free,work 1 us,8,2,5448033,546.9
+2026-10-22 14:45:14,Delphi,Win64,free list,SRW lock,work 1 us,8,2,3592954,875.0
+2026-10-22 14:45:14,Delphi,Win64,free list,lock-free,work 1 us,8,3,5524328,484.4
+2026-10-22 14:45:14,Delphi,Win64,free list,SRW lock,work 1 us,8,3,3350505,875.0
+2026-10-22 14:45:14,Delphi,Win64,free list,lock-free,work 1 us,16,1,3783794,1703.1
+2026-10-22 14:45:14,Delphi,Win64,free list,SRW lock,work 1 us,16,1,2324500,2734.4
+2026-10-22 14:45:14,Delphi,Win64,free list,lock-free,work 1 us,16,2,3670162,1703.1
+2026-10-22 14:45:14,Delphi,Win64,free list,SRW lock,work 1 us,16,2,2344501,2687.5
+2026-10-22 14:45:15,Delphi,Win64,free list,lock-free,work 1 us,16,3,3964046,1687.5
+2026-10-22 14:45:15,Delphi,Win64,free list,SRW lock,work 1 us,16,3,2406551,2453.1
+2026-10-22 14:45:15,Delphi,Win64,free list,lock-free,work 1 us,28,1,3443710,2828.1
+2026-10-22 14:45:15,Delphi,Win64,free list,SRW lock,work 1 us,28,1,1751947,5312.5
+2026-10-22 14:45:15,Delphi,Win64,free list,lock-free,work 1 us,28,2,3191109,3078.1
+2026-10-22 14:45:15,Delphi,Win64,free list,SRW lock,work 1 us,28,2,1760545,5187.5
+2026-10-22 14:45:16,Delphi,Win64,free list,lock-free,work 1 us,28,3,3264157,2750.0
+2026-10-22 14:45:16,Delphi,Win64,free list,SRW lock,work 1 us,28,3,1751011,5156.3
+2026-10-22 14.45.16,FPC,Win64,free list,lock-free,tight,1,1,50318263,78.1
+2026-10-22 14.45.16,FPC,Win64,free list,SRW lock,tight,1,1,36762003,109.4
+2026-10-22 14.45.16,FPC,Win64,free list,lock-free,tight,1,2,50593205,78.1
+2026-10-22 14.45.16,FPC,Win64,free list,SRW lock,tight,1,2,35660795,109.4
+2026-10-22 14.45.16,FPC,Win64,free list,lock-free,tight,1,3,52179812,78.1
+2026-10-22 14.45.16,FPC,Win64,free list,SRW lock,tight,1,3,37567151,109.4
+2026-10-22 14.45.17,FPC,Win64,free list,lock-free,tight,2,1,40500587,171.9
+2026-10-22 14.45.17,FPC,Win64,free list,SRW lock,tight,2,1,23898717,328.1
+2026-10-22 14.45.17,FPC,Win64,free list,lock-free,tight,2,2,35429584,218.8
+2026-10-22 14.45.17,FPC,Win64,free list,SRW lock,tight,2,2,24938900,312.5
+2026-10-22 14.45.17,FPC,Win64,free list,lock-free,tight,2,3,43931423,171.9
+2026-10-22 14.45.17,FPC,Win64,free list,SRW lock,tight,2,3,25648753,312.5
+2026-10-22 14.45.17,FPC,Win64,free list,lock-free,tight,4,1,30258788,546.9
+2026-10-22 14.45.18,FPC,Win64,free list,SRW lock,tight,4,1,15829735,968.8
+2026-10-22 14.45.18,FPC,Win64,free list,lock-free,tight,4,2,27988469,531.3
+2026-10-22 14.45.18,FPC,Win64,free list,SRW lock,tight,4,2,16274320,1000.0
+2026-10-22 14.45.18,FPC,Win64,free list,lock-free,tight,4,3,36607241,437.5
+2026-10-22 14.45.18,FPC,Win64,free list,SRW lock,tight,4,3,18141001,859.4
+2026-10-22 14.45.18,FPC,Win64,free list,lock-free,tight,8,1,25931592,1203.1
+2026-10-22 14.45.19,FPC,Win64,free list,SRW lock,tight,8,1,8873941,3500.0
+2026-10-22 14.45.19,FPC,Win64,free list,lock-free,tight,8,2,22794491,1218.8
+2026-10-22 14.45.20,FPC,Win64,free list,SRW lock,tight,8,2,8972815,3468.8
+2026-10-22 14.45.20,FPC,Win64,free list,lock-free,tight,8,3,27386943,1109.4
+2026-10-22 14.45.20,FPC,Win64,free list,SRW lock,tight,8,3,9588348,3250.0
+2026-10-22 14.45.20,FPC,Win64,free list,lock-free,tight,16,1,14107307,3671.9
+2026-10-22 14.45.21,FPC,Win64,free list,SRW lock,tight,16,1,4368181,14234.4
+2026-10-22 14.45.22,FPC,Win64,free list,lock-free,tight,16,2,13500970,4140.6
+2026-10-22 14.45.23,FPC,Win64,free list,SRW lock,tight,16,2,4394943,14203.1
+2026-10-22 14.45.23,FPC,Win64,free list,lock-free,tight,16,3,15137009,3609.4
+2026-10-22 14.45.24,FPC,Win64,free list,SRW lock,tight,16,3,4489121,14046.9
+2026-10-22 14.45.24,FPC,Win64,free list,lock-free,tight,28,1,7784411,11843.8
+2026-10-22 14.45.26,FPC,Win64,free list,SRW lock,tight,28,1,2593047,40859.4
+2026-10-22 14.45.26,FPC,Win64,free list,lock-free,tight,28,2,7730462,12000.0
+2026-10-22 14.45.28,FPC,Win64,free list,SRW lock,tight,28,2,2657806,39062.5
+2026-10-22 14.45.28,FPC,Win64,free list,lock-free,tight,28,3,8286386,11546.9
+2026-10-22 14.45.30,FPC,Win64,free list,SRW lock,tight,28,3,2706423,36281.3
+2026-10-22 14.45.30,FPC,Win64,free list,lock-free,work 1 us,1,1,993910,406.3
+2026-10-22 14.45.31,FPC,Win64,free list,SRW lock,work 1 us,1,1,991137,406.3
+2026-10-22 14.45.31,FPC,Win64,free list,lock-free,work 1 us,1,2,975403,406.3
+2026-10-22 14.45.31,FPC,Win64,free list,SRW lock,work 1 us,1,2,980803,406.3
+2026-10-22 14.45.32,FPC,Win64,free list,lock-free,work 1 us,1,3,981390,406.3
+2026-10-22 14.45.32,FPC,Win64,free list,SRW lock,work 1 us,1,3,962937,421.9
+2026-10-22 14.45.32,FPC,Win64,free list,lock-free,work 1 us,2,1,1905442,406.3
+2026-10-22 14.45.33,FPC,Win64,free list,SRW lock,work 1 us,2,1,1790494,453.1
+2026-10-22 14.45.33,FPC,Win64,free list,lock-free,work 1 us,2,2,1888619,406.3
+2026-10-22 14.45.33,FPC,Win64,free list,SRW lock,work 1 us,2,2,1798901,437.5
+2026-10-22 14.45.33,FPC,Win64,free list,lock-free,work 1 us,2,3,1874687,437.5
+2026-10-22 14.45.34,FPC,Win64,free list,SRW lock,work 1 us,2,3,1793336,437.5
+2026-10-22 14.45.34,FPC,Win64,free list,lock-free,work 1 us,4,1,3531354,484.4
+2026-10-22 14.45.34,FPC,Win64,free list,SRW lock,work 1 us,4,1,3590632,437.5
+2026-10-22 14.45.34,FPC,Win64,free list,lock-free,work 1 us,4,2,3579995,437.5
+2026-10-22 14.45.34,FPC,Win64,free list,SRW lock,work 1 us,4,2,3570154,437.5
+2026-10-22 14.45.34,FPC,Win64,free list,lock-free,work 1 us,4,3,3545534,453.1
+2026-10-22 14.45.34,FPC,Win64,free list,SRW lock,work 1 us,4,3,3590149,437.5
+2026-10-22 14.45.34,FPC,Win64,free list,lock-free,work 1 us,8,1,6342662,500.0
+2026-10-22 14.45.34,FPC,Win64,free list,SRW lock,work 1 us,8,1,3383723,875.0
+2026-10-22 14.45.34,FPC,Win64,free list,lock-free,work 1 us,8,2,6007359,500.0
+2026-10-22 14.45.35,FPC,Win64,free list,SRW lock,work 1 us,8,2,3253487,1000.0
+2026-10-22 14.45.35,FPC,Win64,free list,lock-free,work 1 us,8,3,6500577,500.0
+2026-10-22 14.45.35,FPC,Win64,free list,SRW lock,work 1 us,8,3,3346832,906.3
+2026-10-22 14.45.35,FPC,Win64,free list,lock-free,work 1 us,16,1,3716505,1468.8
+2026-10-22 14.45.35,FPC,Win64,free list,SRW lock,work 1 us,16,1,2191745,2765.6
+2026-10-22 14.45.35,FPC,Win64,free list,lock-free,work 1 us,16,2,3550411,1609.4
+2026-10-22 14.45.35,FPC,Win64,free list,SRW lock,work 1 us,16,2,2159781,2750.0
+2026-10-22 14.45.35,FPC,Win64,free list,lock-free,work 1 us,16,3,3476810,1781.3
+2026-10-22 14.45.36,FPC,Win64,free list,SRW lock,work 1 us,16,3,2152563,2875.0
+2026-10-22 14.45.36,FPC,Win64,free list,lock-free,work 1 us,28,1,3258785,3031.3
+2026-10-22 14.45.36,FPC,Win64,free list,SRW lock,work 1 us,28,1,1744223,5562.5
+2026-10-22 14.45.36,FPC,Win64,free list,lock-free,work 1 us,28,2,3264290,3000.0
+2026-10-22 14.45.36,FPC,Win64,free list,SRW lock,work 1 us,28,2,1723576,5640.6
+2026-10-22 14.45.37,FPC,Win64,free list,lock-free,work 1 us,28,3,3207024,3000.0
+2026-10-22 14.45.37,FPC,Win64,free list,SRW lock,work 1 us,28,3,1697830,5203.1
+2026-10-22 14:45:37,Delphi,Win32,free list,lock-free,tight,1,1,43359964,93.8
+2026-10-22 14:45:37,Delphi,Win32,free list,SRW lock,tight,1,1,37876636,109.4
+2026-10-22 14:45:37,Delphi,Win32,free list,lock-free,tight,1,2,39362330,109.4
+2026-10-22 14:45:37,Delphi,Win32,free list,SRW lock,tight,1,2,31144886,109.4
+2026-10-22 14:45:37,Delphi,Win32,free list,lock-free,tight,1,3,40288060,93.8
+2026-10-22 14:45:37,Delphi,Win32,free list,SRW lock,tight,1,3,33748439,125.0
+2026-10-22 14:45:38,Delphi,Win32,free list,lock-free,tight,2,1,37591512,203.1
+2026-10-22 14:45:38,Delphi,Win32,free list,SRW lock,tight,2,1,25864689,312.5
+2026-10-22 14:45:38,Delphi,Win32,free list,lock-free,tight,2,2,42577651,171.9
+2026-10-22 14:45:38,Delphi,Win32,free list,SRW lock,tight,2,2,31059518,250.0
+2026-10-22 14:45:38,Delphi,Win32,free list,lock-free,tight,2,3,45045552,171.9
+2026-10-22 14:45:38,Delphi,Win32,free list,SRW lock,tight,2,3,34171095,218.8
+2026-10-22 14:45:38,Delphi,Win32,free list,lock-free,tight,4,1,47359136,250.0
+2026-10-22 14:45:38,Delphi,Win32,free list,SRW lock,tight,4,1,22647107,656.3
+2026-10-22 14:45:39,Delphi,Win32,free list,lock-free,tight,4,2,42004011,343.8
+2026-10-22 14:45:39,Delphi,Win32,free list,SRW lock,tight,4,2,22829487,687.5
+2026-10-22 14:45:39,Delphi,Win32,free list,lock-free,tight,4,3,40060893,390.6
+2026-10-22 14:45:39,Delphi,Win32,free list,SRW lock,tight,4,3,21311851,734.4
+2026-10-22 14:45:39,Delphi,Win32,free list,lock-free,tight,8,1,35831699,703.1
+2026-10-22 14:45:39,Delphi,Win32,free list,SRW lock,tight,8,1,9952477,3156.3
+2026-10-22 14:45:40,Delphi,Win32,free list,lock-free,tight,8,2,34428741,734.4
+2026-10-22 14:45:40,Delphi,Win32,free list,SRW lock,tight,8,2,9617882,3250.0
+2026-10-22 14:45:40,Delphi,Win32,free list,lock-free,tight,8,3,37295342,703.1
+2026-10-22 14:45:41,Delphi,Win32,free list,SRW lock,tight,8,3,8885039,3515.6
+2026-10-22 14:45:41,Delphi,Win32,free list,lock-free,tight,16,1,24636762,2093.8
+2026-10-22 14:45:42,Delphi,Win32,free list,SRW lock,tight,16,1,3759264,16640.6
+2026-10-22 14:45:42,Delphi,Win32,free list,lock-free,tight,16,2,25252685,1968.8
+2026-10-22 14:45:43,Delphi,Win32,free list,SRW lock,tight,16,2,3694611,16937.5
+2026-10-22 14:45:43,Delphi,Win32,free list,lock-free,tight,16,3,25294523,2062.5
+2026-10-22 14:45:44,Delphi,Win32,free list,SRW lock,tight,16,3,3901548,16031.3
+2026-10-22 14:45:44,Delphi,Win32,free list,lock-free,tight,28,1,25429091,2562.5
+2026-10-22 14:45:46,Delphi,Win32,free list,SRW lock,tight,28,1,2303621,46343.8
+2026-10-22 14:45:46,Delphi,Win32,free list,lock-free,tight,28,2,11985222,7781.3
+2026-10-22 14:45:48,Delphi,Win32,free list,SRW lock,tight,28,2,2321702,46234.4
+2026-10-22 14:45:49,Delphi,Win32,free list,lock-free,tight,28,3,12405858,7562.5
+2026-10-22 14:45:50,Delphi,Win32,free list,SRW lock,tight,28,3,2301557,44890.6
+2026-10-22 14:45:51,Delphi,Win32,free list,lock-free,work 1 us,1,1,985583,390.6
+2026-10-22 14:45:51,Delphi,Win32,free list,SRW lock,work 1 us,1,1,983884,406.3
+2026-10-22 14:45:51,Delphi,Win32,free list,lock-free,work 1 us,1,2,983258,406.3
+2026-10-22 14:45:52,Delphi,Win32,free list,SRW lock,work 1 us,1,2,982654,406.3
+2026-10-22 14:45:52,Delphi,Win32,free list,lock-free,work 1 us,1,3,986670,406.3
+2026-10-22 14:45:53,Delphi,Win32,free list,SRW lock,work 1 us,1,3,976312,375.0
+2026-10-22 14:45:53,Delphi,Win32,free list,lock-free,work 1 us,2,1,1847635,437.5
+2026-10-22 14:45:53,Delphi,Win32,free list,SRW lock,work 1 us,2,1,1792605,437.5
+2026-10-22 14:45:53,Delphi,Win32,free list,lock-free,work 1 us,2,2,1833239,437.5
+2026-10-22 14:45:54,Delphi,Win32,free list,SRW lock,work 1 us,2,2,1784384,453.1
+2026-10-22 14:45:54,Delphi,Win32,free list,lock-free,work 1 us,2,3,1791328,406.3
+2026-10-22 14:45:54,Delphi,Win32,free list,SRW lock,work 1 us,2,3,1783700,437.5
+2026-10-22 14:45:54,Delphi,Win32,free list,lock-free,work 1 us,4,1,3578906,437.5
+2026-10-22 14:45:54,Delphi,Win32,free list,SRW lock,work 1 us,4,1,3575131,437.5
+2026-10-22 14:45:54,Delphi,Win32,free list,lock-free,work 1 us,4,2,3591406,437.5
+2026-10-22 14:45:54,Delphi,Win32,free list,SRW lock,work 1 us,4,2,3573502,437.5
+2026-10-22 14:45:55,Delphi,Win32,free list,lock-free,work 1 us,4,3,3520042,453.1
+2026-10-22 14:45:55,Delphi,Win32,free list,SRW lock,work 1 us,4,3,3547703,437.5
+2026-10-22 14:45:55,Delphi,Win32,free list,lock-free,work 1 us,8,1,5860892,500.0
+2026-10-22 14:45:55,Delphi,Win32,free list,SRW lock,work 1 us,8,1,3116891,1062.5
+2026-10-22 14:45:55,Delphi,Win32,free list,lock-free,work 1 us,8,2,5492393,500.0
+2026-10-22 14:45:55,Delphi,Win32,free list,SRW lock,work 1 us,8,2,3044673,1109.4
+2026-10-22 14:45:55,Delphi,Win32,free list,lock-free,work 1 us,8,3,5481855,500.0
+2026-10-22 14:45:55,Delphi,Win32,free list,SRW lock,work 1 us,8,3,3076568,1125.0
+2026-10-22 14:45:55,Delphi,Win32,free list,lock-free,work 1 us,16,1,3638381,1468.8
+2026-10-22 14:45:56,Delphi,Win32,free list,SRW lock,work 1 us,16,1,2158475,2968.8
+2026-10-22 14:45:56,Delphi,Win32,free list,lock-free,work 1 us,16,2,3332639,1750.0
+2026-10-22 14:45:56,Delphi,Win32,free list,SRW lock,work 1 us,16,2,2112390,2921.9
+2026-10-22 14:45:56,Delphi,Win32,free list,lock-free,work 1 us,16,3,3397230,1750.0
+2026-10-22 14:45:56,Delphi,Win32,free list,SRW lock,work 1 us,16,3,2111799,2765.6
+2026-10-22 14:45:56,Delphi,Win32,free list,lock-free,work 1 us,28,1,3338620,2453.1
+2026-10-22 14:45:57,Delphi,Win32,free list,SRW lock,work 1 us,28,1,1588697,6062.5
+2026-10-22 14:45:57,Delphi,Win32,free list,lock-free,work 1 us,28,2,3088362,3046.9
+2026-10-22 14:45:57,Delphi,Win32,free list,SRW lock,work 1 us,28,2,1558854,6593.8
+2026-10-22 14:45:57,Delphi,Win32,free list,lock-free,work 1 us,28,3,3181211,3000.0
+2026-10-22 14:45:57,Delphi,Win32,free list,SRW lock,work 1 us,28,3,1590846,6375.0
+2026-10-22 14.45.58,FPC,Win32,free list,lock-free,tight,1,1,50620737,78.1
+2026-10-22 14.45.58,FPC,Win32,free list,SRW lock,tight,1,1,41812575,93.8
+2026-10-22 14.45.59,FPC,Win32,free list,lock-free,tight,1,2,50902890,78.1
+2026-10-22 14.45.59,FPC,Win32,free list,SRW lock,tight,1,2,41444764,93.8
+2026-10-22 14.45.59,FPC,Win32,free list,lock-free,tight,1,3,50604726,78.1
+2026-10-22 14.45.59,FPC,Win32,free list,SRW lock,tight,1,3,41773276,93.8
+2026-10-22 14.45.59,FPC,Win32,free list,lock-free,tight,2,1,50221603,140.6
+2026-10-22 14.45.59,FPC,Win32,free list,SRW lock,tight,2,1,38113387,187.5
+2026-10-22 14.45.59,FPC,Win32,free list,lock-free,tight,2,2,50130339,125.0
+2026-10-22 14.45.59,FPC,Win32,free list,SRW lock,tight,2,2,38058267,171.9
+2026-10-22 14.45.59,FPC,Win32,free list,lock-free,tight,2,3,49338859,140.6
+2026-10-22 14.45.59,FPC,Win32,free list,SRW lock,tight,2,3,38345396,203.1
+2026-10-22 14.45.59,FPC,Win32,free list,lock-free,tight,4,1,47360818,281.3
+2026-10-22 14.46.00,FPC,Win32,free list,SRW lock,tight,4,1,25539522,593.8
+2026-10-22 14.46.00,FPC,Win32,free list,lock-free,tight,4,2,48994990,218.8
+2026-10-22 14.46.00,FPC,Win32,free list,SRW lock,tight,4,2,25910092,593.8
+2026-10-22 14.46.00,FPC,Win32,free list,lock-free,tight,4,3,48496605,250.0
+2026-10-22 14.46.00,FPC,Win32,free list,SRW lock,tight,4,3,25363330,625.0
+2026-10-22 14.46.00,FPC,Win32,free list,lock-free,tight,8,1,46338129,515.6
+2026-10-22 14.46.00,FPC,Win32,free list,SRW lock,tight,8,1,12467779,2515.6
+2026-10-22 14.46.01,FPC,Win32,free list,lock-free,tight,8,2,38350175,562.5
+2026-10-22 14.46.01,FPC,Win32,free list,SRW lock,tight,8,2,11048320,2765.6
+2026-10-22 14.46.01,FPC,Win32,free list,lock-free,tight,8,3,37601406,609.4
+2026-10-22 14.46.01,FPC,Win32,free list,SRW lock,tight,8,3,11132138,2781.3
+2026-10-22 14.46.02,FPC,Win32,free list,lock-free,tight,16,1,26389750,1578.1
+2026-10-22 14.46.03,FPC,Win32,free list,SRW lock,tight,16,1,4019398,15656.3
+2026-10-22 14.46.03,FPC,Win32,free list,lock-free,tight,16,2,16090752,3671.9
+2026-10-22 14.46.04,FPC,Win32,free list,SRW lock,tight,16,2,4034007,15671.9
+2026-10-22 14.46.04,FPC,Win32,free list,lock-free,tight,16,3,17298569,3546.9
+2026-10-22 14.46.05,FPC,Win32,free list,SRW lock,tight,16,3,4046781,15687.5
+2026-10-22 14.46.05,FPC,Win32,free list,lock-free,tight,28,1,10757102,8500.0
+2026-10-22 14.46.07,FPC,Win32,free list,SRW lock,tight,28,1,2507739,39718.8
+2026-10-22 14.46.07,FPC,Win32,free list,lock-free,tight,28,2,9934596,9625.0
+2026-10-22 14.46.09,FPC,Win32,free list,SRW lock,tight,28,2,2478446,40671.9
+2026-10-22 14.46.09,FPC,Win32,free list,lock-free,tight,28,3,9956381,9500.0
+2026-10-22 14.46.11,FPC,Win32,free list,SRW lock,tight,28,3,2462297,41140.6
+2026-10-22 14.46.12,FPC,Win32,free list,lock-free,work 1 us,1,1,968202,421.9
+2026-10-22 14.46.12,FPC,Win32,free list,SRW lock,work 1 us,1,1,968546,406.3
+2026-10-22 14.46.12,FPC,Win32,free list,lock-free,work 1 us,1,2,969897,406.3
+2026-10-22 14.46.13,FPC,Win32,free list,SRW lock,work 1 us,1,2,951873,421.9
+2026-10-22 14.46.13,FPC,Win32,free list,lock-free,work 1 us,1,3,969608,390.6
+2026-10-22 14.46.14,FPC,Win32,free list,SRW lock,work 1 us,1,3,970831,406.3
+2026-10-22 14.46.14,FPC,Win32,free list,lock-free,work 1 us,2,1,1860283,437.5
+2026-10-22 14.46.14,FPC,Win32,free list,SRW lock,work 1 us,2,1,1784758,453.1
+2026-10-22 14.46.14,FPC,Win32,free list,lock-free,work 1 us,2,2,1861781,406.3
+2026-10-22 14.46.14,FPC,Win32,free list,SRW lock,work 1 us,2,2,1779391,453.1
+2026-10-22 14.46.15,FPC,Win32,free list,lock-free,work 1 us,2,3,1857864,437.5
+2026-10-22 14.46.15,FPC,Win32,free list,SRW lock,work 1 us,2,3,1786448,437.5
+2026-10-22 14.46.15,FPC,Win32,free list,lock-free,work 1 us,4,1,3577018,437.5
+2026-10-22 14.46.15,FPC,Win32,free list,SRW lock,work 1 us,4,1,3581694,437.5
+2026-10-22 14.46.15,FPC,Win32,free list,lock-free,work 1 us,4,2,3486902,421.9
+2026-10-22 14.46.15,FPC,Win32,free list,SRW lock,work 1 us,4,2,3590825,437.5
+2026-10-22 14.46.15,FPC,Win32,free list,lock-free,work 1 us,4,3,3567988,421.9
+2026-10-22 14.46.16,FPC,Win32,free list,SRW lock,work 1 us,4,3,3596314,421.9
+2026-10-22 14.46.16,FPC,Win32,free list,lock-free,work 1 us,8,1,5903798,484.4
+2026-10-22 14.46.16,FPC,Win32,free list,SRW lock,work 1 us,8,1,5665642,453.1
+2026-10-22 14.46.16,FPC,Win32,free list,lock-free,work 1 us,8,2,6304574,500.0
+2026-10-22 14.46.16,FPC,Win32,free list,SRW lock,work 1 us,8,2,3438198,906.3
+2026-10-22 14.46.16,FPC,Win32,free list,lock-free,work 1 us,8,3,5261981,578.1
+2026-10-22 14.46.16,FPC,Win32,free list,SRW lock,work 1 us,8,3,3101184,1000.0
+2026-10-22 14.46.16,FPC,Win32,free list,lock-free,work 1 us,16,1,3740450,1343.8
+2026-10-22 14.46.16,FPC,Win32,free list,SRW lock,work 1 us,16,1,2085190,3187.5
+2026-10-22 14.46.17,FPC,Win32,free list,lock-free,work 1 us,16,2,3353482,1734.4
+2026-10-22 14.46.17,FPC,Win32,free list,SRW lock,work 1 us,16,2,2051072,2953.1
+2026-10-22 14.46.17,FPC,Win32,free list,lock-free,work 1 us,16,3,3293184,1953.1
+2026-10-22 14.46.17,FPC,Win32,free list,SRW lock,work 1 us,16,3,2082964,3109.4
+2026-10-22 14.46.17,FPC,Win32,free list,lock-free,work 1 us,28,1,3283773,2531.3
+2026-10-22 14.46.17,FPC,Win32,free list,SRW lock,work 1 us,28,1,1619864,6234.4
+2026-10-22 14.46.18,FPC,Win32,free list,lock-free,work 1 us,28,2,3009246,3343.8
+2026-10-22 14.46.18,FPC,Win32,free list,SRW lock,work 1 us,28,2,1584638,6281.3
+2026-10-22 14.46.18,FPC,Win32,free list,lock-free,work 1 us,28,3,2939689,3109.4
+2026-10-22 14.46.18,FPC,Win32,free list,SRW lock,work 1 us,28,3,1618808,6125.0
