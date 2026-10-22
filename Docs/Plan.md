@@ -39,10 +39,11 @@ Source/
     Delphi.IOUring.UnitTests.FPC.lpi/.lpr    FPCUnit console runner (Milestone 2)
     Tests.Backend.Windows.API.Layout.pas     record layouts + helpers
     Tests.Backend.Windows.API.pas            live API calls
-    Tests.Ring.pas
+    Tests.Ring.pas                           the core ring (TIORing)
     Tests.SequentialReader.pas
     Tests.Streams.pas
     TestFileHelpers.pas                      generates deterministic test files
+    TestPlatformHelpers.pas                  files, pipes, page memory for tests
   Benchmarks/
     Delphi.IOUring.Benchmarks.dpr            console app, CSV output
   3rdParty/DUnitX
@@ -90,21 +91,21 @@ Source/
 
 ### Phase 2 – Core abstraction (Layer 1)
 
-- [ ] `Delphi.IOUring.Backend.Custom`: neutral plain records, `EIORingError` (readable texts for `IORING_E_*`), `EIORingNotSupported`, `TIORingCompletion` helpers.
-- [ ] `TWindowsIORing` **custom managed record** per Design §5.2: `Open`/`Close`, not copyable, ref conversion, all `Prepare*`, `Submit` with CQ-space guard, `TryPopCompletion`, `PopCompletions`, `WaitForCompletions`, completion event (pop-until-empty rule), pending-count tracking, cancel + drain in `Close`.
-- [ ] `Delphi.IOUring`: `TIORing` alias, `Available`, `QueryCapabilities`, blocking `ReadAt` / `WriteAt`.
-- [ ] Check generated code (Design §4.1 [VERIFY]): cost of a managed-record local, `const` passing by reference, inlining of `Prepare*`.
-- [ ] Tests (`Tests.Ring`, written against `TIORing` only, so they can later run unchanged on Linux):
-  - [ ] Assigning one ring to another raises; ring is closed automatically at end of scope.
-  - [ ] Prepare until SQ full → `PrepareRead` returns False, no exception.
-  - [ ] 1000 random-offset reads in batches; every completion's data verified; all `UserData` values seen exactly once (out-of-order handling).
-  - [ ] Never triggers `IORING_E_COMPLETION_QUEUE_TOO_FULL`, even when the caller prepares more than the CQ can hold.
-  - [ ] Cancel of an in-flight read.
-  - [ ] `Close` with I/O in flight does not crash or corrupt (buffers freed after ring).
-  - [ ] Error path: read from invalid/closed handle gives failed completion, not exception.
-  - [ ] Write + flush + read-back; drain flag orders a read after a write.
+- [x] `Delphi.IOUring.Backend.Custom`: neutral plain records, `EIORingError` (readable texts for `IORING_E_*`), `EIORingNotSupported`, `TIORingCompletion` helpers.
+- [x] `TWindowsIORing` **custom managed record** per Design §5.2: `Open`/`Close`, not copyable, ref conversion, all `Prepare*`, `Submit` with CQ-space guard, `TryPopCompletion`, `PopCompletions`, `WaitForCompletions`, completion event (pop-until-empty rule), pending-count tracking. `Close` **waits** for in-flight I/O (`CloseIoRing` does not cancel it – found in this phase).
+- [x] `Delphi.IOUring`: `TIORing` alias, `Available`, `QueryCapabilities`, blocking `ReadAt` / `WriteAt`.
+- [x] Check generated code (Design §4.1 [VERIFY]): cost of a managed-record local (+2.3 ns Win32, +1.2 ns Win64), `const` passing by reference (yes), inlining of the public methods (dropped, Design §4).
+- [x] Tests (`Tests.Ring`, 26 tests, written against `TIORing`, so they can later run on Linux; files/pipes come from the new shared `TestPlatformHelpers`):
+  - [x] Assigning one ring to another raises; ring is closed automatically at end of scope.
+  - [x] Prepare until SQ full → `PrepareRead` returns False, no exception.
+  - [x] 1000 random-offset reads in batches; every completion's data verified; all `UserData` values seen exactly once (out-of-order handling).
+  - [x] Never triggers `IORING_E_COMPLETION_QUEUE_TOO_FULL`, even when the caller prepares more than the CQ can hold.
+  - [x] Cancel of an in-flight read.
+  - [x] `Close` with I/O in flight waits for it (buffer written before `Close` returns).
+  - [x] Error path: read on a write-only handle gives a failed completion (`E_ACCESSDENIED`), not an exception.
+  - [x] Write + flush + read-back; drain flag orders a read after a write.
 
-**Done when:** tests green on Win32 and Win64.
+**Done when:** tests green on Win32 and Win64. **Done 2026-10-22** – 77 tests pass on Win32 and Win64 (2 more API tests: `CloseIoRing` and `CancelIoEx` behaviour); the core units also compile with FPC 3.2.2 (i386).
 
 ### Phase 3 – Sequential reader (Layer 2)
 

@@ -16,7 +16,8 @@ interface
 uses
   Winapi.Windows,
   DUnitX.TestFramework,
-  Delphi.IOUring.Backend.Windows.API;
+  Delphi.IOUring.Backend.Windows.API,
+  TestPlatformHelpers;
 
 type
   [TestFixture]
@@ -24,15 +25,9 @@ type
   private
     FPatternFileName: string;
     FRing: HIORING;
-    FHandlesToClose: array of THandle;
-    FFilesToDelete: array of string;
-    FMemoryToFree: array of Pointer;
+    FResources: TTestResources;
 
     function NewRing(const ASubmissionQueueSize: UInt32 = 32; const ACompletionQueueSize: UInt32 = 0): HIORING;
-    function OpenFile(const AFileName: string; const AFlags: DWORD = FILE_FLAG_OVERLAPPED): THandle;
-    function CreateNewFile(const AFlags: DWORD = FILE_FLAG_OVERLAPPED): THandle;
-    function AllocPages(const ASize: NativeUInt): Pointer;
-    procedure OpenPipePair(out AServer, AClient: THandle);
     function PopAll(const ARing: HIORING): TArray<IORING_CQE>;
     function FindCompletion(const ACompletions: TArray<IORING_CQE>; const AUserData: NativeUInt): IORING_CQE;
     procedure CheckPattern(const AFileOffset: UInt64; const ABuffer: Pointer; const ACount: NativeInt);
@@ -88,6 +83,10 @@ type
     procedure ReadFile_AtAndAfterEndOfFile;
     [Test]
     procedure ReadFile_NonOverlappedHandle_Works;
+    [Test]
+    procedure CloseIoRing_WithPendingRead_DoesNotCancelIt;
+    [Test]
+    procedure CancelIoEx_CancelsPendingRingRead;
   end;
 
 implementation
@@ -101,27 +100,6 @@ const
   PATTERN_FILE_SIZE = 256 * 1024;
   WAIT_TIMEOUT_MS = 5000;
 
-function HResultFromWin32(const ACode: DWORD): HRESULT;
-begin
-  if ACode = 0 then
-    Result := S_OK
-  else
-    Result := HRESULT((ACode and $0000FFFF) or (FACILITY_WIN32 shl 16) or $80000000);
-end;
-
-function HrToStr(const AResult: HRESULT): string;
-begin
-  Result := Format('0x%.8x', [Cardinal(AResult)]);
-end;
-
-function PageSize: NativeUInt;
-var
-  LInfo: TSystemInfo;
-begin
-  GetSystemInfo(LInfo);
-  Result := LInfo.dwPageSize;
-end;
-
 { TWindowsIoRingApiTests - helpers }
 
 function TWindowsIoRingApiTests.NewRing(const ASubmissionQueueSize, ACompletionQueueSize: UInt32): HIORING;
@@ -134,56 +112,6 @@ begin
 
   LResult := CreateIoRing(IORING_VERSION_4, LFlags, ASubmissionQueueSize, ACompletionQueueSize, Result);
   Assert.AreEqual(S_OK, LResult, 'CreateIoRing ' + HrToStr(LResult));
-end;
-
-function TWindowsIoRingApiTests.OpenFile(const AFileName: string; const AFlags: DWORD): THandle;
-begin
-  Result := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING,
-    FILE_ATTRIBUTE_NORMAL or AFlags, 0);
-  Assert.AreNotEqual(INVALID_HANDLE_VALUE, Result, 'CreateFile: ' + SysErrorMessage(GetLastError));
-
-  FHandlesToClose := FHandlesToClose + [Result];
-end;
-
-function TWindowsIoRingApiTests.CreateNewFile(const AFlags: DWORD): THandle;
-var
-  LFileName: string;
-begin
-  LFileName := TTestFileHelpers.NewTestFileName('Write');
-  FFilesToDelete := FFilesToDelete + [LFileName];
-
-  Result := CreateFile(PChar(LFileName), GENERIC_READ or GENERIC_WRITE, 0, nil, CREATE_ALWAYS,
-    FILE_ATTRIBUTE_NORMAL or AFlags, 0);
-  Assert.AreNotEqual(INVALID_HANDLE_VALUE, Result, 'CreateFile: ' + SysErrorMessage(GetLastError));
-
-  FHandlesToClose := FHandlesToClose + [Result];
-end;
-
-function TWindowsIoRingApiTests.AllocPages(const ASize: NativeUInt): Pointer;
-begin
-  Result := VirtualAlloc(nil, ASize, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
-  Assert.IsNotNull(Result, 'VirtualAlloc');
-
-  FMemoryToFree := FMemoryToFree + [Result];
-end;
-
-procedure TWindowsIoRingApiTests.OpenPipePair(out AServer, AClient: THandle);
-var
-  LGuid: TGUID;
-  LName: string;
-begin
-  CreateGUID(LGuid);
-  LName := '\\.\pipe\Delphi.IOUring.Tests.' + GUIDToString(LGuid);
-
-  AServer := CreateNamedPipe(PChar(LName), PIPE_ACCESS_DUPLEX or FILE_FLAG_OVERLAPPED,
-    PIPE_TYPE_BYTE or PIPE_READMODE_BYTE or PIPE_WAIT, 1, 4096, 4096, 0, nil);
-  Assert.AreNotEqual(INVALID_HANDLE_VALUE, AServer, 'CreateNamedPipe: ' + SysErrorMessage(GetLastError));
-  FHandlesToClose := FHandlesToClose + [AServer];
-
-  AClient := CreateFile(PChar(LName), GENERIC_READ or GENERIC_WRITE, 0, nil, OPEN_EXISTING,
-    FILE_FLAG_OVERLAPPED, 0);
-  Assert.AreNotEqual(INVALID_HANDLE_VALUE, AClient, 'Pipe client: ' + SysErrorMessage(GetLastError));
-  FHandlesToClose := FHandlesToClose + [AClient];
 end;
 
 function TWindowsIoRingApiTests.PopAll(const ARing: HIORING): TArray<IORING_CQE>;
@@ -231,28 +159,19 @@ end;
 procedure TWindowsIoRingApiTests.Setup;
 begin
   FRing := 0;
-  FHandlesToClose := nil;
-  FFilesToDelete := nil;
-  FMemoryToFree := nil;
+  FResources := TTestResources.Create;
 end;
 
 procedure TWindowsIoRingApiTests.TearDown;
-var
-  LHandle: THandle;
-  LFileName: string;
-  LMemory: Pointer;
 begin
-  // The ring first: closing it ends all its I/O before buffers and handles go away
+  // CloseIoRing does not cancel operations still in flight, so every test
+  // completes or cancels its own I/O before it ends
   if FRing <> 0 then
     CloseIoRing(FRing);
   FRing := 0;
 
-  for LHandle in FHandlesToClose do
-    CloseHandle(LHandle);
-  for LMemory in FMemoryToFree do
-    VirtualFree(LMemory, 0, MEM_RELEASE);
-  for LFileName in FFilesToDelete do
-    TTestFileHelpers.DeleteTestFile(LFileName);
+  FResources.Free;
+  FResources := nil;
 end;
 
 { TWindowsIoRingApiTests - tests }
@@ -355,8 +274,8 @@ var
 begin
   FRing := NewRing;
   LEvent := CreateEvent(nil, False, False, nil);
-  FHandlesToClose := FHandlesToClose + [LEvent];
-  LFile := OpenFile(FPatternFileName);
+  FResources.AddHandle(LEvent);
+  LFile := FResources.OpenFile(FPatternFileName);
 
   Assert.AreEqual(S_OK, SetIoRingCompletionEvent(FRing, LEvent));
   Assert.AreEqual(WAIT_TIMEOUT, WaitForSingleObject(LEvent, 0), 'Signalled before any I/O');
@@ -388,7 +307,7 @@ var
   LCqe: IORING_CQE;
 begin
   FRing := NewRing;
-  LFile := OpenFile(FPatternFileName);
+  LFile := FResources.OpenFile(FPatternFileName);
 
   for LIndex := Low(OFFSETS) to High(OFFSETS) do
     Assert.AreEqual(S_OK, BuildIoRingReadFile(FRing, IoRingHandleRefFromHandle(LFile),
@@ -439,8 +358,8 @@ var
   LCqe: IORING_CQE;
 begin
   FRing := NewRing;
-  LFile := OpenFile(FPatternFileName);
-  LMemory := AllocPages(2 * HALF);
+  LFile := FResources.OpenFile(FPatternFileName);
+  LMemory := FResources.AllocPages(2 * HALF);
 
   LBufferInfos[0].Address := LMemory;
   LBufferInfos[0].Length := HALF;
@@ -481,7 +400,7 @@ var
   LCompletions: TArray<IORING_CQE>;
 begin
   FRing := NewRing;
-  LMemory := AllocPages(PageSize);
+  LMemory := FResources.AllocPages(PageSize);
 
   LBufferInfos[0].Address := LMemory;
   LBufferInfos[0].Length := PageSize;
@@ -507,7 +426,7 @@ var
   LCqe: IORING_CQE;
 begin
   FRing := NewRing;
-  LFile := CreateNewFile;
+  LFile := FResources.CreateNewFile;
   TTestFileHelpers.FillPattern(0, LWriteBuffer, DATA_SIZE);
   FillChar(LReadBuffer, SizeOf(LReadBuffer), 0);
 
@@ -547,8 +466,8 @@ var
 begin
   LPage := PageSize;
   FRing := NewRing;
-  LFile := OpenFile(FPatternFileName, FILE_FLAG_OVERLAPPED or FILE_FLAG_NO_BUFFERING);
-  LMemory := AllocPages(SEGMENT_COUNT * LPage);
+  LFile := FResources.OpenFile(FPatternFileName, FILE_FLAG_OVERLAPPED or FILE_FLAG_NO_BUFFERING);
+  LMemory := FResources.AllocPages(SEGMENT_COUNT * LPage);
 
   // Segments in reverse memory order, to prove the data really is scattered
   FillChar(LSegments, SizeOf(LSegments), 0);
@@ -582,9 +501,9 @@ var
 begin
   LPage := PageSize;
   FRing := NewRing;
-  LFile := CreateNewFile(FILE_FLAG_OVERLAPPED or FILE_FLAG_NO_BUFFERING);
-  LWriteMemory := AllocPages(SEGMENT_COUNT * LPage);
-  LReadMemory := AllocPages(SEGMENT_COUNT * LPage);
+  LFile := FResources.CreateNewFile(FILE_FLAG_OVERLAPPED or FILE_FLAG_NO_BUFFERING);
+  LWriteMemory := FResources.AllocPages(SEGMENT_COUNT * LPage);
+  LReadMemory := FResources.AllocPages(SEGMENT_COUNT * LPage);
 
   FillChar(LSegments, SizeOf(LSegments), 0);
   for LIndex := 0 to SEGMENT_COUNT - 1 do
@@ -620,8 +539,8 @@ begin
   // Building the entry succeeds; the operation itself fails.
   LPage := PageSize;
   FRing := NewRing;
-  LFile := OpenFile(FPatternFileName);  // buffered
-  LMemory := AllocPages(SEGMENT_COUNT * LPage);
+  LFile := FResources.OpenFile(FPatternFileName);  // buffered
+  LMemory := FResources.AllocPages(SEGMENT_COUNT * LPage);
 
   FillChar(LSegments, SizeOf(LSegments), 0);
   LSegments[0].Buffer := UInt64(NativeUInt(LMemory));
@@ -648,7 +567,7 @@ var
   LCancel: IORING_CQE;
 begin
   FRing := NewRing;
-  OpenPipePair(LServer, LClient);
+  FResources.OpenPipePair(LServer, LClient);
 
   // Nobody writes to the pipe, so this read stays pending
   Assert.AreEqual(S_OK, BuildIoRingReadFile(FRing, IoRingHandleRefFromHandle(LClient),
@@ -684,7 +603,7 @@ var
   LResult: HRESULT;
 begin
   FRing := NewRing;
-  OpenPipePair(LServer, LClient);
+  FResources.OpenPipePair(LServer, LClient);
 
   Assert.AreEqual(S_OK, BuildIoRingReadFile(FRing, IoRingHandleRefFromHandle(LClient),
     IoRingBufferRefFromPointer(@LBuffer), SizeOf(LBuffer), 0, 1, IOSQE_FLAGS_NONE));
@@ -715,7 +634,7 @@ var
 begin
   FRing := NewRing(8);
   Assert.AreEqual(S_OK, GetIoRingInfo(FRing, LInfo));
-  LFile := OpenFile(FPatternFileName);
+  LFile := FResources.OpenFile(FPatternFileName);
 
   for LIndex := 1 to Integer(LInfo.SubmissionQueueSize) do
     Assert.AreEqual(S_OK, BuildIoRingReadFile(FRing, IoRingHandleRefFromHandle(LFile),
@@ -755,7 +674,7 @@ var
 begin
   FRing := NewRing(8);
   Assert.AreEqual(S_OK, GetIoRingInfo(FRing, LInfo));
-  LFile := OpenFile(FPatternFileName);
+  LFile := FResources.OpenFile(FPatternFileName);
   LUserData := 0;
 
   // Fill the completion queue without popping anything
@@ -788,13 +707,10 @@ var
   LThreadResult: HRESULT;
   LMainResult: HRESULT;
   LRing: HIORING;
-  LByte: Byte;
-  LWritten: DWORD;
-  LOverlapped: TOverlapped;
 begin
   FRing := NewRing;
   LRing := FRing;
-  OpenPipePair(LServer, LClient);
+  FResources.OpenPipePair(LServer, LClient);
 
   Assert.AreEqual(S_OK, BuildIoRingReadFile(FRing, IoRingHandleRefFromHandle(LClient),
     IoRingBufferRefFromPointer(@LPipeBuffer), SizeOf(LPipeBuffer), 0, 1, IOSQE_FLAGS_NONE));
@@ -816,16 +732,7 @@ begin
     Log('VERIFY: SubmitIoRing while another thread waits in SubmitIoRing returns ' + HrToStr(LMainResult));
 
     // Complete the pipe read so thread 1 returns
-    LByte := 42;
-    FillChar(LOverlapped, SizeOf(LOverlapped), 0);
-    LOverlapped.hEvent := CreateEvent(nil, True, False, nil);
-    try
-      if not WriteFile(LServer, LByte, 1, LWritten, @LOverlapped) then
-        Assert.AreEqual(DWORD(ERROR_IO_PENDING), GetLastError, 'Pipe write');
-      Assert.IsTrue(GetOverlappedResult(LServer, LOverlapped, LWritten, True), 'Pipe write result');
-    finally
-      CloseHandle(LOverlapped.hEvent);
-    end;
+    WriteByteToPipe(LServer, 42);
 
     LThread.WaitFor;
     Log('VERIFY: waiting SubmitIoRing on the other thread returned ' + HrToStr(LThreadResult));
@@ -850,9 +757,9 @@ var
   LCqe: IORING_CQE;
 begin
   LFileName := TTestFileHelpers.CreatePatternFile(FILE_SIZE, 'Eof');
-  FFilesToDelete := FFilesToDelete + [LFileName];
+  FResources.AddFile(LFileName);
   FRing := NewRing;
-  LFile := OpenFile(LFileName);
+  LFile := FResources.OpenFile(LFileName);
 
   // 1: crosses EOF, 2: starts at EOF, 3: starts after EOF
   Assert.AreEqual(S_OK, BuildIoRingReadFile(FRing, IoRingHandleRefFromHandle(LFile),
@@ -890,7 +797,7 @@ var
   LCompletions: TArray<IORING_CQE>;
 begin
   FRing := NewRing;
-  LFile := OpenFile(FPatternFileName, 0);  // no FILE_FLAG_OVERLAPPED
+  LFile := FResources.OpenFile(FPatternFileName, 0);  // no FILE_FLAG_OVERLAPPED
 
   Assert.AreEqual(S_OK, BuildIoRingReadFile(FRing, IoRingHandleRefFromHandle(LFile),
     IoRingBufferRefFromPointer(@LBuffer), SizeOf(LBuffer), 8192, 1, IOSQE_FLAGS_NONE));
@@ -903,6 +810,66 @@ begin
   Assert.AreEqual(S_OK, LCompletions[0].ResultCode);
   Assert.AreEqual(NativeUInt(SizeOf(LBuffer)), LCompletions[0].Information);
   CheckPattern(8192, @LBuffer, SizeOf(LBuffer));
+end;
+
+procedure TWindowsIoRingApiTests.CloseIoRing_WithPendingRead_DoesNotCancelIt;
+var
+  LServer: THandle;
+  LClient: THandle;
+  LRing: HIORING;
+  LRingBuffer: array[0..15] of Byte;
+  LStart: UInt64;
+  LCloseTime: UInt64;
+begin
+  // CloseIoRing returns at once and does NOT cancel an operation that is still
+  // in flight: the kernel writes into the buffer after the ring is closed.
+  // So buffers must stay valid until every submitted operation has completed.
+  LRing := NewRing;
+  FResources.OpenPipePair(LServer, LClient);
+  FillChar(LRingBuffer, SizeOf(LRingBuffer), 0);
+
+  Assert.AreEqual(S_OK, BuildIoRingReadFile(LRing, IoRingHandleRefFromHandle(LClient),
+    IoRingBufferRefFromPointer(@LRingBuffer), SizeOf(LRingBuffer), 0, 1, IOSQE_FLAGS_NONE));
+  Assert.AreEqual(S_OK, SubmitIoRing(LRing, 0, 0, nil));
+  Sleep(50);
+
+  LStart := GetTickCount64;
+  Assert.AreEqual(S_OK, CloseIoRing(LRing));
+  LCloseTime := GetTickCount64 - LStart;
+
+  WriteByteToPipe(LServer, 42);
+  Sleep(50);
+
+  Log(Format('VERIFY: CloseIoRing with a pending read took %d ms; ring buffer[0] afterwards = %d',
+    [LCloseTime, LRingBuffer[0]]));
+
+  Assert.AreEqual(Byte(42), LRingBuffer[0], 'Expected the closed ring''s read to complete into the buffer');
+end;
+
+procedure TWindowsIoRingApiTests.CancelIoEx_CancelsPendingRingRead;
+var
+  LServer: THandle;
+  LClient: THandle;
+  LBuffer: array[0..15] of Byte;
+  LCompletions: TArray<IORING_CQE>;
+begin
+  // CancelIoEx(Handle, nil) cancels all I/O on a handle. Does that include
+  // operations submitted through an IoRing?
+  FRing := NewRing;
+  FResources.OpenPipePair(LServer, LClient);
+
+  Assert.AreEqual(S_OK, BuildIoRingReadFile(FRing, IoRingHandleRefFromHandle(LClient),
+    IoRingBufferRefFromPointer(@LBuffer), SizeOf(LBuffer), 0, 1, IOSQE_FLAGS_NONE));
+  Assert.AreEqual(S_OK, SubmitIoRing(FRing, 0, 0, nil));
+  Sleep(50);
+
+  Assert.IsTrue(CancelIoEx(LClient, nil), 'CancelIoEx: ' + SysErrorMessage(GetLastError));
+  Assert.AreEqual(S_OK, SubmitIoRing(FRing, 1, WAIT_TIMEOUT_MS, nil));
+
+  LCompletions := PopAll(FRing);
+  Assert.AreEqual(1, Length(LCompletions));
+  Log('VERIFY: ring read after CancelIoEx completes with ' + HrToStr(LCompletions[0].ResultCode));
+  Assert.AreEqual(HResultFromWin32(ERROR_OPERATION_ABORTED), LCompletions[0].ResultCode);
 end;
 
 initialization

@@ -72,10 +72,15 @@
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="..\Units\Delphi.IOUring.Backend.Windows.API.pas"/>
+        <DCCReference Include="..\Units\Delphi.IOUring.Backend.Custom.pas"/>
+        <DCCReference Include="..\Units\Delphi.IOUring.Backend.Windows.pas"/>
+        <DCCReference Include="..\Units\Delphi.IOUring.pas"/>
         <DCCReference Include="TestFileHelpers.pas"/>
+        <DCCReference Include="TestPlatformHelpers.pas"/>
         <DCCReference Include="Tests.TestFileHelpers.pas"/>
         <DCCReference Include="Tests.Backend.Windows.API.Layout.pas"/>
         <DCCReference Include="Tests.Backend.Windows.API.pas"/>
+        <DCCReference Include="Tests.Ring.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

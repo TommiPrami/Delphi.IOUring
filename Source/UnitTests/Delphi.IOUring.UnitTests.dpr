@@ -16,10 +16,15 @@ uses
   {$ENDIF}
   DUnitX.TestFramework,
   Delphi.IOUring.Backend.Windows.API in '..\Units\Delphi.IOUring.Backend.Windows.API.pas',
+  Delphi.IOUring.Backend.Custom in '..\Units\Delphi.IOUring.Backend.Custom.pas',
+  Delphi.IOUring.Backend.Windows in '..\Units\Delphi.IOUring.Backend.Windows.pas',
+  Delphi.IOUring in '..\Units\Delphi.IOUring.pas',
   TestFileHelpers in 'TestFileHelpers.pas',
+  TestPlatformHelpers in 'TestPlatformHelpers.pas',
   Tests.TestFileHelpers in 'Tests.TestFileHelpers.pas',
   Tests.Backend.Windows.API.Layout in 'Tests.Backend.Windows.API.Layout.pas',
-  Tests.Backend.Windows.API in 'Tests.Backend.Windows.API.pas';
+  Tests.Backend.Windows.API in 'Tests.Backend.Windows.API.pas',
+  Tests.Ring in 'Tests.Ring.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

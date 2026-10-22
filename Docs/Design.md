@@ -1,10 +1,11 @@
 # Delphi.IOUring – Design Specification
 
-Status: **Draft v0.4** (2026-10-22) – Phase 1 (complete Windows API unit)
-implemented. Things marked **[DECIDE]** need an answer from the project owner;
-things marked **[VERIFY]** must be proven by a spike or unit test before
-building on them, and become **[VERIFIED]** with the answer once a test proves
-them. Decisions already made are listed in §15.
+Status: **Draft v0.5** (2026-10-22) – Phase 1 (complete Windows API unit) and
+Phase 2 (core ring, see the implementation notes in §5.2) implemented. Things
+marked **[DECIDE]** need an answer from the project owner; things marked
+**[VERIFY]** must be proven by a spike or unit test before building on them,
+and become **[VERIFIED]** with the answer once a test proves them. Decisions
+already made are listed in §15.
 
 ---
 
@@ -279,10 +280,17 @@ microseconds. So:
    {$IFDEF MSWINDOWS} TIORing = TWindowsIORing; {$ENDIF}
    {$IFDEF LINUX}     TIORing = TLinuxIORing;   {$ENDIF}
    ```
-   Both records expose the same set of methods. Calls are direct and can be
-   `inline`d. No interfaces (no ref-count traffic), no anonymous methods, no
+   Both records expose the same set of methods. Calls are direct (no virtual
+   dispatch). No interfaces (no ref-count traffic), no anonymous methods, no
    `TObject` per request on the hot path. The shared unit tests are compiled
    against `TIORing`, which keeps the two implementations honest.
+
+   **`inline` – decided in Phase 2:** the public methods are **not** `inline`.
+   User code reaches them through the aliases in `Delphi.IOUring`, and Delphi
+   expands an inline routine only if the caller also lists the unit that
+   implements it; otherwise every call site gets hint H2443. A normal call
+   costs about 1 ns next to the 50–100 ns of the Windows `Build*` call it
+   wraps. `inline` stays on private helpers inside the units.
 2. **Records instead of objects** – see §4.1.
 3. **Batching is the main lever.** `PrepareRead` does not submit; `Submit`
    does. `PopCompletions(var Buffer: array of TIORingCompletion): Integer`
@@ -337,9 +345,15 @@ Rules for the managed (owning) records:
   `Initialize(var)`, `Finalize(var)`, `Copy(constref; var)`). This is one of
   the few places where `{$IFDEF FPC}` is accepted, inside the record
   declaration only.
-- [VERIFY] in Phase 2: generated code for a managed record local on Win32 and
-  Win64 (cost of the implicit frame), and that `const` parameters of a
-  managed record type are passed by reference in both compilers.
+- **[VERIFIED]** in Phase 2 (Delphi 13, Release build, micro-benchmark):
+  a routine with a local `TIORing` costs **+2.3 ns per call on Win32 and
+  +1.2 ns on Win64** compared to the same routine with a plain record (the
+  implicit `try/finally`, `Initialize`, `Finalize` → `Close` on a closed ring,
+  and the dynamic-array field). Fine for owners, too much for per-operation
+  values – as planned. A plain `const` parameter of type `TIORing` is passed
+  by reference (no copy, no `Assign`), the same as `const [ref]`; tested in
+  Delphi. FPC 3.2.2 compiles the operator declarations; its runtime behaviour
+  is tested in Milestone 2.
 
 ### 4.2 Lighter alternatives to RTL classes (idea for later)
 
@@ -519,6 +533,48 @@ Design rules:
   `IORING_E_COMPLETION_QUEUE_TOO_FULL` instead of reacting to it.
 - `Submit` with a wait that times out is not an error; it returns normally
   and the caller pops whatever arrived.
+
+#### Implementation notes (Phase 2)
+
+The code (`Delphi.IOUring.Backend.Windows.pas`, `Delphi.IOUring.pas`) is the
+reference; this is what it does where the draft above was open or differs:
+
+- **Close waits.** `CloseIoRing` does **not** cancel operations that are still
+  in flight – the kernel writes into the buffer after the ring is closed
+  (**[VERIFIED]**, test `CloseIoRing_WithPendingRead_DoesNotCancelIt`). So
+  `Close` (and the end of scope) pops and waits, using the completion event,
+  until every submitted operation has completed, then closes. Prepared but not
+  submitted entries are dropped. An operation that may never complete (pipe
+  read) must be cancelled first: `PrepareCancel`, or `CancelIoEx(Handle, nil)`,
+  which **[VERIFIED]** also cancels ring operations. Without that, `Close`
+  waits forever – the only alternative would be freeing memory the kernel is
+  still writing to.
+- **Completion event** is created in `Open` (auto-reset) and always set; `Close`
+  needs it to wait without submitting anything.
+- **Room check:** `Prepare*` returns False when the SQ is full **or** when
+  `PreparedCount + PendingCount` reached the CQ size, so `SubmitIoRing` never
+  fails with `IORING_E_COMPLETION_QUEUE_TOO_FULL` (tested). `Prepare*` on a
+  closed ring raises instead of returning False (no endless retry loop).
+- **Waiting:** `Submit(AWaitCount)` and `WaitForCompletions(ACount)` wait for
+  at most the number of outstanding operations. **[VERIFIED]** the count
+  includes completions already in the CQ (3 queued → a wait for 3 returns at
+  once). `WaitForCompletions` uses the same system call as `Submit`, so it
+  also submits prepared entries.
+- **Zero-copy pop:** `TIORingCompletion` has the layout of `IORING_CQE` and
+  `TIORingBufferInfo` that of `IORING_BUFFER_INFO` (compile-time `{$IF SizeOf}`
+  checks + tests), so completions are popped straight into the caller's record.
+- **Registration arrays are copied** and kept until the ring is idle (nothing
+  prepared, nothing in flight), because the kernel reads them only when the
+  registration runs (tested by spoiling the caller's arrays before Submit).
+- **Scatter/gather:** `TIORingSegment` = `FILE_SEGMENT_ELEMENT`; the caller's
+  segment array is used directly (must stay valid until the completion).
+  **[VERIFIED]** only `SegmentCount` entries are used – no terminating entry.
+- **Copying a ring** raises `EInvalidOpException` (the `Assign` / FPC `Copy`
+  operator). `Open` on an open ring raises `EIORingError`.
+- **`ReadAt` / `WriteAt`** need an idle ring and raise otherwise; `ReadAt`
+  returns 0 at or after EOF.
+- `GetIoRingInfo` on a closed ring handle still returns `S_OK` (it can't be
+  used to check whether a ring is open).
 
 ### 5.3 Sync vs async
 
