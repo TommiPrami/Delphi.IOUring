@@ -56,6 +56,8 @@ type
     procedure NativeTypes_UseMatchingSize;
     [Test]
     procedure BarrierAndPause_Run;
+    [Test]
+    procedure BackOff_DoublesUpToTheLimit;
 
     // Several threads
     [Test]
@@ -342,6 +344,25 @@ begin
   TAtomic.FullBarrier;
   TAtomic.CpuPause;
   Assert.Pass;
+end;
+
+procedure TAtomicTests.BackOff_DoublesUpToTheLimit;
+var
+  LPauses: Integer;
+begin
+  LPauses := 1;
+  TAtomic.BackOff(LPauses);
+  Assert.AreEqual(2, LPauses, 'First');
+  TAtomic.BackOff(LPauses);
+  Assert.AreEqual(4, LPauses, 'Second');
+  LPauses := IORING_BACKOFF_MAX_PAUSES div 2;
+  TAtomic.BackOff(LPauses);
+  Assert.AreEqual(IORING_BACKOFF_MAX_PAUSES, LPauses, 'Reaches the limit');
+  TAtomic.BackOff(LPauses);
+  Assert.AreEqual(IORING_BACKOFF_MAX_PAUSES, LPauses, 'Stays at the limit');
+  LPauses := 3;
+  TAtomic.BackOff(LPauses, 5);
+  Assert.AreEqual(5, LPauses, 'Own limit: never more than it');
 end;
 
 procedure TAtomicTests.Stress_Increment32_IsExact;

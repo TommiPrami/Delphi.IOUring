@@ -78,6 +78,10 @@ const
   // Timeout for TAtomic.WaitWhileEqual: no time limit
   IORING_WAIT_INFINITE = Cardinal($FFFFFFFF);
 
+  // The longest wait of TAtomic.BackOff, in CPU pauses: ~35 µs on a recent
+  // Intel performance core (Docs/Benchmarks.md, "Engine structures")
+  IORING_BACKOFF_MAX_PAUSES = 1024;
+
 type
   // Atomic operations; only class methods, nothing to create.
   //
@@ -148,6 +152,13 @@ type
     // loop.
     class procedure CpuPause; static; {$IFNDEF FPC}inline;{$ENDIF}
 
+    // After a failed compare-exchange (or another lost race): waits APauses
+    // CPU pauses, then doubles APauses, up to AMaxPauses. Start every
+    // operation with APauses = 1. Without it, threads that fail together try
+    // again together and fail again - a lock-free structure then loses badly
+    // to a lock (Docs/Benchmarks.md, "Engine structures").
+    class procedure BackOff(var APauses: Integer; const AMaxPauses: Integer = IORING_BACKOFF_MAX_PAUSES); static;
+
     // Sleeps while ATarget = AExpected, until a WakeOne/WakeAll on ATarget or
     // the timeout. Returns at once if ATarget <> AExpected already. True:
     // woken, or the value differed - possibly also without a reason (a
@@ -163,6 +174,11 @@ type
     class procedure WakeOne(var ATarget); static;
     class procedure WakeAll(var ATarget); static;
   end;
+
+// ASize bytes, zeroed, starting at a cache-line boundary - for data that
+// threads share (lock-free structures). Free with FreeMem(AMemory): AMemory
+// is the block as allocated.
+function IORingAllocCacheAligned(const ASize: NativeUInt; out AMemory: Pointer): Pointer;
 
 implementation
 
@@ -500,6 +516,20 @@ begin
 end;
 {$ENDIF}
 
+class procedure TAtomic.BackOff(var APauses: Integer; const AMaxPauses: Integer);
+var
+  LPause: Integer;
+begin
+  for LPause := 1 to APauses do
+    CpuPause;
+  if APauses < AMaxPauses then
+  begin
+    APauses := APauses * 2;
+    if APauses > AMaxPauses then
+      APauses := AMaxPauses;
+  end;
+end;
+
 class function TAtomic.WaitWhileEqual(var ATarget: Integer; AExpected: Integer;
   ATimeoutMilliseconds: Cardinal): Boolean;
 begin
@@ -521,6 +551,17 @@ end;
 class procedure TAtomic.WakeAll(var ATarget);
 begin
   IORingWakeByAddressAll(@ATarget);
+end;
+
+function IORingAllocCacheAligned(const ASize: NativeUInt; out AMemory: Pointer): Pointer;
+var
+  LAddress: NativeUInt;
+begin
+  GetMem(AMemory, ASize + (IORING_CACHE_LINE_SIZE - 1));
+  LAddress := NativeUInt(AMemory) + NativeUInt(IORING_CACHE_LINE_SIZE - 1);
+  LAddress := LAddress and not NativeUInt(IORING_CACHE_LINE_SIZE - 1);
+  Result := Pointer(LAddress);
+  FillChar(Result^, ASize, 0);
 end;
 
 end.

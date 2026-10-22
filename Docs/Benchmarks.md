@@ -35,6 +35,10 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
   pool is as fast as an SRW lock or faster in every case measured – 1.1–6.7×
   faster with several threads in a tight loop – but only with backoff;
   without it, the lock was up to 4.8× faster.
+- **Request queue (Phase 12):** the lock-free queue from the producers to the
+  I/O thread beats an SRW-lock queue everywhere: 4–23 % with few producers
+  and real work, 3–290× under contention, where the lock starves the
+  consumer.
 
 ## Machine
 
@@ -234,7 +238,7 @@ Two things learned on the way:
 
 ## Engine structures (Phase 11)
 
-Measured 2026-10-22 with `Source/Benchmarks/Delphi.IOUring.Benchmarks.Structures`
+The free list (Phase 11) and the request queue (Phase 12). Measured 2026-10-22 with `Source/Benchmarks/Delphi.IOUring.Benchmarks.Structures`
 (Delphi, Release) and its Free Pascal build (`Build-FPC.ps1 -Project Structures`,
 `-O3`), on an Intel Core i7-14700: 8 performance cores with 2 threads each and
 12 efficiency cores, 28 logical processors. Raw data:
@@ -316,6 +320,66 @@ What was learned on the way:
   sleeps, so with 28 threads it used 31 s of CPU time against 6 s for the
   lock-free stack.
 
+### Request queue (Phase 12)
+
+N producer threads put values in, **one** consumer takes them all out – the
+engine's case (many threads hand requests to one I/O thread). Raw data:
+[2026-10-22-structures-queue.csv](BenchmarkResults/2026-10-22-structures-queue.csv).
+
+- **lock-free**: `TIORingRequestQueue` – Vyukov's bounded queue: one
+  compare-exchange per value on each side, with backoff.
+- **SRW lock**: a ring buffer behind a Windows SRW lock. To give the lock a
+  fair chance, it first looks at the count *without* the lock, so a full or
+  empty queue is answered without taking the lock – what a careful lock-based
+  queue does (the lock-free queue does it by itself).
+- **tight**: producers put values in as fast as they can (when the queue is
+  full, they pause and try again); **work 1 µs**: ~1 µs of work before each
+  value, like preparing a request.
+- 1024 cells. Threads = producers (plus the consumer, so at most 27 here).
+
+Million values per second through the queue, median of 3 runs; CPU = CPU
+time of all threads in one run. Delphi, Win64:
+
+| Producers | tight: lock-free | tight: SRW lock | CPU (lock-free / SRW) | work 1 µs: lock-free | work 1 µs: SRW lock |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | **94.4** | 21.9 | 0.09 / 0.38 s | **0.99** | 0.93 |
+| 2 | **72.5** | 15.4 | 0.17 / 0.80 s | **1.97** | 1.83 |
+| 4 | **62.8** | 4.8 | 0.30 / 4.1 s | **3.94** | 3.20 |
+| 8 | **55.3** | 4.9 | 0.55 / 7.2 s | **6.76** | 3.27 |
+| 16 | **37.7** | 0.15 | 1.6 / 345 s | **4.79** | 0.19 |
+| 27 | **18.3** | 0.07 | 4.4 / 1231 s | **4.67** | 0.07 |
+
+Lock-free ÷ SRW lock in all four builds:
+
+| Build | tight, 1 producer | tight, 2–27 producers | work 1 µs, 1–4 producers | work 1 µs, 8–27 producers |
+| --- | ---: | ---: | ---: | ---: |
+| Delphi Win64 | 4.3 | 4.7–276 | 1.07–1.23 | 2.1–65 |
+| FPC Win64 | 3.0 | 5.7–266 | 1.06–1.19 | 2.0–52 |
+| Delphi Win32 | 3.6 | 5.1–253 | 1.04–1.09 | 2.6–43 |
+| FPC Win32 | 4.8 | 9.3–290 | 1.06–1.09 | 2.5–60 |
+
+**Result: the lock-free queue wins everywhere, so it stays.**
+
+Why the difference is so big:
+
+- **With the lock, the consumer must win the same lock as every producer.**
+  With many producers it seldom gets it, the queue stays full, and the
+  producers spin – with 27 producers the SRW queue moved only 70 000 values
+  per second and used about 20 minutes of CPU time in one run. In the
+  lock-free queue the producers and the consumer use different counters; a
+  busy enqueue side does not stop the consumer.
+- **The "look first" trick made the lock worse with many producers, not
+  better.** A first run without it (raw data:
+  […-queue-lock-without-peek.csv](BenchmarkResults/2026-10-22-structures-queue-lock-without-peek.csv))
+  gave the SRW queue 0.20 instead of 0.07 million values per second at 27
+  producers: when the consumer frees one cell, all waiting producers see it at
+  once and rush for the lock. Against that version, too, the lock-free queue
+  won everywhere (1.05–118×).
+- **With few producers and real work** (the usual case for the engine) the
+  difference is small – 4–23 % – because the queue is then rarely
+  contended. One value through the lock-free queue costs about 11 ns
+  (94 million per second with one producer and one consumer).
+
 ## Known limits of these measurements
 
 - **One machine, one very fast disk.** The NVMe drive has low latency, so
@@ -366,7 +430,8 @@ work scenario, default 200), `--threads` (default 4), `--csv`, `--tune`,
 platform. Close other programs first – background disk or CPU work changes
 the results a lot.
 
-Engine structures (about 30 s per build; options `--runs`, `--threads`, `--csv`):
+Engine structures (free list about 30 s, queue about 5 min per build; options
+`--only freelist|queue`, `--runs`, `--threads`, `--csv`):
 
 ```
 Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Structures.exe --runs 3 --csv structures.csv

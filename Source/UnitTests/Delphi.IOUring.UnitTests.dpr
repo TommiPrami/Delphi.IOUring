@@ -23,6 +23,7 @@ uses
   Delphi.IOUring.Streams in '..\Units\Delphi.IOUring.Streams.pas',
   Delphi.IOUring.Atomics in '..\Units\Delphi.IOUring.Atomics.pas',
   Delphi.IOUring.RequestPool in '..\Units\Delphi.IOUring.RequestPool.pas',
+  Delphi.IOUring.RequestQueue in '..\Units\Delphi.IOUring.RequestQueue.pas',
   TestFileHelpers in 'TestFileHelpers.pas',
   TestPlatformHelpers in 'TestPlatformHelpers.pas',
   Tests.TestFileHelpers in 'Tests.TestFileHelpers.pas',
@@ -33,7 +34,8 @@ uses
   Tests.Streams in 'Tests.Streams.pas',
   TestThreadHelpers in 'TestThreadHelpers.pas',
   Tests.Atomics in 'Tests.Atomics.pas',
-  Tests.RequestPool in 'Tests.RequestPool.pas';
+  Tests.RequestPool in 'Tests.RequestPool.pas',
+  Tests.RequestQueue in 'Tests.RequestQueue.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

@@ -52,6 +52,7 @@ type
     procedure LoadStore_AllTypes;
     procedure NativeTypes_UseMatchingSize;
     procedure BarrierAndPause_Run;
+    procedure BackOff_DoublesUpToTheLimit;
     // Several threads
     procedure Stress_Increment32_IsExact;
     procedure Stress_FetchAdd64_CarriesIntoUpperHalf;
@@ -448,6 +449,25 @@ begin
   TAtomic.FullBarrier;
   TAtomic.CpuPause;
   AssertTrue(True);
+end;
+
+procedure TAtomicTests.BackOff_DoublesUpToTheLimit;
+var
+  LPauses: Integer;
+begin
+  LPauses := 1;
+  TAtomic.BackOff(LPauses);
+  AssertEquals('First', 2, LPauses);
+  TAtomic.BackOff(LPauses);
+  AssertEquals('Second', 4, LPauses);
+  LPauses := IORING_BACKOFF_MAX_PAUSES div 2;
+  TAtomic.BackOff(LPauses);
+  AssertEquals('Reaches the limit', IORING_BACKOFF_MAX_PAUSES, LPauses);
+  TAtomic.BackOff(LPauses);
+  AssertEquals('Stays at the limit', IORING_BACKOFF_MAX_PAUSES, LPauses);
+  LPauses := 3;
+  TAtomic.BackOff(LPauses, 5);
+  AssertEquals('Own limit: never more than it', 5, LPauses);
 end;
 
 procedure TAtomicTests.Stress_Increment32_IsExact;

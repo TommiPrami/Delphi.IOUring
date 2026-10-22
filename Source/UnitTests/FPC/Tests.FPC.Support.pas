@@ -15,6 +15,9 @@ uses
   Classes,
   fpcunit;
 
+const
+  RUN_THREADS_TIMEOUT_MILLISECONDS = 60000;
+
 type
   // Writes one byte to a pipe after a delay (FPC 3.2.2 has no anonymous
   // methods for TThread.CreateAnonymousThread). Create, then Start; WaitFor
@@ -56,8 +59,10 @@ type
   protected
     // Runs AWork(Index) in ACount threads (Index 0..ACount-1) that start at
     // the same moment; returns when all are done. Fails if a thread raised an
-    // exception. AWork must not use Assert*/Check*: count failures and check
-    // them after RunThreads.
+    // exception, or if the threads are not done after
+    // RUN_THREADS_TIMEOUT_MILLISECONDS (an endless loop: those threads cannot
+    // be stopped and are left running). AWork must not use Assert*/Check*:
+    // count failures and check them after RunThreads.
     procedure RunThreads(const ACount: Integer; const AWork: TWorkMethod);
     // Prints a line between the test results (findings worth seeing)
     procedure Log(const AText: string);
@@ -144,24 +149,38 @@ var
 procedure TIORingTestCase.RunThreads(const ACount: Integer; const AWork: TWorkMethod);
 var
   LThreads: array of TWorkerThread;
-  LReady: Integer;
+  LReady: PReadyCount;    // on the heap: stuck threads may outlive this call
   LIndex: Integer;
+  LDeadline: UInt64;
+  LNow: UInt64;
 begin
-  LReady := 0;
+  New(LReady);
+  LReady^ := 0;
   SetLength(LThreads, ACount);
   for LIndex := 0 to ACount - 1 do
-    LThreads[LIndex] := TWorkerThread.Create(LIndex, ACount, @LReady, AWork);
+    LThreads[LIndex] := TWorkerThread.Create(LIndex, ACount, LReady, AWork);
+  for LIndex := 0 to ACount - 1 do
+    LThreads[LIndex].Start;
+
+  LDeadline := GetTickCount64 + RUN_THREADS_TIMEOUT_MILLISECONDS;
+  for LIndex := 0 to ACount - 1 do
+  begin
+    LNow := GetTickCount64;
+    if (LNow >= LDeadline) or
+      (WaitForSingleObject(LThreads[LIndex].Handle, Cardinal(LDeadline - LNow)) <> WAIT_OBJECT_0) then
+      // Left running on purpose (and not freed: freeing waits for them)
+      Fail(Format('Thread %d still runs after %d s: an endless loop?',
+        [LIndex, RUN_THREADS_TIMEOUT_MILLISECONDS div 1000]));
+  end;
+
   try
-    for LIndex := 0 to ACount - 1 do
-      LThreads[LIndex].Start;
-    for LIndex := 0 to ACount - 1 do
-      LThreads[LIndex].WaitFor;
     for LIndex := 0 to ACount - 1 do
       if LThreads[LIndex].FatalException <> nil then
         Fail(Format('Thread %d: %s', [LIndex, Exception(LThreads[LIndex].FatalException).Message]));
   finally
     for LIndex := 0 to ACount - 1 do
       LThreads[LIndex].Free;
+    Dispose(LReady);
   end;
 end;
 

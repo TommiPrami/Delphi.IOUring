@@ -34,6 +34,7 @@ Source/
     Delphi.IOUring.Streams.pas               TStream descendants
     Delphi.IOUring.Atomics.pas               TAtomic: CAS / fences / wait-wake (new)
     Delphi.IOUring.RequestPool.pas           request slots, handles, lock-free free list (new)
+    Delphi.IOUring.RequestQueue.pas          lock-free queue: producers -> I/O thread (new)
     Delphi.IOUring.Engine.pas                I/O thread(s), request pool       (Milestone 3)
   Build-FPC.ps1                              builds/runs the FPC tests or benchmark (no fpc.exe/lazbuild needed; -Optimize)
   UnitTests/
@@ -48,6 +49,7 @@ Source/
     Tests.Streams.pas                        TSequentialReadOnlyFileStream
     Tests.Atomics.pas                        TAtomic, incl. multi-thread stress
     Tests.RequestPool.pas                    free list and request pool, incl. an engine simulation
+    Tests.RequestQueue.pas                   request queue, incl. wrap-around and producer/consumer stress
     TestFileHelpers.pas                      generates deterministic test files
     TestPlatformHelpers.pas                  files, pipes, page memory for tests
     TestThreadHelpers.pas                    starting threads together, busy waiting (Delphi tests)
@@ -56,7 +58,7 @@ Source/
     Bench.Common.pas                         consumer, timing, cache purge, test files (Delphi + FPC)
     Bench.Readers.pas                        reading routines shared with the FPC benchmark
     Bench.Contenders.pas                     the Delphi contender list (anonymous methods, threads)
-    Bench.Structures.pas                     engine structures: lock-free vs lock (Delphi + FPC)
+    Bench.Structures.pas                     engine structures (free list, queue): lock-free vs lock (Delphi + FPC)
     Delphi.IOUring.Benchmarks.Structures.dpr/.dproj   runs Bench.Structures (Delphi)
     FPC/Delphi.IOUring.Benchmarks.FPC.lpr    Free Pascal benchmark: the main contenders
     FPC/Delphi.IOUring.Benchmarks.Structures.FPC.lpr  runs Bench.Structures (FPC)
@@ -200,6 +202,13 @@ Source/
 
   **Done 2026-10-22** – Delphi 158 tests and FPC 144 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 12 – Lock-free request queue**: bounded array queue with per-cell sequence numbers, cache-line padding. Benchmark against an SRW-lock queue; keep whichever wins (Design §10.5).
+  - [x] `Delphi.IOUring.RequestQueue`: `TIORingRequestQueue` – Vyukov's bounded MPMC queue of pointer-sized values; positions on their own cache lines, `NativeUInt` positions that may wrap around (signed differences), backoff (Design §10.8).
+  - [x] `TAtomic.BackOff` and `IORingAllocCacheAligned` moved to `Delphi.IOUring.Atomics` (shared by the free list, the pool and the queue).
+  - [x] Tests `Tests.RequestQueue` / `Tests.FPC.RequestQueue` (12 each): order, full/empty, capacity, laps, wrap-around of the positions (also under load), many producers with one or many consumers (every value once, in order per producer with one consumer). The tests themselves were checked by breaking the queue on purpose (Design §10.8).
+  - [x] `RunThreads` (Delphi and FPC test helpers) fails a test whose threads still run after 60 s, so a broken lock-free structure fails the run instead of hanging it.
+  - [x] Benchmark against an SRW-lock queue (`Bench.Structures`, `--only queue`): **the lock-free queue wins everywhere** – 4–23 % with few producers and real work, up to 290× under contention ([Benchmarks.md](Benchmarks.md#request-queue-phase-12)). It stays.
+
+  **Done 2026-10-22** – Delphi 171 tests and FPC 157 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 13 – Engine with one I/O thread**: I/O thread loop (drain → prepare → one submit → reap → notify), sleep/wake protocol without syscalls when busy, `WaitOnAddress` waiting, `BeginBatch`/`EndBatch`, clean shutdown with requests in flight (every request completes: ok / error / cancelled). Stress test: many producer threads, random reads, all data verified. Stats counters.
 - **Phase 14 – Read stream with block provider**: look-ahead distance, merging adjacent requests (contiguous buffer or scatter), in-order delivery. Benchmark: many small "known in advance" random reads vs `TFileStream` + seek.
 - **Phase 15 – Several I/O threads** (only if Phase 13 benchmarks show one thread is the limit): per-file routing, wake-up policy that avoids thundering herd.
@@ -218,7 +227,9 @@ Source/
 
 ## Immediate next step
 
-Phase 12 – the lock-free request queue (producers → I/O thread): a bounded
-array queue with a sequence number per cell, cache-line padding, and its
-benchmark against an SRW-lock queue in `Bench.Structures` – learning from
-Phase 11: test with backoff from the start.
+Phase 13 – the engine with one I/O thread: it takes requests from the queue
+(Phase 12), prepares and submits them on its ring, reaps the completions and
+wakes the waiting producers through the request pool (Phase 11); it sleeps
+only when there is nothing to do, and producers wake it only then. Before
+starting: decide the request data (the pool's payload) and the engine API
+(Design §10.4).

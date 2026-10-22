@@ -23,6 +23,7 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Free Pascal / Lazarus on Windows | done: FPC 3.2.2, Win32 and Win64, all tests pass, same speed as Delphi |
 | Atomics for the engine (`Delphi.IOUring.Atomics`: CAS, acquire/release, wait/wake) | done, tested (Delphi and FPC) |
 | Request pool for the engine (`Delphi.IOUring.RequestPool`: slots, handles, lock-free free list) | done, tested, benchmarked against a lock |
+| Request queue for the engine (`Delphi.IOUring.RequestQueue`: lock-free, producers → I/O thread) | done, tested, benchmarked against a lock |
 | I/O engine (threads, many requests in flight), write stream | in progress |
 | Linux `io_uring` through Free Pascal | planned |
 

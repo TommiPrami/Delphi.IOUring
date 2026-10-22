@@ -1,0 +1,289 @@
+timestamp,compiler,platform,structure,variant,scenario,threads,run,ops_per_s,cpu_ms
+2026-10-22 15:57:28,Delphi,Win64,queue,lock-free,tight,1,1,86374433,93.8
+2026-10-22 15:57:28,Delphi,Win64,queue,SRW lock,tight,1,1,22931835,343.8
+2026-10-22 15:57:28,Delphi,Win64,queue,lock-free,tight,1,2,90501833,93.8
+2026-10-22 15:57:28,Delphi,Win64,queue,SRW lock,tight,1,2,24147153,343.8
+2026-10-22 15:57:28,Delphi,Win64,queue,lock-free,tight,1,3,107264487,62.5
+2026-10-22 15:57:28,Delphi,Win64,queue,SRW lock,tight,1,3,26042175,312.5
+2026-10-22 15:57:29,Delphi,Win64,queue,lock-free,tight,2,1,84137902,125.0
+2026-10-22 15:57:29,Delphi,Win64,queue,SRW lock,tight,2,1,21618350,562.5
+2026-10-22 15:57:29,Delphi,Win64,queue,lock-free,tight,2,2,63361318,187.5
+2026-10-22 15:57:29,Delphi,Win64,queue,SRW lock,tight,2,2,23197954,500.0
+2026-10-22 15:57:29,Delphi,Win64,queue,lock-free,tight,2,3,80531508,125.0
+2026-10-22 15:57:29,Delphi,Win64,queue,SRW lock,tight,2,3,21111187,546.9
+2026-10-22 15:57:29,Delphi,Win64,queue,lock-free,tight,4,1,65395808,234.4
+2026-10-22 15:57:29,Delphi,Win64,queue,SRW lock,tight,4,1,19737199,1000.0
+2026-10-22 15:57:30,Delphi,Win64,queue,lock-free,tight,4,2,70100419,281.3
+2026-10-22 15:57:30,Delphi,Win64,queue,SRW lock,tight,4,2,19664233,968.8
+2026-10-22 15:57:30,Delphi,Win64,queue,lock-free,tight,4,3,60422961,281.3
+2026-10-22 15:57:30,Delphi,Win64,queue,SRW lock,tight,4,3,15447296,1265.6
+2026-10-22 15:57:30,Delphi,Win64,queue,lock-free,tight,8,1,55543984,531.3
+2026-10-22 15:57:32,Delphi,Win64,queue,SRW lock,tight,8,1,2741048,12781.3
+2026-10-22 15:57:32,Delphi,Win64,queue,lock-free,tight,8,2,57013355,593.8
+2026-10-22 15:57:33,Delphi,Win64,queue,SRW lock,tight,8,2,2532638,13687.5
+2026-10-22 15:57:33,Delphi,Win64,queue,lock-free,tight,8,3,48296930,562.5
+2026-10-22 15:57:35,Delphi,Win64,queue,SRW lock,tight,8,3,2182894,16093.8
+2026-10-22 15:57:35,Delphi,Win64,queue,lock-free,tight,16,1,44034920,1187.5
+2026-10-22 15:57:43,Delphi,Win64,queue,SRW lock,tight,16,1,491870,136984.4
+2026-10-22 15:57:44,Delphi,Win64,queue,lock-free,tight,16,2,32315137,1796.9
+2026-10-22 15:57:53,Delphi,Win64,queue,SRW lock,tight,16,2,409026,162984.4
+2026-10-22 15:57:53,Delphi,Win64,queue,lock-free,tight,16,3,29354782,1984.4
+2026-10-22 15:58:03,Delphi,Win64,queue,SRW lock,tight,16,3,433577,153296.9
+2026-10-22 15:58:03,Delphi,Win64,queue,lock-free,tight,27,1,15580313,4656.3
+2026-10-22 15:58:23,Delphi,Win64,queue,SRW lock,tight,27,1,197523,544312.5
+2026-10-22 15:58:23,Delphi,Win64,queue,lock-free,tight,27,2,20581722,2828.1
+2026-10-22 15:58:44,Delphi,Win64,queue,SRW lock,tight,27,2,198124,540656.3
+2026-10-22 15:58:44,Delphi,Win64,queue,lock-free,tight,27,3,15872496,5062.5
+2026-10-22 15:59:04,Delphi,Win64,queue,SRW lock,tight,27,3,196655,545265.6
+2026-10-22 15:59:05,Delphi,Win64,queue,lock-free,work 1 us,1,1,990344,812.5
+2026-10-22 15:59:05,Delphi,Win64,queue,SRW lock,work 1 us,1,1,838613,921.9
+2026-10-22 15:59:05,Delphi,Win64,queue,lock-free,work 1 us,1,2,987096,812.5
+2026-10-22 15:59:06,Delphi,Win64,queue,SRW lock,work 1 us,1,2,834164,968.8
+2026-10-22 15:59:06,Delphi,Win64,queue,lock-free,work 1 us,1,3,996666,812.5
+2026-10-22 15:59:07,Delphi,Win64,queue,SRW lock,work 1 us,1,3,840329,937.5
+2026-10-22 15:59:07,Delphi,Win64,queue,lock-free,work 1 us,2,1,1958691,609.4
+2026-10-22 15:59:07,Delphi,Win64,queue,SRW lock,work 1 us,2,1,1672954,703.1
+2026-10-22 15:59:07,Delphi,Win64,queue,lock-free,work 1 us,2,2,1975650,578.1
+2026-10-22 15:59:08,Delphi,Win64,queue,SRW lock,work 1 us,2,2,1658884,750.0
+2026-10-22 15:59:08,Delphi,Win64,queue,lock-free,work 1 us,2,3,1932909,609.4
+2026-10-22 15:59:08,Delphi,Win64,queue,SRW lock,work 1 us,2,3,1676362,703.1
+2026-10-22 15:59:08,Delphi,Win64,queue,lock-free,work 1 us,4,1,3730682,468.8
+2026-10-22 15:59:08,Delphi,Win64,queue,SRW lock,work 1 us,4,1,3006863,625.0
+2026-10-22 15:59:08,Delphi,Win64,queue,lock-free,work 1 us,4,2,3924031,546.9
+2026-10-22 15:59:09,Delphi,Win64,queue,SRW lock,work 1 us,4,2,3096431,625.0
+2026-10-22 15:59:09,Delphi,Win64,queue,lock-free,work 1 us,4,3,3944423,468.8
+2026-10-22 15:59:09,Delphi,Win64,queue,SRW lock,work 1 us,4,3,3052946,703.1
+2026-10-22 15:59:09,Delphi,Win64,queue,lock-free,work 1 us,8,1,6856124,421.9
+2026-10-22 15:59:09,Delphi,Win64,queue,SRW lock,work 1 us,8,1,3500022,953.1
+2026-10-22 15:59:09,Delphi,Win64,queue,lock-free,work 1 us,8,2,7060028,484.4
+2026-10-22 15:59:09,Delphi,Win64,queue,SRW lock,work 1 us,8,2,3949603,828.1
+2026-10-22 15:59:09,Delphi,Win64,queue,lock-free,work 1 us,8,3,7089559,546.9
+2026-10-22 15:59:09,Delphi,Win64,queue,SRW lock,work 1 us,8,3,2552909,1375.0
+2026-10-22 15:59:09,Delphi,Win64,queue,lock-free,work 1 us,16,1,5471881,765.6
+2026-10-22 15:59:10,Delphi,Win64,queue,SRW lock,work 1 us,16,1,664419,9843.8
+2026-10-22 15:59:10,Delphi,Win64,queue,lock-free,work 1 us,16,2,5336108,1218.8
+2026-10-22 15:59:11,Delphi,Win64,queue,SRW lock,work 1 us,16,2,616107,11031.3
+2026-10-22 15:59:11,Delphi,Win64,queue,lock-free,work 1 us,16,3,5424611,1140.6
+2026-10-22 15:59:11,Delphi,Win64,queue,SRW lock,work 1 us,16,3,639373,10406.3
+2026-10-22 15:59:12,Delphi,Win64,queue,lock-free,work 1 us,27,1,3638512,2062.5
+2026-10-22 15:59:13,Delphi,Win64,queue,SRW lock,work 1 us,27,1,229496,45734.4
+2026-10-22 15:59:13,Delphi,Win64,queue,lock-free,work 1 us,27,2,4273452,1953.1
+2026-10-22 15:59:15,Delphi,Win64,queue,SRW lock,work 1 us,27,2,227261,47015.6
+2026-10-22 15:59:15,Delphi,Win64,queue,lock-free,work 1 us,27,3,4189919,2296.9
+2026-10-22 15:59:17,Delphi,Win64,queue,SRW lock,work 1 us,27,3,236791,45218.8
+2026-10-22 15.59.17,FPC,Win64,queue,lock-free,tight,1,1,60086224,125.0
+2026-10-22 15.59.17,FPC,Win64,queue,SRW lock,tight,1,1,23306899,359.4
+2026-10-22 15.59.17,FPC,Win64,queue,lock-free,tight,1,2,61075229,125.0
+2026-10-22 15.59.18,FPC,Win64,queue,SRW lock,tight,1,2,23286682,343.8
+2026-10-22 15.59.18,FPC,Win64,queue,lock-free,tight,1,3,99157164,62.5
+2026-10-22 15.59.18,FPC,Win64,queue,SRW lock,tight,1,3,24739463,343.8
+2026-10-22 15.59.18,FPC,Win64,queue,lock-free,tight,2,1,75305458,125.0
+2026-10-22 15.59.18,FPC,Win64,queue,SRW lock,tight,2,1,22995775,515.6
+2026-10-22 15.59.18,FPC,Win64,queue,lock-free,tight,2,2,76440911,171.9
+2026-10-22 15.59.18,FPC,Win64,queue,SRW lock,tight,2,2,23652964,500.0
+2026-10-22 15.59.18,FPC,Win64,queue,lock-free,tight,2,3,73472687,125.0
+2026-10-22 15.59.18,FPC,Win64,queue,SRW lock,tight,2,3,20825524,562.5
+2026-10-22 15.59.19,FPC,Win64,queue,lock-free,tight,4,1,61911838,265.6
+2026-10-22 15.59.19,FPC,Win64,queue,SRW lock,tight,4,1,10038422,1921.9
+2026-10-22 15.59.19,FPC,Win64,queue,lock-free,tight,4,2,64779426,296.9
+2026-10-22 15.59.19,FPC,Win64,queue,SRW lock,tight,4,2,10172009,1937.5
+2026-10-22 15.59.19,FPC,Win64,queue,lock-free,tight,4,3,63845749,265.6
+2026-10-22 15.59.20,FPC,Win64,queue,SRW lock,tight,4,3,13040020,1500.0
+2026-10-22 15.59.20,FPC,Win64,queue,lock-free,tight,8,1,47643437,671.9
+2026-10-22 15.59.21,FPC,Win64,queue,SRW lock,tight,8,1,3008349,11875.0
+2026-10-22 15.59.21,FPC,Win64,queue,lock-free,tight,8,2,52624655,546.9
+2026-10-22 15.59.23,FPC,Win64,queue,SRW lock,tight,8,2,2069070,17156.3
+2026-10-22 15.59.23,FPC,Win64,queue,lock-free,tight,8,3,52504463,515.6
+2026-10-22 15.59.25,FPC,Win64,queue,SRW lock,tight,8,3,2478390,14343.8
+2026-10-22 15.59.25,FPC,Win64,queue,lock-free,tight,16,1,32678671,1578.1
+2026-10-22 15.59.33,FPC,Win64,queue,SRW lock,tight,16,1,524021,128640.6
+2026-10-22 15.59.33,FPC,Win64,queue,lock-free,tight,16,2,32482561,1671.9
+2026-10-22 15.59.41,FPC,Win64,queue,SRW lock,tight,16,2,495349,136046.9
+2026-10-22 15.59.41,FPC,Win64,queue,lock-free,tight,16,3,27510506,1796.9
+2026-10-22 15.59.49,FPC,Win64,queue,SRW lock,tight,16,3,479739,140187.5
+2026-10-22 15.59.49,FPC,Win64,queue,lock-free,tight,27,1,23440315,3109.4
+2026-10-22 16.00.09,FPC,Win64,queue,SRW lock,tight,27,1,206518,503156.3
+2026-10-22 16.00.09,FPC,Win64,queue,lock-free,tight,27,2,15852618,4359.4
+2026-10-22 16.00.29,FPC,Win64,queue,SRW lock,tight,27,2,205352,505390.6
+2026-10-22 16.00.29,FPC,Win64,queue,lock-free,tight,27,3,18561036,3093.8
+2026-10-22 16.00.48,FPC,Win64,queue,SRW lock,tight,27,3,206296,503968.8
+2026-10-22 16.00.49,FPC,Win64,queue,lock-free,work 1 us,1,1,981321,812.5
+2026-10-22 16.00.49,FPC,Win64,queue,SRW lock,work 1 us,1,1,838453,937.5
+2026-10-22 16.00.50,FPC,Win64,queue,lock-free,work 1 us,1,2,991589,812.5
+2026-10-22 16.00.50,FPC,Win64,queue,SRW lock,work 1 us,1,2,841133,953.1
+2026-10-22 16.00.50,FPC,Win64,queue,lock-free,work 1 us,1,3,992457,781.3
+2026-10-22 16.00.51,FPC,Win64,queue,SRW lock,work 1 us,1,3,844969,968.8
+2026-10-22 16.00.51,FPC,Win64,queue,lock-free,work 1 us,2,1,1982583,609.4
+2026-10-22 16.00.51,FPC,Win64,queue,SRW lock,work 1 us,2,1,1685950,687.5
+2026-10-22 16.00.52,FPC,Win64,queue,lock-free,work 1 us,2,2,1937553,609.4
+2026-10-22 16.00.52,FPC,Win64,queue,SRW lock,work 1 us,2,2,1666583,734.4
+2026-10-22 16.00.52,FPC,Win64,queue,lock-free,work 1 us,2,3,1981915,562.5
+2026-10-22 16.00.52,FPC,Win64,queue,SRW lock,work 1 us,2,3,1697296,703.1
+2026-10-22 16.00.52,FPC,Win64,queue,lock-free,work 1 us,4,1,3722731,500.0
+2026-10-22 16.00.52,FPC,Win64,queue,SRW lock,work 1 us,4,1,2951006,625.0
+2026-10-22 16.00.53,FPC,Win64,queue,lock-free,work 1 us,4,2,3694809,546.9
+2026-10-22 16.00.53,FPC,Win64,queue,SRW lock,work 1 us,4,2,3093868,671.9
+2026-10-22 16.00.53,FPC,Win64,queue,lock-free,work 1 us,4,3,3918419,468.8
+2026-10-22 16.00.53,FPC,Win64,queue,SRW lock,work 1 us,4,3,3097725,625.0
+2026-10-22 16.00.53,FPC,Win64,queue,lock-free,work 1 us,8,1,5761945,468.8
+2026-10-22 16.00.53,FPC,Win64,queue,SRW lock,work 1 us,8,1,3743846,953.1
+2026-10-22 16.00.53,FPC,Win64,queue,lock-free,work 1 us,8,2,7057910,453.1
+2026-10-22 16.00.53,FPC,Win64,queue,SRW lock,work 1 us,8,2,3748161,843.8
+2026-10-22 16.00.53,FPC,Win64,queue,lock-free,work 1 us,8,3,7070261,500.0
+2026-10-22 16.00.53,FPC,Win64,queue,SRW lock,work 1 us,8,3,3810068,968.8
+2026-10-22 16.00.54,FPC,Win64,queue,lock-free,work 1 us,16,1,4181170,1125.0
+2026-10-22 16.00.54,FPC,Win64,queue,SRW lock,work 1 us,16,1,681612,9984.4
+2026-10-22 16.00.54,FPC,Win64,queue,lock-free,work 1 us,16,2,5046172,1265.6
+2026-10-22 16.00.55,FPC,Win64,queue,SRW lock,work 1 us,16,2,683561,10015.6
+2026-10-22 16.00.55,FPC,Win64,queue,lock-free,work 1 us,16,3,5263504,1171.9
+2026-10-22 16.00.55,FPC,Win64,queue,SRW lock,work 1 us,16,3,638171,10328.1
+2026-10-22 16.00.56,FPC,Win64,queue,lock-free,work 1 us,27,1,4996165,1859.4
+2026-10-22 16.00.57,FPC,Win64,queue,SRW lock,work 1 us,27,1,227639,44875.0
+2026-10-22 16.00.57,FPC,Win64,queue,lock-free,work 1 us,27,2,4790328,2125.0
+2026-10-22 16.00.59,FPC,Win64,queue,SRW lock,work 1 us,27,2,224173,45890.6
+2026-10-22 16.00.59,FPC,Win64,queue,lock-free,work 1 us,27,3,4124590,2218.8
+2026-10-22 16.01.01,FPC,Win64,queue,SRW lock,work 1 us,27,3,224685,45828.1
+2026-10-22 16:01:01,Delphi,Win32,queue,lock-free,tight,1,1,79995200,93.8
+2026-10-22 16:01:01,Delphi,Win32,queue,SRW lock,tight,1,1,22998022,343.8
+2026-10-22 16:01:01,Delphi,Win32,queue,lock-free,tight,1,2,96251023,62.5
+2026-10-22 16:01:02,Delphi,Win32,queue,SRW lock,tight,1,2,22116065,375.0
+2026-10-22 16:01:02,Delphi,Win32,queue,lock-free,tight,1,3,89136490,93.8
+2026-10-22 16:01:02,Delphi,Win32,queue,SRW lock,tight,1,3,24688767,312.5
+2026-10-22 16:01:02,Delphi,Win32,queue,lock-free,tight,2,1,79352484,171.9
+2026-10-22 16:01:02,Delphi,Win32,queue,SRW lock,tight,2,1,18773702,593.8
+2026-10-22 16:01:02,Delphi,Win32,queue,lock-free,tight,2,2,80448905,140.6
+2026-10-22 16:01:02,Delphi,Win32,queue,SRW lock,tight,2,2,17469232,703.1
+2026-10-22 16:01:02,Delphi,Win32,queue,lock-free,tight,2,3,81630987,140.6
+2026-10-22 16:01:03,Delphi,Win32,queue,SRW lock,tight,2,3,18843659,609.4
+2026-10-22 16:01:03,Delphi,Win32,queue,lock-free,tight,4,1,66743422,281.3
+2026-10-22 16:01:03,Delphi,Win32,queue,SRW lock,tight,4,1,9593154,2000.0
+2026-10-22 16:01:03,Delphi,Win32,queue,lock-free,tight,4,2,70121310,218.8
+2026-10-22 16:01:04,Delphi,Win32,queue,SRW lock,tight,4,2,10088425,1968.8
+2026-10-22 16:01:04,Delphi,Win32,queue,lock-free,tight,4,3,58666510,296.9
+2026-10-22 16:01:04,Delphi,Win32,queue,SRW lock,tight,4,3,9687411,2031.3
+2026-10-22 16:01:04,Delphi,Win32,queue,lock-free,tight,8,1,55617353,562.5
+2026-10-22 16:01:06,Delphi,Win32,queue,SRW lock,tight,8,1,2336850,15234.4
+2026-10-22 16:01:06,Delphi,Win32,queue,lock-free,tight,8,2,55949534,500.0
+2026-10-22 16:01:08,Delphi,Win32,queue,SRW lock,tight,8,2,2467894,14390.6
+2026-10-22 16:01:08,Delphi,Win32,queue,lock-free,tight,8,3,48196255,656.3
+2026-10-22 16:01:09,Delphi,Win32,queue,SRW lock,tight,8,3,2334270,14968.8
+2026-10-22 16:01:09,Delphi,Win32,queue,lock-free,tight,16,1,36307854,1203.1
+2026-10-22 16:01:18,Delphi,Win32,queue,SRW lock,tight,16,1,457234,147765.6
+2026-10-22 16:01:18,Delphi,Win32,queue,lock-free,tight,16,2,35504114,1765.6
+2026-10-22 16:01:27,Delphi,Win32,queue,SRW lock,tight,16,2,461015,145765.6
+2026-10-22 16:01:27,Delphi,Win32,queue,lock-free,tight,16,3,30953523,1843.8
+2026-10-22 16:01:36,Delphi,Win32,queue,SRW lock,tight,16,3,452476,148609.4
+2026-10-22 16:01:36,Delphi,Win32,queue,lock-free,tight,27,1,19113770,4578.1
+2026-10-22 16:01:59,Delphi,Win32,queue,SRW lock,tight,27,1,176100,615765.6
+2026-10-22 16:01:59,Delphi,Win32,queue,lock-free,tight,27,2,22197659,3000.0
+2026-10-22 16:02:21,Delphi,Win32,queue,SRW lock,tight,27,2,185914,581265.6
+2026-10-22 16:02:21,Delphi,Win32,queue,lock-free,tight,27,3,20873646,3890.6
+2026-10-22 16:02:43,Delphi,Win32,queue,SRW lock,tight,27,3,177388,607765.6
+2026-10-22 16:02:44,Delphi,Win32,queue,lock-free,work 1 us,1,1,991663,812.5
+2026-10-22 16:02:44,Delphi,Win32,queue,SRW lock,work 1 us,1,1,835103,968.8
+2026-10-22 16:02:45,Delphi,Win32,queue,lock-free,work 1 us,1,2,987847,796.9
+2026-10-22 16:02:45,Delphi,Win32,queue,SRW lock,work 1 us,1,2,854409,937.5
+2026-10-22 16:02:46,Delphi,Win32,queue,lock-free,work 1 us,1,3,993041,812.5
+2026-10-22 16:02:46,Delphi,Win32,queue,SRW lock,work 1 us,1,3,851113,937.5
+2026-10-22 16:02:46,Delphi,Win32,queue,lock-free,work 1 us,2,1,1919017,609.4
+2026-10-22 16:02:46,Delphi,Win32,queue,SRW lock,work 1 us,2,1,1656740,718.8
+2026-10-22 16:02:47,Delphi,Win32,queue,lock-free,work 1 us,2,2,1866516,578.1
+2026-10-22 16:02:47,Delphi,Win32,queue,SRW lock,work 1 us,2,2,1690088,734.4
+2026-10-22 16:02:47,Delphi,Win32,queue,lock-free,work 1 us,2,3,1915067,609.4
+2026-10-22 16:02:47,Delphi,Win32,queue,SRW lock,work 1 us,2,3,1637324,703.1
+2026-10-22 16:02:47,Delphi,Win32,queue,lock-free,work 1 us,4,1,3774760,468.8
+2026-10-22 16:02:48,Delphi,Win32,queue,SRW lock,work 1 us,4,1,3018959,703.1
+2026-10-22 16:02:48,Delphi,Win32,queue,lock-free,work 1 us,4,2,3696960,546.9
+2026-10-22 16:02:48,Delphi,Win32,queue,SRW lock,work 1 us,4,2,2944012,671.9
+2026-10-22 16:02:48,Delphi,Win32,queue,lock-free,work 1 us,4,3,3722073,546.9
+2026-10-22 16:02:48,Delphi,Win32,queue,SRW lock,work 1 us,4,3,3030487,625.0
+2026-10-22 16:02:48,Delphi,Win32,queue,lock-free,work 1 us,8,1,5347951,546.9
+2026-10-22 16:02:48,Delphi,Win32,queue,SRW lock,work 1 us,8,1,2699602,1187.5
+2026-10-22 16:02:48,Delphi,Win32,queue,lock-free,work 1 us,8,2,7134830,500.0
+2026-10-22 16:02:49,Delphi,Win32,queue,SRW lock,work 1 us,8,2,2742450,1296.9
+2026-10-22 16:02:49,Delphi,Win32,queue,lock-free,work 1 us,8,3,7077016,421.9
+2026-10-22 16:02:49,Delphi,Win32,queue,SRW lock,work 1 us,8,3,2126167,1687.5
+2026-10-22 16:02:49,Delphi,Win32,queue,lock-free,work 1 us,16,1,4848720,968.8
+2026-10-22 16:02:50,Delphi,Win32,queue,SRW lock,work 1 us,16,1,540284,12359.4
+2026-10-22 16:02:50,Delphi,Win32,queue,lock-free,work 1 us,16,2,5051462,1265.6
+2026-10-22 16:02:50,Delphi,Win32,queue,SRW lock,work 1 us,16,2,533827,12687.5
+2026-10-22 16:02:50,Delphi,Win32,queue,lock-free,work 1 us,16,3,4719653,1421.9
+2026-10-22 16:02:51,Delphi,Win32,queue,SRW lock,work 1 us,16,3,506466,13296.9
+2026-10-22 16:02:51,Delphi,Win32,queue,lock-free,work 1 us,27,1,4755472,1671.9
+2026-10-22 16:02:53,Delphi,Win32,queue,SRW lock,work 1 us,27,1,215057,50093.8
+2026-10-22 16:02:53,Delphi,Win32,queue,lock-free,work 1 us,27,2,4724912,1859.4
+2026-10-22 16:02:55,Delphi,Win32,queue,SRW lock,work 1 us,27,2,205664,52390.6
+2026-10-22 16:02:55,Delphi,Win32,queue,lock-free,work 1 us,27,3,4749374,2031.3
+2026-10-22 16:02:57,Delphi,Win32,queue,SRW lock,work 1 us,27,3,205605,51734.4
+2026-10-22 16.02.58,FPC,Win32,queue,lock-free,tight,1,1,87644339,93.8
+2026-10-22 16.02.58,FPC,Win32,queue,SRW lock,tight,1,1,19780731,406.3
+2026-10-22 16.02.58,FPC,Win32,queue,lock-free,tight,1,2,81935312,93.8
+2026-10-22 16.02.59,FPC,Win32,queue,SRW lock,tight,1,2,17412047,468.8
+2026-10-22 16.02.59,FPC,Win32,queue,lock-free,tight,1,3,90035339,93.8
+2026-10-22 16.02.59,FPC,Win32,queue,SRW lock,tight,1,3,18352917,437.5
+2026-10-22 16.02.59,FPC,Win32,queue,lock-free,tight,2,1,73328567,140.6
+2026-10-22 16.02.59,FPC,Win32,queue,SRW lock,tight,2,1,15181187,796.9
+2026-10-22 16.02.59,FPC,Win32,queue,lock-free,tight,2,2,74465709,171.9
+2026-10-22 16.02.59,FPC,Win32,queue,SRW lock,tight,2,2,12768049,921.9
+2026-10-22 16.03.00,FPC,Win32,queue,lock-free,tight,2,3,76619546,125.0
+2026-10-22 16.03.00,FPC,Win32,queue,SRW lock,tight,2,3,14104870,843.8
+2026-10-22 16.03.00,FPC,Win32,queue,lock-free,tight,4,1,61745547,312.5
+2026-10-22 16.03.00,FPC,Win32,queue,SRW lock,tight,4,1,7310850,2703.1
+2026-10-22 16.03.01,FPC,Win32,queue,lock-free,tight,4,2,65532947,234.4
+2026-10-22 16.03.01,FPC,Win32,queue,SRW lock,tight,4,2,7577853,2578.1
+2026-10-22 16.03.01,FPC,Win32,queue,lock-free,tight,4,3,63782629,312.5
+2026-10-22 16.03.02,FPC,Win32,queue,SRW lock,tight,4,3,7176948,2765.6
+2026-10-22 16.03.02,FPC,Win32,queue,lock-free,tight,8,1,51833614,609.4
+2026-10-22 16.03.04,FPC,Win32,queue,SRW lock,tight,8,1,1880658,18984.4
+2026-10-22 16.03.04,FPC,Win32,queue,lock-free,tight,8,2,49256837,750.0
+2026-10-22 16.03.06,FPC,Win32,queue,SRW lock,tight,8,2,1913006,18609.4
+2026-10-22 16.03.06,FPC,Win32,queue,lock-free,tight,8,3,51020408,546.9
+2026-10-22 16.03.08,FPC,Win32,queue,SRW lock,tight,8,3,1824021,19421.9
+2026-10-22 16.03.08,FPC,Win32,queue,lock-free,tight,16,1,33716578,1359.4
+2026-10-22 16.03.19,FPC,Win32,queue,SRW lock,tight,16,1,371092,181000.0
+2026-10-22 16.03.19,FPC,Win32,queue,lock-free,tight,16,2,38682101,1281.3
+2026-10-22 16.03.30,FPC,Win32,queue,SRW lock,tight,16,2,376399,178406.3
+2026-10-22 16.03.30,FPC,Win32,queue,lock-free,tight,16,3,35020137,1640.6
+2026-10-22 16.03.40,FPC,Win32,queue,SRW lock,tight,16,3,385655,174312.5
+2026-10-22 16.03.41,FPC,Win32,queue,lock-free,tight,27,1,17496418,4812.5
+2026-10-22 16.04.03,FPC,Win32,queue,SRW lock,tight,27,1,176662,608750.0
+2026-10-22 16.04.04,FPC,Win32,queue,lock-free,tight,27,2,17567111,5656.3
+2026-10-22 16.04.26,FPC,Win32,queue,SRW lock,tight,27,2,174557,615281.3
+2026-10-22 16.04.27,FPC,Win32,queue,lock-free,tight,27,3,20220178,4875.0
+2026-10-22 16.04.49,FPC,Win32,queue,SRW lock,tight,27,3,176351,610593.8
+2026-10-22 16.04.50,FPC,Win32,queue,lock-free,work 1 us,1,1,995052,781.3
+2026-10-22 16.04.50,FPC,Win32,queue,SRW lock,work 1 us,1,1,850890,937.5
+2026-10-22 16.04.51,FPC,Win32,queue,lock-free,work 1 us,1,2,988208,812.5
+2026-10-22 16.04.51,FPC,Win32,queue,SRW lock,work 1 us,1,2,851104,937.5
+2026-10-22 16.04.52,FPC,Win32,queue,lock-free,work 1 us,1,3,985302,812.5
+2026-10-22 16.04.52,FPC,Win32,queue,SRW lock,work 1 us,1,3,853936,937.5
+2026-10-22 16.04.52,FPC,Win32,queue,lock-free,work 1 us,2,1,1755456,656.3
+2026-10-22 16.04.52,FPC,Win32,queue,SRW lock,work 1 us,2,1,1713532,703.1
+2026-10-22 16.04.53,FPC,Win32,queue,lock-free,work 1 us,2,2,1802882,703.1
+2026-10-22 16.04.53,FPC,Win32,queue,SRW lock,work 1 us,2,2,1704274,687.5
+2026-10-22 16.04.53,FPC,Win32,queue,lock-free,work 1 us,2,3,1813212,625.0
+2026-10-22 16.04.53,FPC,Win32,queue,SRW lock,work 1 us,2,3,1710052,703.1
+2026-10-22 16.04.53,FPC,Win32,queue,lock-free,work 1 us,4,1,3383608,531.3
+2026-10-22 16.04.54,FPC,Win32,queue,SRW lock,work 1 us,4,1,3035224,703.1
+2026-10-22 16.04.54,FPC,Win32,queue,lock-free,work 1 us,4,2,3740135,546.9
+2026-10-22 16.04.54,FPC,Win32,queue,SRW lock,work 1 us,4,2,3085896,625.0
+2026-10-22 16.04.54,FPC,Win32,queue,lock-free,work 1 us,4,3,3755551,546.9
+2026-10-22 16.04.54,FPC,Win32,queue,SRW lock,work 1 us,4,3,3084159,625.0
+2026-10-22 16.04.54,FPC,Win32,queue,lock-free,work 1 us,8,1,5232109,562.5
+2026-10-22 16.04.54,FPC,Win32,queue,SRW lock,work 1 us,8,1,2526640,1484.4
+2026-10-22 16.04.54,FPC,Win32,queue,lock-free,work 1 us,8,2,7157812,421.9
+2026-10-22 16.04.55,FPC,Win32,queue,SRW lock,work 1 us,8,2,2084397,1750.0
+2026-10-22 16.04.55,FPC,Win32,queue,lock-free,work 1 us,8,3,7185328,421.9
+2026-10-22 16.04.55,FPC,Win32,queue,SRW lock,work 1 us,8,3,2187442,1671.9
+2026-10-22 16.04.55,FPC,Win32,queue,lock-free,work 1 us,16,1,3224818,1625.0
+2026-10-22 16.04.56,FPC,Win32,queue,SRW lock,work 1 us,16,1,507373,13453.1
+2026-10-22 16.04.56,FPC,Win32,queue,lock-free,work 1 us,16,2,4942299,1312.5
+2026-10-22 16.04.57,FPC,Win32,queue,SRW lock,work 1 us,16,2,460156,14484.4
+2026-10-22 16.04.57,FPC,Win32,queue,lock-free,work 1 us,16,3,4993197,1296.9
+2026-10-22 16.04.58,FPC,Win32,queue,SRW lock,work 1 us,16,3,500024,13187.5
+2026-10-22 16.04.58,FPC,Win32,queue,lock-free,work 1 us,27,1,4385387,1703.1
+2026-10-22 16.05.00,FPC,Win32,queue,SRW lock,work 1 us,27,1,183450,57859.4
+2026-10-22 16.05.00,FPC,Win32,queue,lock-free,work 1 us,27,2,4801599,2062.5
+2026-10-22 16.05.02,FPC,Win32,queue,SRW lock,work 1 us,27,2,180332,59218.8
+2026-10-22 16.05.02,FPC,Win32,queue,lock-free,work 1 us,27,3,4650042,2109.4
+2026-10-22 16.05.05,FPC,Win32,queue,SRW lock,work 1 us,27,3,178293,60265.6

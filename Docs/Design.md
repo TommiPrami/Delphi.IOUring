@@ -5,8 +5,8 @@ Free Pascal 3.2.2 on Windows, Win32 and Win64 (§12.1). Milestone 1 (Phases 1–
 complete Windows API unit, core ring (implementation notes in §5.2),
 sequential reader (notes in §7), read-only stream (notes in §8.1),
 benchmarks ([Benchmarks.md](Benchmarks.md)). Milestone 3 started: the
-atomics unit (Phase 10, notes in §10.6) and the request pool (Phase 11, notes
-in §10.7). Things marked **[DECIDE]**
+atomics unit (Phase 10, notes in §10.6), the request pool (Phase 11, notes
+in §10.7) and the request queue (Phase 12, notes in §10.8). Things marked **[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
 **[VERIFIED]** with the answer once a test proves them. Decisions already made
@@ -238,6 +238,7 @@ barrier. That is the shape of the core API. Everything outside the subset
  │                                    read streams, overlap handling      │
  │   Delphi.IOUring.Atomics           CAS / fences / wait-on-address      │
  │   Delphi.IOUring.RequestPool       request slots, lock-free free list  │
+ │   Delphi.IOUring.RequestQueue      lock-free queue to the I/O thread   │
  ├────────────────────────────────────────────────────────────────────────┤
  │ Layer 1 – Core abstraction (OS independent, records)                   │
  │   Delphi.IOUring.Backend.Custom    shared types, constants, errors     │
@@ -265,6 +266,7 @@ Unit responsibilities:
 | `Delphi.IOUring.Streams` | `TStream` descendants | SequentialReader |
 | `Delphi.IOUring.Atomics` *(new)* | `TAtomic`: one place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5, §10.6) | RTL only |
 | `Delphi.IOUring.RequestPool` *(new)* | `TIORingRequestPool` (request slots, states, handles, waiting) and `TIORingFreeList` (lock-free stack) (§10.3, §10.7) | `Delphi.IOUring`, Atomics |
+| `Delphi.IOUring.RequestQueue` *(new)* | `TIORingRequestQueue`: bounded lock-free queue from the producers to an I/O thread (§10.5, §10.8) | `Delphi.IOUring`, Atomics |
 | `Delphi.IOUring.Engine` *(later)* | §10, §11 | `Delphi.IOUring`, Atomics, RequestPool |
 
 The "all OS-specific code lives in the `Backend.<OS>` units" rule still holds:
@@ -1076,7 +1078,7 @@ shutdown). On the hot path:
 
 | Where | Technique |
 | --- | --- |
-| Producers → I/O thread | **Bounded MPSC/MPMC array queue** with a sequence number per cell (Vyukov style): producers claim a cell with one CAS on the tail counter, the I/O thread reads without CAS. No allocation, fixed memory. |
+| Producers → I/O thread | **Bounded MPSC/MPMC array queue** with a sequence number per cell (Vyukov style): producers claim a cell with one CAS on the tail counter, the I/O thread reads without CAS. No allocation, fixed memory. **Built in Phase 12 as a full MPMC queue (the consumer uses one CAS too), with backoff; it beats an SRW-lock queue everywhere** (§10.8, [Benchmarks.md](Benchmarks.md#request-queue-phase-12)). |
 | Request pool free list | **Lock-free stack** (Treiber) of slot indices. ABA problem solved with a tag/generation in the same word as the index, swapped with one CAS (64-bit CAS on Win32 = `CMPXCHG8B`). Optional per-thread small cache of free slots to avoid contention. **Built in Phase 11, with exponential backoff; it wins or ties against an SRW lock in every case measured** (§10.7, [Benchmarks.md](Benchmarks.md#engine-structures-phase-11)). The per-thread cache is not needed so far. |
 | I/O thread → waiting producer | Per-request **state word**. The waiter spins briefly, then sleeps with `WaitOnAddress` (Windows) / `futex` (Linux). The I/O thread calls `WakeByAddressSingle` only if the "someone is waiting" bit is set – no syscall when nobody sleeps. |
 | I/O thread sleeping | Waits on {request-queue signal, ring completion event}. Producers signal only when the I/O thread has announced it is going to sleep (a flag set with CAS), so a busy engine costs producers no syscall. |
@@ -1230,6 +1232,72 @@ stack behind an SRW lock, the lock-free free list **wins or ties in every
 case** – 1.2–1.4× with one thread, 1.1–6.7× with 2–28 threads in a tight
 loop, the same with 1 µs of work and up to 4 threads, 1.6–2.0× with 8–28
 threads – in Delphi and FPC, Win32 and Win64. **It stays.**
+
+### 10.8 Request queue – implementation notes (Phase 12)
+
+`Delphi.IOUring.RequestQueue` has one managed record, `TIORingRequestQueue`:
+a bounded first-in first-out queue of pointer-sized values (request handles)
+– Dmitry Vyukov's bounded MPMC queue.
+
+- An array of cells (a power of two; `Open` rounds up) and two position
+  counters that only grow: the enqueue position and the dequeue position,
+  each on a cache line of its own.
+- Each cell has a **sequence number** that says whose turn the cell is:
+  `P` = free for the producer of position `P`; `P + 1` = holds the value of
+  position `P`; `P + Capacity` = free again, for the next lap.
+- A producer claims a position with one compare-exchange on the enqueue
+  position, writes the value, and then publishes it by storing the new
+  sequence number (release). A consumer does the same on the dequeue side and
+  stores `P + Capacity` when it has read the value. Producers and consumers
+  touch different counters, so the two sides hardly disturb each other.
+- **Any number of producers and consumers** may use it at once. The engine
+  has one consumer per queue (the I/O thread); a single-consumer version
+  could skip one compare-exchange per value, but the queue would then break
+  silently if a second consumer ever came along – not worth it unless a
+  benchmark shows a need.
+- After a lost race (a failed compare-exchange, or a position another thread
+  took first) the thread backs off with `TAtomic.BackOff` – the lesson of
+  Phase 11.
+- Positions are `NativeUInt`: on Win32 they wrap around after 2^32 values
+  (minutes at full speed, so it *will* happen in a long-running program).
+  All comparisons use the signed difference, which is correct across the
+  wrap-around; `Open` has a parameter for tests to start just before it.
+- `Count` is exact only when the queue is idle; otherwise it is a moment's
+  picture.
+
+Also new in `Delphi.IOUring.Atomics`: `TAtomic.BackOff` (moved from the free
+list, now shared) and `IORingAllocCacheAligned` (cache-line aligned memory,
+used by the pool, the free list and the queue).
+
+Tests: `Tests.RequestQueue` (DUnitX) and `Tests.FPC.RequestQueue` (FPCUnit),
+12 each – order, full and empty, capacity rounding, any value, 10 000 laps
+around the array, the wrap-around of the positions (single-threaded and
+under load), a closed queue; and stress with several producers and one or
+several consumers: every value must come out exactly once, and with one
+consumer in each producer's order. The stress tests give up after 20 s
+(values lost) and `RunThreads` fails a test whose threads still run after
+60 s (an endless loop), so a broken queue fails the run instead of hanging
+it.
+
+**Checking the tests themselves** (by breaking the queue on purpose):
+
+- Producers claiming a position with a plain write instead of a
+  compare-exchange: all five stress tests fail (four with "thread still runs
+  after 60 s", one with "values were lost") – caught, and the run ends.
+- Publishing the cell *before* writing the value: **not caught**. On x86 the
+  two writes leave the CPU one instruction apart and in order, so a consumer
+  almost never reads between them. Such ordering mistakes cannot be found by
+  stress tests on x86; only careful reading of the code (and later AArch64,
+  where memory order is weaker) can find them.
+
+Benchmark (Design rule §10.5, details in
+[Benchmarks.md](Benchmarks.md#request-queue-phase-12)): N producers → one
+consumer, against a ring buffer behind an SRW lock (which first checks
+"full"/"empty" without the lock, to give it a fair chance). The lock-free
+queue **wins everywhere** – 4–23 % with 1–4 producers and 1 µs of work per
+value, 2–65× with 8–27 producers, 3–290× in a tight loop – in Delphi and
+FPC, Win32 and Win64. With the lock, the consumer has to win the same lock
+as every producer and starves when there are many of them. **It stays.**
 
 ---
 

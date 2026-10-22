@@ -9,18 +9,29 @@
     lock-free   TIORingFreeList (Treiber stack, one 64-bit compare-exchange)
     SRW lock    the same stack (an array) behind a Windows SRW lock
   Each thread repeats: take one index, work, give it back.
+
+  Request queue (Phase 12): producers -> one consumer (the I/O thread).
+    lock-free   TIORingRequestQueue (Vyukov's bounded queue)
+    SRW lock    a ring buffer behind a Windows SRW lock
+  N producers put values in, one consumer takes them all out.
+
+  Scenarios:
     tight       no work in between: the worst case for contention
-    work 1 us   ~1 µs of work while holding the index (a request being used)
-  Reported: million take+give pairs per second, all threads together (median
-  of the runs), and the CPU time of all threads.
+    work 1 us   ~1 µs of work per operation (free list: while holding the
+                index; queue: before each value, like preparing a request)
+  Reported: million operations per second, all threads together (median of
+  the runs), and the CPU time of all threads. Free list: one operation = take
+  + give; queue: one value through the queue.
 
   Shared by Delphi (Delphi.IOUring.Benchmarks.Structures.dpr) and Free Pascal
   (FPC\Delphi.IOUring.Benchmarks.Structures.FPC.lpr).
 
   Options:
+    --only <name>      freelist or queue (default: both)
     --runs <n>         runs per case; the median is reported (default 3)
     --threads <list>   thread counts, comma separated (default 1,2,4,8,16 and
-                       the number of logical processors)
+                       the number of logical processors; for the queue these
+                       are producers, at most one less than the processors)
     --csv <file>       append every single run to this CSV file
 }
 
@@ -45,6 +56,7 @@ uses
   Delphi.IOUring,
   Delphi.IOUring.Atomics,
   Delphi.IOUring.RequestPool,
+  Delphi.IOUring.RequestQueue,
   Bench.Common;
 
 {$IFDEF FPC}
@@ -57,17 +69,21 @@ const
 
 const
   FREE_LIST_CAPACITY = 1024;
+  QUEUE_CAPACITY = 1024;
   WORK_MICROSECONDS = 1;
-  // Take+give pairs per case, split between the threads
-  TIGHT_PAIRS = 4000000;
-  WORK_PAIRS = 400000;
+  // Operations per case, split between the threads (queue: the producers)
+  TIGHT_OPERATIONS = 4000000;
+  WORK_OPERATIONS = 400000;
 
 type
-  TFreeListVariant = (fvLockFree, fvSrwLock);
+  TStructure = (stFreeList, stQueue);
+  TContender = (cnLockFree, cnSrwLock);
   TScenario = (scTight, scWork);
 
 const
-  VARIANT_NAMES: array[TFreeListVariant] of string = ('lock-free', 'SRW lock');
+  STRUCTURE_NAMES: array[TStructure] of string = ('free list', 'queue');
+  STRUCTURE_OPTIONS: array[TStructure] of string = ('freelist', 'queue');
+  CONTENDER_NAMES: array[TContender] of string = ('lock-free', 'SRW lock');
   SCENARIO_NAMES: array[TScenario] of string = ('tight', 'work 1 us');
 
 // Windows SRW lock (Vista and newer); own names, so the Windows units'
@@ -78,6 +94,9 @@ procedure BenchReleaseSRWLockExclusive(var ALock: Pointer); stdcall;
   external 'kernel32.dll' name 'ReleaseSRWLockExclusive';
 
 type
+  TNativeUIntArray = array[0..MaxInt div SizeOf(NativeUInt) - 1] of NativeUInt;
+  PNativeUIntArray = ^TNativeUIntArray;
+
   // The same stack as TIORingFreeList, behind an SRW lock. The lock and the
   // count share one cache line of their own (like the lock-free head).
   TLockedFreeList = record
@@ -95,28 +114,68 @@ type
   PLockedFreeList = ^TLockedFreeList;
   PIORingFreeList = ^TIORingFreeList;
 
-  TFreeListWorker = class(TThread)
+  // A ring buffer behind an SRW lock. The lock, the head and the count share
+  // one cache line of their own.
+  TLockedQueue = record
   private
-    FVariant: TFreeListVariant;
-    FLockFree: PIORingFreeList;
-    FLocked: PLockedFreeList;
-    FPairs: Integer;
-    FWorkMicroseconds: Cardinal;
+    FMemory: Pointer;
+    FLock: ^Pointer;
+    FHead: PCardinal;     // the next value to take
+    FCount: PCardinal;
+    FItems: PNativeUIntArray;
+    FMask: Cardinal;
+  public
+    // ACapacity: a power of two
+    procedure Open(const ACapacity: Cardinal);
+    procedure Close;
+    function TryEnqueue(const AValue: NativeUInt): Boolean;
+    function TryDequeue(out AValue: NativeUInt): Boolean;
+  end;
+  PLockedQueue = ^TLockedQueue;
+  PIORingRequestQueue = ^TIORingRequestQueue;
+
+  // A benchmark thread: waits until all threads of the run have started,
+  // then runs Work between StartTime and EndTime
+  TBenchWorker = class(TThread)
+  private
     FReady: PInteger;
     FThreads: Integer;
   protected
+    FContender: TContender;
+    FOperations: Integer;
+    FWorkMicroseconds: Cardinal;
     procedure Execute; override;
+    procedure Work; virtual; abstract;
   public
     StartTime: UInt64;    // microseconds
     EndTime: UInt64;
+    constructor Create(const AContender: TContender; const AOperations: Integer;
+      const AWorkMicroseconds: Cardinal; const AReady: PInteger; const AThreads: Integer);
+  end;
+
+  TFreeListWorker = class(TBenchWorker)
+  protected
+    procedure Work; override;
+  public
+    LockFree: PIORingFreeList;
+    Locked: PLockedFreeList;
     Misses: Integer;      // takes that found the stack empty (should stay 0)
-    constructor Create(const AVariant: TFreeListVariant; const ALockFree: PIORingFreeList;
-      const ALocked: PLockedFreeList; const APairs: Integer; const AWorkMicroseconds: Cardinal;
-      const AReady: PInteger; const AThreads: Integer);
+  end;
+
+  // A producer puts the values 1..Operations in; the consumer takes
+  // Operations values out and adds them up (to check that none was lost)
+  TQueueWorker = class(TBenchWorker)
+  protected
+    procedure Work; override;
+  public
+    LockFree: PIORingRequestQueue;
+    Locked: PLockedQueue;
+    Consumer: Boolean;
+    Sum: UInt64;
   end;
 
   TRunResult = record
-    PairsPerSecond: Double;
+    OperationsPerSecond: Double;
     CpuMilliseconds: Double;
   end;
 
@@ -125,21 +184,19 @@ var
   GRuns: Integer = 3;
   GThreadCounts: array of Integer;
   GCsvFile: string;
+  GStructures: set of TStructure = [stFreeList, stQueue];
 
 { TLockedFreeList }
 
 procedure TLockedFreeList.Open(const ACapacity: Cardinal);
 var
-  LAddress: NativeUInt;
+  LBlock: PByte;
   LIndex: Cardinal;
 begin
-  GetMem(FMemory, IORING_CACHE_LINE_SIZE + ACapacity * SizeOf(Cardinal) + IORING_CACHE_LINE_SIZE);
-  LAddress := NativeUInt(FMemory) + NativeUInt(IORING_CACHE_LINE_SIZE - 1);
-  LAddress := LAddress and not NativeUInt(IORING_CACHE_LINE_SIZE - 1);
-  FLock := Pointer(LAddress);
-  FCount := Pointer(LAddress + SizeOf(Pointer));
-  FItems := Pointer(LAddress + IORING_CACHE_LINE_SIZE);
-  FLock^ := nil;
+  LBlock := IORingAllocCacheAligned(IORING_CACHE_LINE_SIZE + ACapacity * SizeOf(Cardinal), FMemory);
+  FLock := Pointer(LBlock);
+  FCount := Pointer(LBlock + 8);
+  FItems := Pointer(LBlock + IORING_CACHE_LINE_SIZE);
   // Same order as TIORingFreeList: 0 on top
   for LIndex := 0 to ACapacity - 1 do
     FItems^[LIndex] := ACapacity - 1 - LIndex;
@@ -174,117 +231,294 @@ begin
   BenchReleaseSRWLockExclusive(FLock^);
 end;
 
-{ TFreeListWorker }
+{ TLockedQueue }
 
-constructor TFreeListWorker.Create(const AVariant: TFreeListVariant; const ALockFree: PIORingFreeList;
-  const ALocked: PLockedFreeList; const APairs: Integer; const AWorkMicroseconds: Cardinal;
-  const AReady: PInteger; const AThreads: Integer);
+procedure TLockedQueue.Open(const ACapacity: Cardinal);
+var
+  LBlock: PByte;
 begin
-  FVariant := AVariant;
-  FLockFree := ALockFree;
-  FLocked := ALocked;
-  FPairs := APairs;
+  LBlock := IORingAllocCacheAligned(IORING_CACHE_LINE_SIZE + ACapacity * SizeOf(NativeUInt), FMemory);
+  FLock := Pointer(LBlock);
+  FHead := Pointer(LBlock + 8);
+  FCount := Pointer(LBlock + 12);
+  FItems := Pointer(LBlock + IORING_CACHE_LINE_SIZE);
+  FMask := ACapacity - 1;
+end;
+
+procedure TLockedQueue.Close;
+begin
+  FreeMem(FMemory);
+  FMemory := nil;
+end;
+
+// Both first look at the count without the lock: a full (or empty) queue is
+// then answered without taking the lock - what a careful lock-based queue
+// does, and what the lock-free queue does by itself
+function TLockedQueue.TryEnqueue(const AValue: NativeUInt): Boolean;
+begin
+  if TAtomic.LoadAcquire(FCount^) > FMask then
+    Exit(False);
+  BenchAcquireSRWLockExclusive(FLock^);
+  Result := FCount^ <= FMask;
+  if Result then
+  begin
+    FItems^[(FHead^ + FCount^) and FMask] := AValue;
+    Inc(FCount^);
+  end;
+  BenchReleaseSRWLockExclusive(FLock^);
+end;
+
+function TLockedQueue.TryDequeue(out AValue: NativeUInt): Boolean;
+begin
+  AValue := 0;
+  if TAtomic.LoadAcquire(FCount^) = 0 then
+    Exit(False);
+  BenchAcquireSRWLockExclusive(FLock^);
+  Result := FCount^ > 0;
+  if Result then
+  begin
+    AValue := FItems^[FHead^];
+    FHead^ := (FHead^ + 1) and FMask;
+    Dec(FCount^);
+  end
+  else
+    AValue := 0;
+  BenchReleaseSRWLockExclusive(FLock^);
+end;
+
+{ TBenchWorker }
+
+constructor TBenchWorker.Create(const AContender: TContender; const AOperations: Integer;
+  const AWorkMicroseconds: Cardinal; const AReady: PInteger; const AThreads: Integer);
+begin
+  FContender := AContender;
+  FOperations := AOperations;
   FWorkMicroseconds := AWorkMicroseconds;
   FReady := AReady;
   FThreads := AThreads;
   inherited Create(True);
 end;
 
-procedure TFreeListWorker.Execute;
-var
-  LPair: Integer;
-  LIndex: Cardinal;
+procedure TBenchWorker.Execute;
 begin
   // Start together
   TAtomic.Increment(FReady^);
   while TAtomic.LoadAcquire(FReady^) < FThreads do
     TThread.Yield;
-
   StartTime := TIORingPlatform.TimestampMicroseconds;
-  case FVariant of
-    fvLockFree:
-      for LPair := 1 to FPairs do
-        if FLockFree^.TryPop(LIndex) then
+  Work;
+  EndTime := TIORingPlatform.TimestampMicroseconds;
+end;
+
+{ TFreeListWorker }
+
+procedure TFreeListWorker.Work;
+var
+  LPair: Integer;
+  LIndex: Cardinal;
+begin
+  case FContender of
+    cnLockFree:
+      for LPair := 1 to FOperations do
+        if LockFree^.TryPop(LIndex) then
         begin
           if FWorkMicroseconds > 0 then
             SpinMicroseconds(FWorkMicroseconds);
-          FLockFree^.Push(LIndex);
+          LockFree^.Push(LIndex);
         end
         else
           Inc(Misses);
-    fvSrwLock:
-      for LPair := 1 to FPairs do
-        if FLocked^.TryPop(LIndex) then
+    cnSrwLock:
+      for LPair := 1 to FOperations do
+        if Locked^.TryPop(LIndex) then
         begin
           if FWorkMicroseconds > 0 then
             SpinMicroseconds(FWorkMicroseconds);
-          FLocked^.Push(LIndex);
+          Locked^.Push(LIndex);
         end
         else
           Inc(Misses);
   end;
-  EndTime := TIORingPlatform.TimestampMicroseconds;
+end;
+
+{ TQueueWorker }
+
+procedure TQueueWorker.Work;
+var
+  LItem: Integer;
+  LValue: NativeUInt;
+begin
+  if Consumer then
+  begin
+    LItem := 0;
+    case FContender of
+      cnLockFree:
+        while LItem < FOperations do
+          if LockFree^.TryDequeue(LValue) then
+          begin
+            Inc(LItem);
+            Inc(Sum, LValue);
+          end
+          else
+            TAtomic.CpuPause;
+      cnSrwLock:
+        while LItem < FOperations do
+          if Locked^.TryDequeue(LValue) then
+          begin
+            Inc(LItem);
+            Inc(Sum, LValue);
+          end
+          else
+            TAtomic.CpuPause;
+    end;
+  end
+  else
+    case FContender of
+      cnLockFree:
+        for LItem := 1 to FOperations do
+        begin
+          if FWorkMicroseconds > 0 then
+            SpinMicroseconds(FWorkMicroseconds);
+          while not LockFree^.TryEnqueue(NativeUInt(LItem)) do
+            TAtomic.CpuPause;
+        end;
+      cnSrwLock:
+        for LItem := 1 to FOperations do
+        begin
+          if FWorkMicroseconds > 0 then
+            SpinMicroseconds(FWorkMicroseconds);
+          while not Locked^.TryEnqueue(NativeUInt(LItem)) do
+            TAtomic.CpuPause;
+        end;
+    end;
 end;
 
 { Running }
 
-function RunFreeList(const AVariant: TFreeListVariant; const AScenario: TScenario;
+// Starts AWorkers together and measures them: operations per second from the
+// first start to the last end
+function RunWorkers(const AWorkers: array of TBenchWorker; const AOperations: Int64): TRunResult;
+var
+  LMeasurement: TBenchMeasurement;
+  LIndex: Integer;
+  LStart: UInt64;
+  LEnd: UInt64;
+begin
+  LMeasurement.Start;
+  for LIndex := 0 to High(AWorkers) do
+    AWorkers[LIndex].Start;
+  for LIndex := 0 to High(AWorkers) do
+    AWorkers[LIndex].WaitFor;
+  LMeasurement.Stop;
+
+  LStart := High(UInt64);
+  LEnd := 0;
+  for LIndex := 0 to High(AWorkers) do
+  begin
+    if AWorkers[LIndex].FatalException <> nil then
+      raise Exception.Create('A benchmark thread failed: ' + Exception(AWorkers[LIndex].FatalException).Message);
+    if AWorkers[LIndex].StartTime < LStart then
+      LStart := AWorkers[LIndex].StartTime;
+    if AWorkers[LIndex].EndTime > LEnd then
+      LEnd := AWorkers[LIndex].EndTime;
+  end;
+  Result.OperationsPerSecond := AOperations / ((LEnd - LStart) / 1000000);
+  Result.CpuMilliseconds := LMeasurement.UserMilliseconds + LMeasurement.KernelMilliseconds;
+end;
+
+procedure ScenarioSettings(const AScenario: TScenario; out AOperations: Integer; out AWork: Cardinal);
+begin
+  if AScenario = scTight then
+  begin
+    AOperations := TIGHT_OPERATIONS;
+    AWork := 0;
+  end
+  else
+  begin
+    AOperations := WORK_OPERATIONS;
+    AWork := WORK_MICROSECONDS;
+  end;
+end;
+
+function RunFreeList(const AContender: TContender; const AScenario: TScenario;
   const AThreads: Integer): TRunResult;
 var
   LLockFree: TIORingFreeList;
   LLocked: TLockedFreeList;
-  LWorkers: array of TFreeListWorker;
+  LWorkers: array of TBenchWorker;
+  LWorker: TFreeListWorker;
   LReady: Integer;
   LIndex: Integer;
   LPairs: Integer;
   LWork: Cardinal;
-  LStart: UInt64;
-  LEnd: UInt64;
-  LMeasurement: TBenchMeasurement;
 begin
-  if AScenario = scTight then
-  begin
-    LPairs := TIGHT_PAIRS div AThreads;
-    LWork := 0;
-  end
-  else
-  begin
-    LPairs := WORK_PAIRS div AThreads;
-    LWork := WORK_MICROSECONDS;
-  end;
-
+  ScenarioSettings(AScenario, LPairs, LWork);
+  LPairs := LPairs div AThreads;
   LLockFree.Open(FREE_LIST_CAPACITY);
   LLocked.Open(FREE_LIST_CAPACITY);
   try
     LReady := 0;
     SetLength(LWorkers, AThreads);
     for LIndex := 0 to AThreads - 1 do
-      LWorkers[LIndex] := TFreeListWorker.Create(AVariant, @LLockFree, @LLocked, LPairs, LWork,
-        @LReady, AThreads);
+    begin
+      LWorker := TFreeListWorker.Create(AContender, LPairs, LWork, @LReady, AThreads);
+      LWorker.LockFree := @LLockFree;
+      LWorker.Locked := @LLocked;
+      LWorkers[LIndex] := LWorker;
+    end;
     try
-      LMeasurement.Start;
+      Result := RunWorkers(LWorkers, Int64(LPairs) * AThreads);
       for LIndex := 0 to AThreads - 1 do
-        LWorkers[LIndex].Start;
-      for LIndex := 0 to AThreads - 1 do
-        LWorkers[LIndex].WaitFor;
-      LMeasurement.Stop;
-
-      // From the first thread starting to the last one finishing
-      LStart := High(UInt64);
-      LEnd := 0;
-      for LIndex := 0 to AThreads - 1 do
-      begin
-        if LWorkers[LIndex].Misses > 0 then
+        if TFreeListWorker(LWorkers[LIndex]).Misses > 0 then
           raise Exception.Create('The free list ran empty - the benchmark is wrong');
-        if LWorkers[LIndex].StartTime < LStart then
-          LStart := LWorkers[LIndex].StartTime;
-        if LWorkers[LIndex].EndTime > LEnd then
-          LEnd := LWorkers[LIndex].EndTime;
-      end;
-      Result.PairsPerSecond := Int64(LPairs) * AThreads / ((LEnd - LStart) / 1000000);
-      Result.CpuMilliseconds := LMeasurement.UserMilliseconds + LMeasurement.KernelMilliseconds;
     finally
       for LIndex := 0 to AThreads - 1 do
+        LWorkers[LIndex].Free;
+    end;
+  finally
+    LLocked.Close;
+    LLockFree.Close;
+  end;
+end;
+
+function RunQueue(const AContender: TContender; const AScenario: TScenario;
+  const AProducers: Integer): TRunResult;
+var
+  LLockFree: TIORingRequestQueue;
+  LLocked: TLockedQueue;
+  LWorkers: array of TBenchWorker;
+  LWorker: TQueueWorker;
+  LReady: Integer;
+  LIndex: Integer;
+  LPerProducer: Integer;
+  LWork: Cardinal;
+begin
+  ScenarioSettings(AScenario, LPerProducer, LWork);
+  LPerProducer := LPerProducer div AProducers;
+  LLockFree.Open(QUEUE_CAPACITY);
+  LLocked.Open(QUEUE_CAPACITY);
+  try
+    LReady := 0;
+    // Worker 0 is the consumer
+    SetLength(LWorkers, AProducers + 1);
+    for LIndex := 0 to AProducers do
+    begin
+      if LIndex = 0 then
+        LWorker := TQueueWorker.Create(AContender, LPerProducer * AProducers, 0, @LReady, AProducers + 1)
+      else
+        LWorker := TQueueWorker.Create(AContender, LPerProducer, LWork, @LReady, AProducers + 1);
+      LWorker.LockFree := @LLockFree;
+      LWorker.Locked := @LLocked;
+      LWorker.Consumer := LIndex = 0;
+      LWorkers[LIndex] := LWorker;
+    end;
+    try
+      Result := RunWorkers(LWorkers, Int64(LPerProducer) * AProducers);
+      // Every producer put 1..LPerProducer in
+      if TQueueWorker(LWorkers[0]).Sum <> UInt64(AProducers) * (UInt64(LPerProducer) * UInt64(LPerProducer + 1) div 2) then
+        raise Exception.Create('The queue lost or changed values - the benchmark or the queue is wrong');
+    finally
+      for LIndex := 0 to AProducers do
         LWorkers[LIndex].Free;
     end;
   finally
@@ -334,8 +568,8 @@ begin
   Result := LInfo.dwNumberOfProcessors;
 end;
 
-procedure AppendCsv(const AVariant: TFreeListVariant; const AScenario: TScenario; const AThreads, ARun: Integer;
-  const AResult: TRunResult);
+procedure AppendCsv(const AStructure: TStructure; const AContender: TContender; const AScenario: TScenario;
+  const AThreads, ARun: Integer; const AResult: TRunResult);
 var
   LFile: TextFile;
   LNew: Boolean;
@@ -349,12 +583,13 @@ begin
   else
     Append(LFile);
   try
+    // ops_per_s: free list = take+give pairs, queue = values; threads: queue = producers
     if LNew then
-      Writeln(LFile, 'timestamp,compiler,platform,structure,variant,scenario,threads,run,pairs_per_s,cpu_ms');
-    Writeln(LFile, Format('%s,%s,%s,free list,%s,%s,%d,%d,%.0f,%.1f',
+      Writeln(LFile, 'timestamp,compiler,platform,structure,variant,scenario,threads,run,ops_per_s,cpu_ms');
+    Writeln(LFile, Format('%s,%s,%s,%s,%s,%s,%d,%d,%.0f,%.1f',
       [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now, GInvariant), COMPILER_NAME, PlatformName,
-       VARIANT_NAMES[AVariant], SCENARIO_NAMES[AScenario], AThreads, ARun, AResult.PairsPerSecond,
-       AResult.CpuMilliseconds], GInvariant));
+       STRUCTURE_NAMES[AStructure], CONTENDER_NAMES[AContender], SCENARIO_NAMES[AScenario], AThreads, ARun,
+       AResult.OperationsPerSecond, AResult.CpuMilliseconds], GInvariant));
   finally
     CloseFile(LFile);
   end;
@@ -367,6 +602,8 @@ var
   LList: TStringList;
   LItem: Integer;
   LCpus: Integer;
+  LStructure: TStructure;
+  LFound: Boolean;
 begin
   LIndex := 1;
   while LIndex <= ParamCount do
@@ -390,6 +627,19 @@ begin
         LList.Free;
       end;
     end
+    else if (LName = '--only') and (LIndex < ParamCount) then
+    begin
+      Inc(LIndex);
+      LFound := False;
+      for LStructure := Low(TStructure) to High(TStructure) do
+        if LowerCase(ParamStr(LIndex)) = STRUCTURE_OPTIONS[LStructure] then
+        begin
+          GStructures := [LStructure];
+          LFound := True;
+        end;
+      if not LFound then
+        raise Exception.CreateFmt('Unknown structure: %s (freelist or queue)', [ParamStr(LIndex)]);
+    end
     else if (LName = '--csv') and (LIndex < ParamCount) then
     begin
       Inc(LIndex);
@@ -399,6 +649,9 @@ begin
       raise Exception.CreateFmt('Unknown option: %s', [ParamStr(LIndex)]);
     Inc(LIndex);
   end;
+
+  if GRuns < 1 then
+    raise Exception.Create('--runs must be at least 1');
 
   if Length(GThreadCounts) = 0 then
   begin
@@ -415,55 +668,93 @@ begin
   end;
 end;
 
-procedure RunStructureBenchmarks;
+procedure RunStructure(const AStructure: TStructure);
 var
   LScenario: TScenario;
   LThreadIndex: Integer;
   LThreads: Integer;
   LRun: Integer;
-  LVariant: TFreeListVariant;
+  LContender: TContender;
   LResult: TRunResult;
-  LRates: array[TFreeListVariant] of array of Double;
-  LCpu: array[TFreeListVariant] of array of Double;
-  LRate: array[TFreeListVariant] of Double;
+  LRates: array[TContender] of array of Double;
+  LCpu: array[TContender] of array of Double;
+  LRate: array[TContender] of Double;
+  LDone: array of Integer;
+  LIndex: Integer;
+  LSkip: Boolean;
+begin
+  Writeln;
+  if AStructure = stFreeList then
+  begin
+    Writeln('Free list: take one index, (work,) give it back.');
+    Writeln('Mops/s = million take+give pairs per second, all threads; median of ', GRuns, ' runs.');
+  end
+  else
+  begin
+    Writeln('Request queue: N producers put values in, one consumer takes them out.');
+    Writeln('Threads = producers (plus the consumer). Mops/s = million values per second; median of ', GRuns, ' runs.');
+  end;
+  Writeln('CPU ms = CPU time of all threads for the run (median).');
+  Writeln;
+  Writeln(Format('%-10s %7s %11s %11s %9s %12s %12s',
+    ['Scenario', 'Threads', 'lock-free', 'SRW lock', 'LF/SRW', 'LF CPU ms', 'SRW CPU ms'], GInvariant));
+  Writeln(Format('%-10s %7s %11s %11s %9s %12s %12s', ['', '', 'Mops/s', 'Mops/s', '', '', ''], GInvariant));
+
+  for LScenario := Low(TScenario) to High(TScenario) do
+  begin
+    LDone := nil;
+    for LThreadIndex := 0 to High(GThreadCounts) do
+    begin
+      LThreads := GThreadCounts[LThreadIndex];
+      // The queue needs a processor for the consumer too
+      if (AStructure = stQueue) and (LThreads >= LogicalProcessorCount) then
+        LThreads := LogicalProcessorCount - 1;
+      LSkip := LThreads < 1;
+      for LIndex := 0 to High(LDone) do
+        if LDone[LIndex] = LThreads then
+          LSkip := True;
+      if LSkip then
+        Continue;
+      SetLength(LDone, Length(LDone) + 1);
+      LDone[High(LDone)] := LThreads;
+
+      for LContender := Low(TContender) to High(TContender) do
+      begin
+        SetLength(LRates[LContender], GRuns);
+        SetLength(LCpu[LContender], GRuns);
+      end;
+      // The contenders take turns, so that a slow moment of the machine hits both
+      for LRun := 1 to GRuns do
+        for LContender := Low(TContender) to High(TContender) do
+        begin
+          if AStructure = stFreeList then
+            LResult := RunFreeList(LContender, LScenario, LThreads)
+          else
+            LResult := RunQueue(LContender, LScenario, LThreads);
+          LRates[LContender][LRun - 1] := LResult.OperationsPerSecond;
+          LCpu[LContender][LRun - 1] := LResult.CpuMilliseconds;
+          AppendCsv(AStructure, LContender, LScenario, LThreads, LRun, LResult);
+        end;
+      for LContender := Low(TContender) to High(TContender) do
+        LRate[LContender] := Median(LRates[LContender]);
+      Writeln(Format('%-10s %7d %11.2f %11.2f %9.2f %12.0f %12.0f',
+        [SCENARIO_NAMES[LScenario], LThreads, LRate[cnLockFree] / 1E6, LRate[cnSrwLock] / 1E6,
+         LRate[cnLockFree] / LRate[cnSrwLock], Median(LCpu[cnLockFree]), Median(LCpu[cnSrwLock])], GInvariant));
+    end;
+  end;
+end;
+
+procedure RunStructureBenchmarks;
+var
+  LStructure: TStructure;
 begin
   ParseOptions;
   Writeln(Format('Engine structures: %s %s, %d logical processors, %s',
     [COMPILER_NAME, PlatformName, LogicalProcessorCount, FormatDateTime('yyyy-mm-dd hh:nn', Now, GInvariant)],
     GInvariant));
-  Writeln;
-  Writeln('Free list: take one index, (work,) give it back.');
-  Writeln('Mpairs/s = million take+give pairs per second, all threads; median of ', GRuns, ' runs.');
-  Writeln('CPU ms = CPU time of all threads for the run (median).');
-  Writeln;
-  Writeln(Format('%-10s %7s %11s %11s %9s %12s %12s',
-    ['Scenario', 'Threads', 'lock-free', 'SRW lock', 'LF/SRW', 'LF CPU ms', 'SRW CPU ms'], GInvariant));
-  Writeln(Format('%-10s %7s %11s %11s %9s %12s %12s', ['', '', 'Mpairs/s', 'Mpairs/s', '', '', ''], GInvariant));
-
-  for LScenario := Low(TScenario) to High(TScenario) do
-    for LThreadIndex := 0 to High(GThreadCounts) do
-    begin
-      LThreads := GThreadCounts[LThreadIndex];
-      for LVariant := Low(TFreeListVariant) to High(TFreeListVariant) do
-      begin
-        SetLength(LRates[LVariant], GRuns);
-        SetLength(LCpu[LVariant], GRuns);
-      end;
-      // Variants take turns, so that a slow moment of the machine hits both
-      for LRun := 1 to GRuns do
-        for LVariant := Low(TFreeListVariant) to High(TFreeListVariant) do
-        begin
-          LResult := RunFreeList(LVariant, LScenario, LThreads);
-          LRates[LVariant][LRun - 1] := LResult.PairsPerSecond;
-          LCpu[LVariant][LRun - 1] := LResult.CpuMilliseconds;
-          AppendCsv(LVariant, LScenario, LThreads, LRun, LResult);
-        end;
-      for LVariant := Low(TFreeListVariant) to High(TFreeListVariant) do
-        LRate[LVariant] := Median(LRates[LVariant]);
-      Writeln(Format('%-10s %7d %11.2f %11.2f %9.2f %12.0f %12.0f',
-        [SCENARIO_NAMES[LScenario], LThreads, LRate[fvLockFree] / 1E6, LRate[fvSrwLock] / 1E6,
-         LRate[fvLockFree] / LRate[fvSrwLock], Median(LCpu[fvLockFree]), Median(LCpu[fvSrwLock])], GInvariant));
-    end;
+  for LStructure := Low(TStructure) to High(TStructure) do
+    if LStructure in GStructures then
+      RunStructure(LStructure);
 end;
 
 initialization

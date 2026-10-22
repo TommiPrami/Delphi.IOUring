@@ -28,7 +28,8 @@ uses
   Tests.FPC.SequentialReader,
   Tests.FPC.Streams,
   Tests.FPC.Atomics,
-  Tests.FPC.RequestPool;
+  Tests.FPC.RequestPool,
+  Tests.FPC.RequestQueue;
 
 type
   // TComponent: interface without reference counting, as TTestResult expects

@@ -68,7 +68,8 @@ type
   // every push and pop, so a thread that read the top before another thread
   // changed the stack always fails and tries again (no ABA problem). The links
   // stay in memory until Close, so reading the link of an index that another
-  // thread has just taken is harmless.
+  // thread has just taken is harmless. Before trying again, a thread backs
+  // off (TAtomic.BackOff).
   TIORingFreeList = record
   private
     FMemory: Pointer;          // as allocated
@@ -202,22 +203,6 @@ const
   // The state word, then padding: the payload starts 8-byte aligned
   SLOT_HEADER_SIZE = 8;
 
-  // Most CPU pauses between two tries of a contended free list
-  FREE_LIST_MAX_BACKOFF = 1024;
-
-// Memory of ASize bytes starting at a cache-line boundary; AMemory is what
-// FreeMem needs
-function AllocCacheAligned(const ASize: NativeUInt; out AMemory: Pointer): Pointer;
-var
-  LAddress: NativeUInt;
-begin
-  GetMem(AMemory, ASize + (IORING_CACHE_LINE_SIZE - 1));
-  LAddress := NativeUInt(AMemory) + NativeUInt(IORING_CACHE_LINE_SIZE - 1);
-  LAddress := LAddress and not NativeUInt(IORING_CACHE_LINE_SIZE - 1);
-  Result := Pointer(LAddress);
-  FillChar(Result^, ASize, 0);
-end;
-
 { TIORingFreeList }
 
 {$IFDEF FPC}
@@ -256,7 +241,7 @@ begin
     raise EIORingError.Create('The free list is already open');
 
   // The head alone on the first cache line, the links after it
-  FHead := AllocCacheAligned(IORING_CACHE_LINE_SIZE + NativeUInt(ACapacity) * SizeOf(Cardinal), FMemory);
+  FHead := IORingAllocCacheAligned(IORING_CACHE_LINE_SIZE + NativeUInt(ACapacity) * SizeOf(Cardinal), FMemory);
   FNext := PCardinalArray(PByte(FHead) + IORING_CACHE_LINE_SIZE);
   FCapacity := ACapacity;
 
@@ -285,18 +270,6 @@ begin
   FCapacity := 0;
 end;
 
-// After a failed compare-exchange: wait a little, longer each time, so that
-// the threads do not all try again at the same moment
-procedure BackOff(var ABackoff: Integer); inline;
-var
-  LPause: Integer;
-begin
-  for LPause := 1 to ABackoff do
-    TAtomic.CpuPause;
-  if ABackoff < FREE_LIST_MAX_BACKOFF then
-    ABackoff := ABackoff * 2;
-end;
-
 function TIORingFreeList.TryPop(out AIndex: Cardinal): Boolean;
 var
   LOld: UInt64;
@@ -318,7 +291,7 @@ begin
     LNew := (((LOld shr 32) + 1) shl 32) or TAtomic.LoadAcquire(FNext^[LTop]);
     if TAtomic.CompareExchange(FHead^, LNew, LOld) = LOld then
       Break;
-    BackOff(LBackoff);
+    TAtomic.BackOff(LBackoff);
   until False;
   AIndex := LTop;
   Result := True;
@@ -339,7 +312,7 @@ begin
     LNew := (((LOld shr 32) + 1) shl 32) or AIndex;
     if TAtomic.CompareExchange(FHead^, LNew, LOld) = LOld then
       Exit;
-    BackOff(LBackoff);
+    TAtomic.BackOff(LBackoff);
   until False;
 end;
 
@@ -422,7 +395,7 @@ begin
     raise EIORingError.CreateFmt('Request pool of %d slots of %d bytes is too big', [ACapacity, FStride]);
 
   try
-    FSlots := AllocCacheAligned(NativeUInt(LSize), FMemory);
+    FSlots := IORingAllocCacheAligned(NativeUInt(LSize), FMemory);
     FFreeList.Open(ACapacity);
   except
     Close;

@@ -10,10 +10,15 @@ interface
 uses
   System.SysUtils;
 
+const
+  RUN_THREADS_TIMEOUT_MILLISECONDS = 60000;
+
 // Runs AWork(Index) in ACount threads (Index 0..ACount-1) that start at the
 // same moment; returns when all are done. Fails the test if a thread raised
-// an exception. AWork must not use Assert: count failures and check them
-// after RunThreads.
+// an exception, or if the threads are not done after
+// RUN_THREADS_TIMEOUT_MILLISECONDS (an endless loop: those threads cannot be
+// stopped and are left running). AWork must not use Assert: count failures
+// and check them after RunThreads.
 procedure RunThreads(const ACount: Integer; const AWork: TProc<Integer>);
 
 // Busy for AMicroseconds, without giving up the CPU
@@ -22,6 +27,7 @@ procedure SpinMicroseconds(const AMicroseconds: Int64);
 implementation
 
 uses
+  Winapi.Windows,
   System.Classes,
   System.Diagnostics,
   DUnitX.TestFramework,
@@ -61,24 +67,38 @@ end;
 procedure RunThreads(const ACount: Integer; const AWork: TProc<Integer>);
 var
   LThreads: TArray<TWorkerThread>;
-  LReady: Integer;
+  LReady: PInteger;    // on the heap: stuck threads may outlive this call
   LIndex: Integer;
+  LDeadline: UInt64;
+  LNow: UInt64;
 begin
-  LReady := 0;
+  New(LReady);
+  LReady^ := 0;
   SetLength(LThreads, ACount);
   for LIndex := 0 to ACount - 1 do
-    LThreads[LIndex] := TWorkerThread.Create(LIndex, ACount, @LReady, AWork);
+    LThreads[LIndex] := TWorkerThread.Create(LIndex, ACount, LReady, AWork);
+  for LIndex := 0 to ACount - 1 do
+    LThreads[LIndex].Start;
+
+  LDeadline := TThread.GetTickCount64 + RUN_THREADS_TIMEOUT_MILLISECONDS;
+  for LIndex := 0 to ACount - 1 do
+  begin
+    LNow := TThread.GetTickCount64;
+    if (LNow >= LDeadline) or
+      (WaitForSingleObject(LThreads[LIndex].Handle, Cardinal(LDeadline - LNow)) <> WAIT_OBJECT_0) then
+      // Left running on purpose (and not freed: freeing waits for them)
+      Assert.Fail(Format('Thread %d still runs after %d s: an endless loop?',
+        [LIndex, RUN_THREADS_TIMEOUT_MILLISECONDS div 1000]));
+  end;
+
   try
-    for LIndex := 0 to ACount - 1 do
-      LThreads[LIndex].Start;
-    for LIndex := 0 to ACount - 1 do
-      LThreads[LIndex].WaitFor;
     for LIndex := 0 to ACount - 1 do
       if LThreads[LIndex].FatalException <> nil then
         Assert.Fail(Format('Thread %d: %s', [LIndex, Exception(LThreads[LIndex].FatalException).Message]));
   finally
     for LIndex := 0 to ACount - 1 do
       LThreads[LIndex].Free;
+    Dispose(LReady);
   end;
 end;
 
