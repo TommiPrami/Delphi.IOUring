@@ -34,9 +34,12 @@ Source/
     Delphi.IOUring.Streams.pas               TStream descendants
     Delphi.IOUring.Atomics.pas               CAS / fences / wait-on-address    (Milestone 3)
     Delphi.IOUring.Engine.pas                I/O thread(s), request pool       (Milestone 3)
+  Build-FPC.ps1                              builds/runs the FPC tests or benchmark (no fpc.exe/lazbuild needed)
   UnitTests/
     Delphi.IOUring.UnitTests.dpr/.dproj      DUnitX console runner (Delphi)
-    Delphi.IOUring.UnitTests.FPC.lpi/.lpr    FPCUnit console runner (Milestone 2)
+    FPC/                                     Free Pascal tests (FPCUnit), separate from the DUnitX ones
+      Delphi.IOUring.UnitTests.FPC.lpr/.lpi  runner (own small console runner on FPCUnit)
+      Tests.FPC.*.pas                        the same checks as the Delphi test units
     Tests.Backend.Windows.API.Layout.pas     record layouts + helpers
     Tests.Backend.Windows.API.pas            live API calls
     Tests.Ring.pas                           the core ring (TIORing)
@@ -46,8 +49,10 @@ Source/
     TestPlatformHelpers.pas                  files, pipes, page memory for tests
   Benchmarks/
     Delphi.IOUring.Benchmarks.dpr/.dproj     console app, CSV output
-    Bench.Common.pas                         consumer, timing, cache purge, test files
-    Bench.Contenders.pas                     the ways of reading that are compared
+    Bench.Common.pas                         consumer, timing, cache purge, test files (Delphi + FPC)
+    Bench.Readers.pas                        reading routines shared with the FPC benchmark
+    Bench.Contenders.pas                     the Delphi contender list (anonymous methods, threads)
+    FPC/Delphi.IOUring.Benchmarks.FPC.lpr    Free Pascal benchmark: the main contenders
   3rdParty/DUnitX
 ```
 
@@ -153,17 +158,21 @@ Source/
 
 ## Milestone 2 – Free Pascal / Lazarus on Windows
 
-- **Phase 6 – Tool set-up**: working FPC/Lazarus with Win64 and Win32 compilers (see note below); build scripts (`lazbuild` / `fpc` command lines) for the library and tests.
-- **Phase 7 – Test runner for FPC**: DUnitX is Delphi-only. **[DECIDE]** either (a) write the test bodies as plain shared routines and add thin DUnitX + FPCUnit wrappers, or (b) keep separate FPCUnit tests. Proposal: (a), so the same checks run on both compilers.
-- **Phase 8 – Port**: compile Milestone 1 with FPC; fix only with the allowed `{$IFDEF FPC}` places (Design §12.2). Answer the FPC [VERIFY]s: `delayed` support, record layouts, by-value records on Win32, managed-record operators.
-- **Phase 9 – FPC benchmarks**: same benchmark app compiled with FPC; compare against Delphi numbers.
+- **Phase 6 – Tool set-up**: working FPC/Lazarus with Win64 and Win32 compilers; build scripts for the library and tests.
+  - [x] `Source\Build-FPC.ps1 -Project Tests|Benchmarks -Platform Win32|Win64 [-Run]`: calls the compiler binary directly, so it needs no `fpc.exe`, `fpc.cfg` or `lazbuild`.
+  - [x] Lazarus project file for the tests (`Delphi.IOUring.UnitTests.FPC.lpi`) – **not yet opened in Lazarus** (see the note below).
+  - [ ] **Win64:** waiting for a working 64-bit FPC. The Lazarus 5.0 RC1 install in `C:\lazarus` (FPC 3.2.2) only has the 32-bit compiler `ppc386.exe`; `fpc.exe`, `ppcx64.exe`, `lazbuild.exe` and `lazarus.exe` are missing. The owner repairs it; then: `Build-FPC.ps1 -Project Tests -Platform Win64 -Run`.
+- **Phase 7 – Test runner for FPC**: **decided 2026-10-22: separate FPCUnit tests** (`Source/UnitTests/FPC/Tests.FPC.*`), the same checks as the Delphi test units. The shared helpers (`TestFileHelpers`, `TestPlatformHelpers`) are used by both. A small own console runner on FPCUnit sets the exit code.
+  - [x] 101 FPC tests (Delphi has 115 because DUnitX counts each `[TestCase]` separately; the FPC tests loop over the same cases).
+- **Phase 8 – Port**: compile Milestone 1 with FPC; fix only with the allowed `{$IFDEF FPC}` places (Design §12.2).
+  - [x] `delayed` replaced for FPC by functions that look themselves up with `GetProcAddress` on first use (Design §6.3), so FPC programs start on Windows without IoRing.
+  - [x] FPC [VERIFY]s answered on Win32: record layouts, records passed by value (stdcall), managed-record operators (`Initialize`/`Finalize`/`Copy`), `const`/`constref` passing without copy – all tested.
+  - [x] **All 101 FPC tests pass on Win32** (FPC 3.2.2). Win64: see Phase 6.
+- **Phase 9 – FPC benchmarks**:
+  - [x] Reading routines moved to `Bench.Readers` (Delphi and FPC); separate small FPC program with the main contenders (the Delphi contender list uses anonymous methods).
+  - [x] Win32, Delphi and FPC run back to back: **the same speed within noise** ([Benchmarks.md](Benchmarks.md#free-pascal)). Win64: see Phase 6.
 
-**Done when:** all tests pass with Delphi and FPC on Win32 and Win64.
-
-Note (2026-10-22): Lazarus 5.0 RC1 is registered as installed in `C:\lazarus`
-with FPC 3.2.2, but only the i386 cross-compiler (`ppc386.exe`) was found
-there; `fpc.exe`, `ppcx64.exe` and `lazarus.exe` are missing. The
-installation may need repairing before Phase 6.
+**Done when:** all tests pass with Delphi and FPC on Win32 and Win64. **State 2026-10-22: done for Win32; Win64 waits for the 64-bit FPC compiler.**
 
 ---
 

@@ -88,3 +88,15 @@ Source/Benchmarks/Win32/
 Source/Benchmarks/Win64/
 Source/Benchmarks/*.res
 Source/Benchmarks/*.csv
+
+# Delphi.IOUring: Free Pascal / Lazarus build output and session files
+Source/UnitTests/FPC/Win32/
+Source/UnitTests/FPC/Win64/
+Source/UnitTests/FPC/bin/
+Source/UnitTests/FPC/lib/
+Source/Benchmarks/FPC/Win32/
+Source/Benchmarks/FPC/Win64/
+Source/Benchmarks/FPC/bin/
+Source/Benchmarks/FPC/lib/
+*.lps
+backup/

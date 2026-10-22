@@ -75,6 +75,7 @@
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="Bench.Common.pas"/>
+        <DCCReference Include="Bench.Readers.pas"/>
         <DCCReference Include="Bench.Contenders.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

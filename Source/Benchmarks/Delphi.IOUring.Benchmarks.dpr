@@ -39,8 +39,8 @@ uses
   System.Generics.Defaults,
   System.Win.Registry,
   Delphi.IOUring,
-  Delphi.IOUring.SequentialReader,
   Bench.Common in 'Bench.Common.pas',
+  Bench.Readers in 'Bench.Readers.pas',
   Bench.Contenders in 'Bench.Contenders.pas';
 
 type
@@ -266,22 +266,6 @@ begin
   Result.Stalls := LStalls;
   AChecksum := LConsumer.Checksum;
   ABytes := LConsumer.Bytes;
-end;
-
-// The first unbuffered read after a buffered read of the same file is slower
-// (about 0.13 s here, for 1 GiB as for 10 GiB), probably because Windows
-// keeps the file's cache structures for a while after the buffered reader
-// closes it. This untimed unbuffered read takes that cost, so the unbuffered
-// contenders after it are measured fairly.
-procedure ReadUnbufferedUntimed(const AFileName: string);
-var
-  LReader: TIORingSequentialReader;
-  LData: PByte;
-  LLength: NativeInt;
-begin
-  LReader.Open(AFileName, [sroUnbuffered]);
-  while LReader.TryAcquireChunk(LData, LLength) do
-    LReader.ReleaseChunk;
 end;
 
 procedure RunCase(const ASizeGiB: Integer; const AScenario: TScenario; const ACache: TCacheState;

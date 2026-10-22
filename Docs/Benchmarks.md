@@ -177,6 +177,41 @@ reads in the same run: 1 456.
 **Decision: the defaults stay as they are** (1 MiB × 8, adaptive read-ahead,
 sequential-scan hint on, registration on).
 
+## Free Pascal
+
+Measured 2026-10-22, later the same day (Milestone 2, Phase 9): Free Pascal
+3.2.2, **Win32 only** (the 64-bit FPC compiler is not installed yet), with
+`Source/Benchmarks/FPC` – the same files, consumer and reading routines
+(`Bench.Common`, `Bench.Readers`) as the Delphi program, main contenders only.
+Delphi Win32 and FPC Win32 were run **right after each other**, 1 GiB, 3 runs,
+median MiB/s:
+
+| Contender | read-through, cold: Delphi | FPC | read-through, warm: Delphi | FPC | work, cold: Delphi | FPC |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| TFileStream 64 KiB reads | 1 444 | 1 453 | 2 848 | 2 653 | 1 172 | 1 159 |
+| TFileStream 1 MiB reads | 3 463 | 3 715 | 3 318 | 3 072 | 2 365 | 2 375 |
+| ReadFile 1 MiB, sequential scan | 3 598 | 3 597 | 3 146 | 3 018 | 2 268 | 2 369 |
+| Overlapped ReadFile 1 MiB × 8 | 6 477 | 6 501 | 3 319 | 3 268 | 3 067 | 3 091 |
+| IoRing stream, 64 KiB reads | 6 009 | 6 497 | 2 782 | 2 761 | 2 972 | 3 043 |
+| **IoRing reader, zero-copy** | **6 576** | **6 561** | **3 172** | **2 970** | **3 068** | **3 046** |
+
+**The library is as fast with Free Pascal as with Delphi** – the differences
+are within the run-to-run noise, and the plain RTL/Windows contenders move by
+the same amounts.
+
+Two things learned on the way:
+
+- **Compare only numbers from the same session.** In this afternoon session,
+  memory-bound work on this machine was about half as fast as in the morning
+  for *both* compilers (Delphi warm read-through 3.2 GiB/s instead of 6.2), so
+  an FPC run compared with the morning's Delphi numbers looked 2× slower when
+  it was not. Disk-bound cold reads were not affected.
+- Free Pascal's `Move` is slower than Delphi's for large blocks (a memory-only
+  test, 1 MiB blocks copied and checksummed: FPC 7.0 GiB/s, Delphi 11.1 GiB/s
+  on Win32; the checksum loop alone is the same, 13.5 GiB/s). That matters for
+  the stream's extra copy when the data comes from the cache, not for the
+  zero-copy reader.
+
 ## Known limits of these measurements
 
 - **One machine, one very fast disk.** The NVMe drive has low latency, so
@@ -212,6 +247,12 @@ sequential-scan hint on, registration on).
 ```
 Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.exe --sizes 1,10 --runs 3 --csv results.csv
 Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.exe --tune --sizes 10 --runs 3
+```
+
+Free Pascal (Win32; Win64 once `ppcx64.exe` is installed):
+
+```
+Source\Build-FPC.ps1 -Project Benchmarks -Platform Win32 -Run -RunArguments '--sizes','1,10','--runs','3'
 ```
 
 Options: `--dir` (where the test files go; default `%TEMP%\Delphi.IOUring.Bench`),

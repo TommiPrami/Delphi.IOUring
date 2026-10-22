@@ -3,13 +3,21 @@
 {
   Shared pieces of the benchmark: the consumer every contender feeds its data
   to, time and CPU measurement, file cache purge and test file creation.
+  Compiles with Delphi and Free Pascal.
 }
+
+{$I Delphi.IOUring.inc}
 
 interface
 
 uses
+{$IFDEF FPC}
+  Windows,
+  SysUtils;
+{$ELSE}
   Winapi.Windows,
   System.SysUtils;
+{$ENDIF}
 
 const
   MiB = 1024 * 1024;
@@ -172,6 +180,7 @@ var
   LNow: Int64;
   LTicks: Int64;
 begin
+  LNow := 0;   // set by QueryPerformanceCounter; FPC cannot see that
   QueryPerformanceCounter(LStart);
   LTicks := Int64(AMicroseconds) * GFrequency div 1000000;
   repeat
@@ -215,7 +224,7 @@ begin
     if LHandle = INVALID_HANDLE_VALUE then
       RaiseLastOSError;
     try
-      LState := $9E3779B97F4A7C15;
+      LState := UInt64($9E3779B97F4A7C15);
       LRemaining := ASize;
       while LRemaining > 0 do
       begin

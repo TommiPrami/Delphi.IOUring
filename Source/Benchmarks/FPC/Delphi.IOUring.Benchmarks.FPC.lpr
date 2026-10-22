@@ -1,0 +1,349 @@
+﻿program Delphi.IOUring.Benchmarks.FPC;
+
+{
+  Free Pascal version of the sequential reading benchmark (Plan, Phase 9).
+
+  The same method as the Delphi benchmark (Source\Benchmarks): same files,
+  same consumer (Bench.Common) and the same reading routines (Bench.Readers),
+  but only the main contenders - enough to compare the code Free Pascal makes
+  for the library with Delphi's. The Delphi-only contenders (TBufferedFileStream,
+  threads) are left out.
+
+  Delphi.IOUring.Benchmarks.FPC [options]
+    --dir <folder>   where the test files are created (default %TEMP%\Delphi.IOUring.Bench)
+    --sizes <list>   file sizes in GiB, comma separated (default 1,10)
+    --runs <n>       runs per contender and case; the median is reported (default 3)
+    --work-us <n>    CPU work per MiB in the work scenario (default 200; first size only)
+    --keep           keep the test files
+
+  Build: Source\Build-FPC.ps1 -Project Benchmarks -Platform Win32
+}
+
+{$I Delphi.IOUring.inc}
+
+uses
+  Windows,
+  SysUtils,
+  Classes,
+  Delphi.IOUring,
+  Delphi.IOUring.SequentialReader,
+  Bench.Common,
+  Bench.Readers;
+
+type
+  TContender = (cnFileStream64K, cnFileStream1M, cnReadFile1M, cnOverlapped, cnOverlappedUnbuffered,
+    cnIORingStream, cnIORingStreamUnbuffered, cnIORingReader, cnIORingReaderUnbuffered);
+  TScenario = (scReadThrough, scWork);
+  TCacheState = (csCold, csWarm);
+
+  TMeasurement = record
+    Seconds: Double;
+    UserMilliseconds: Double;
+    KernelMilliseconds: Double;
+    Stalls: UInt64;
+    Valid: Boolean;
+  end;
+
+const
+  CONTENDER_NAMES: array[TContender] of string = (
+    'TFileStream 64 KiB reads',
+    'TFileStream 1 MiB reads',
+    'ReadFile 1 MiB, sequential scan',
+    'Overlapped ReadFile 1 MiB x 8',
+    'Overlapped ReadFile 1 MiB x 8, unbuffered',
+    'IoRing stream, 64 KiB reads',
+    'IoRing stream, 64 KiB reads, unbuffered',
+    'IoRing reader, zero-copy',
+    'IoRing reader, zero-copy, unbuffered');
+  CONTENDER_UNBUFFERED: array[TContender] of Boolean = (
+    False, False, False, False, True, False, True, False, True);
+  SCENARIO_NAMES: array[TScenario] of string = ('read-through', 'work');
+  CACHE_NAMES: array[TCacheState] of string = ('cold', 'warm');
+{$IFDEF CPUX64}
+  PLATFORM_NAME = 'Win64';
+{$ELSE}
+  PLATFORM_NAME = 'Win32';
+{$ENDIF}
+
+var
+  GFolder: string;
+  GSizes: array of Integer;
+  GRuns: Integer;
+  GWorkMicroseconds: Cardinal;
+  GKeep: Boolean;
+  GInvariant: TFormatSettings;
+
+procedure ParseOptions;
+var
+  LIndex: Integer;
+  LName: string;
+  LParts: TStringList;
+  LPart: Integer;
+
+  function NextValue: string;
+  begin
+    Inc(LIndex);
+    if LIndex > ParamCount then
+      raise Exception.CreateFmt('Missing value for %s', [LName]);
+    Result := ParamStr(LIndex);
+  end;
+
+begin
+  GFolder := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'Delphi.IOUring.Bench';
+  SetLength(GSizes, 2);
+  GSizes[0] := 1;
+  GSizes[1] := 10;
+  GRuns := 3;
+  GWorkMicroseconds := 200;
+  GKeep := False;
+
+  LIndex := 1;
+  while LIndex <= ParamCount do
+  begin
+    LName := LowerCase(ParamStr(LIndex));
+    if LName = '--dir' then
+      GFolder := NextValue
+    else if LName = '--sizes' then
+    begin
+      LParts := TStringList.Create;
+      try
+        LParts.CommaText := NextValue;
+        SetLength(GSizes, LParts.Count);
+        for LPart := 0 to LParts.Count - 1 do
+          GSizes[LPart] := StrToInt(Trim(LParts[LPart]));
+      finally
+        LParts.Free;
+      end;
+    end
+    else if LName = '--runs' then
+      GRuns := StrToInt(NextValue)
+    else if LName = '--work-us' then
+      GWorkMicroseconds := StrToInt(NextValue)
+    else if LName = '--keep' then
+      GKeep := True
+    else
+      raise Exception.CreateFmt('Unknown option %s', [ParamStr(LIndex)]);
+    Inc(LIndex);
+  end;
+end;
+
+function BenchFileName(const ASizeGiB: Integer): string;
+begin
+  Result := IncludeTrailingPathDelimiter(GFolder) + Format('Bench-%dGiB.bin', [ASizeGiB]);
+end;
+
+procedure PrepareFile(const ASizeGiB: Integer);
+var
+  LFileName: string;
+  LSize: Int64;
+begin
+  LFileName := BenchFileName(ASizeGiB);
+  LSize := Int64(ASizeGiB) * 1024 * MiB;
+  if FileSizeOf(LFileName) = LSize then
+    Exit;
+  Writeln('Creating ', LFileName, ' ...');
+  ForceDirectories(GFolder);
+  CreateBenchFile(LFileName, LSize);
+end;
+
+function RunContender(const AContender: TContender; const AFileName: string; var AConsumer: TBenchConsumer): UInt64;
+begin
+  Result := 0;
+  case AContender of
+    cnFileStream64K:
+      ReadWithFileStream(AFileName, 64 * 1024, AConsumer);
+    cnFileStream1M:
+      ReadWithFileStream(AFileName, MiB, AConsumer);
+    cnReadFile1M:
+      ReadWithReadFile(AFileName, MiB, True, AConsumer);
+    cnOverlapped:
+      ReadWithOverlapped(AFileName, False, MiB, 8, AConsumer);
+    cnOverlappedUnbuffered:
+      ReadWithOverlapped(AFileName, True, MiB, 8, AConsumer);
+    cnIORingStream:
+      Result := ReadWithIORingStream(AFileName, [], AConsumer);
+    cnIORingStreamUnbuffered:
+      Result := ReadWithIORingStream(AFileName, [sroUnbuffered], AConsumer);
+    cnIORingReader:
+      Result := ReadWithIORingZeroCopy(AFileName, [], IORING_READER_DEFAULT_BUFFER_SIZE,
+        IORING_READER_DEFAULT_BUFFER_COUNT, AConsumer);
+    cnIORingReaderUnbuffered:
+      Result := ReadWithIORingZeroCopy(AFileName, [sroUnbuffered], IORING_READER_DEFAULT_BUFFER_SIZE,
+        IORING_READER_DEFAULT_BUFFER_COUNT, AConsumer);
+  end;
+end;
+
+function Median(AValues: array of Double): Double;
+var
+  LCount: Integer;
+  LIndex: Integer;
+  LInner: Integer;
+  LValue: Double;
+begin
+  LCount := Length(AValues);
+  // Insertion sort: a handful of values
+  for LIndex := 1 to LCount - 1 do
+  begin
+    LValue := AValues[LIndex];
+    LInner := LIndex - 1;
+    while (LInner >= 0) and (AValues[LInner] > LValue) do
+    begin
+      AValues[LInner + 1] := AValues[LInner];
+      Dec(LInner);
+    end;
+    AValues[LInner + 1] := LValue;
+  end;
+  if Odd(LCount) then
+    Result := AValues[LCount div 2]
+  else
+    Result := (AValues[LCount div 2 - 1] + AValues[LCount div 2]) / 2;
+end;
+
+procedure RunCase(const ASizeGiB: Integer; const AScenario: TScenario; const ACache: TCacheState);
+var
+  LFileName: string;
+  LWork: Cardinal;
+  LResults: array[TContender] of array of TMeasurement;
+  LContender: TContender;
+  LRun: Integer;
+  LUnbufferedPass: Boolean;
+  LConsumer: TBenchConsumer;
+  LMeasurement: TBenchMeasurement;
+  LStalls: UInt64;
+  LReference: UInt64;
+  LHaveReference: Boolean;
+  LSeconds: array of Double;
+  LUser: array of Double;
+  LKernel: array of Double;
+  LStallValues: array of Double;
+  LAllValid: Boolean;
+  LMedian: Double;
+begin
+  LFileName := BenchFileName(ASizeGiB);
+  if AScenario = scWork then
+    LWork := GWorkMicroseconds
+  else
+    LWork := 0;
+
+  for LContender := Low(TContender) to High(TContender) do
+    SetLength(LResults[LContender], 0);
+
+  if ACache = csWarm then
+  begin
+    LConsumer.Init(0);
+    RunContender(cnFileStream64K, LFileName, LConsumer);
+  end;
+
+  LHaveReference := False;
+  LReference := 0;
+  for LRun := 1 to GRuns do
+    for LUnbufferedPass := False to True do
+    begin
+      if LUnbufferedPass then
+      begin
+        if ACache = csWarm then
+          Continue;
+        ReadUnbufferedUntimed(LFileName);
+      end;
+
+      for LContender := Low(TContender) to High(TContender) do
+      begin
+        if CONTENDER_UNBUFFERED[LContender] <> LUnbufferedPass then
+          Continue;
+        if ACache = csCold then
+          PurgeFileCache(LFileName);
+
+        LConsumer.Init(LWork);
+        LMeasurement.Start;
+        LStalls := RunContender(LContender, LFileName, LConsumer);
+        LMeasurement.Stop;
+
+        if not LHaveReference then
+        begin
+          LReference := LConsumer.Checksum;
+          LHaveReference := True;
+        end;
+
+        SetLength(LResults[LContender], Length(LResults[LContender]) + 1);
+        with LResults[LContender][High(LResults[LContender])] do
+        begin
+          Seconds := LMeasurement.Seconds;
+          UserMilliseconds := LMeasurement.UserMilliseconds;
+          KernelMilliseconds := LMeasurement.KernelMilliseconds;
+          Stalls := LStalls;
+          Valid := (LConsumer.Checksum = LReference) and (LConsumer.Bytes = Int64(ASizeGiB) * 1024 * MiB);
+        end;
+      end;
+    end;
+
+  Writeln(Format('%s FPC, %d GiB, %s, %s cache (median of %d runs)',
+    [PLATFORM_NAME, ASizeGiB, SCENARIO_NAMES[AScenario], CACHE_NAMES[ACache], GRuns]));
+  Writeln(Format('  %-48s %8s %9s %9s %9s %7s', ['Contender', 'Seconds', 'MiB/s', 'User ms', 'Kernel ms', 'Stalls']));
+  for LContender := Low(TContender) to High(TContender) do
+  begin
+    if Length(LResults[LContender]) = 0 then
+      Continue;
+    SetLength(LSeconds, Length(LResults[LContender]));
+    SetLength(LUser, Length(LResults[LContender]));
+    SetLength(LKernel, Length(LResults[LContender]));
+    SetLength(LStallValues, Length(LResults[LContender]));
+    LAllValid := True;
+    for LRun := 0 to High(LResults[LContender]) do
+    begin
+      LSeconds[LRun] := LResults[LContender][LRun].Seconds;
+      LUser[LRun] := LResults[LContender][LRun].UserMilliseconds;
+      LKernel[LRun] := LResults[LContender][LRun].KernelMilliseconds;
+      LStallValues[LRun] := LResults[LContender][LRun].Stalls;
+      LAllValid := LAllValid and LResults[LContender][LRun].Valid;
+    end;
+    LMedian := Median(LSeconds);
+    Write(Format('  %-48s %8.3f %9.0f %9.0f %9.0f %7.0f',
+      [CONTENDER_NAMES[LContender], LMedian, ASizeGiB * 1024.0 / LMedian, Median(LUser), Median(LKernel),
+       Median(LStallValues)], GInvariant));
+    if not LAllValid then
+      Write('  CHECKSUM!');
+    Writeln;
+  end;
+  Writeln;
+end;
+
+var
+  LSizeIndex: Integer;
+  LScenario: TScenario;
+  LCache: TCacheState;
+begin
+  GInvariant := DefaultFormatSettings;
+  GInvariant.DecimalSeparator := '.';
+  GInvariant.ThousandSeparator := ',';
+  try
+    ParseOptions;
+    if not IORingAvailable then
+      raise Exception.Create('IoRing is not available on this system');
+
+    Writeln(Format('Free Pascal %s, %s, %d runs, files in %s', [{$I %FPCVERSION%}, PLATFORM_NAME, GRuns, GFolder]));
+    Writeln;
+
+    for LSizeIndex := 0 to High(GSizes) do
+      PrepareFile(GSizes[LSizeIndex]);
+    try
+      for LSizeIndex := 0 to High(GSizes) do
+        for LScenario := Low(TScenario) to High(TScenario) do
+        begin
+          if (LScenario = scWork) and (LSizeIndex > 0) then
+            Continue;
+          for LCache := Low(TCacheState) to High(TCacheState) do
+            RunCase(GSizes[LSizeIndex], LScenario, LCache);
+        end;
+    finally
+      if not GKeep then
+        for LSizeIndex := 0 to High(GSizes) do
+          DeleteFile(BenchFileName(GSizes[LSizeIndex]));
+    end;
+  except
+    on E: Exception do
+    begin
+      Writeln(E.ClassName, ': ', E.Message);
+      ExitCode := 1;
+    end;
+  end;
+end.

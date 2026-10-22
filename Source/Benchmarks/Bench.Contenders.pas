@@ -1,9 +1,11 @@
 ﻿unit Bench.Contenders;
 
 {
-  The ways of reading a file that the benchmark compares. Every contender
-  reads the whole file and gives the data, in file order, to a TBenchConsumer
-  (except the multi-threaded one, whose threads each read a part).
+  The ways of reading a file that the Delphi benchmark compares. Every
+  contender reads the whole file and gives the data, in file order, to a
+  TBenchConsumer (except the multi-threaded one, whose threads each read a
+  part). The reading routines shared with the Free Pascal benchmark are in
+  Bench.Readers; the ones here use Delphi-only features.
 }
 
 interface
@@ -36,31 +38,9 @@ uses
   System.SysUtils,
   System.Classes,
   Delphi.IOUring.SequentialReader,
-  Delphi.IOUring.Streams;
-
-const
-  STREAM_READ_SIZE = 64 * 1024;
+  Bench.Readers;
 
 { Classic RTL streams }
-
-procedure ReadWithFileStream(const AFileName: string; const AReadSize: Integer; var AConsumer: TBenchConsumer);
-var
-  LStream: TFileStream;
-  LBuffer: TBytes;
-  LRead: Integer;
-begin
-  SetLength(LBuffer, AReadSize);
-  LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
-  try
-    repeat
-      LRead := LStream.Read(LBuffer[0], AReadSize);
-      if LRead > 0 then
-        AConsumer.Consume(@LBuffer[0], LRead);
-    until LRead = 0;
-  finally
-    LStream.Free;
-  end;
-end;
 
 procedure ReadWithBufferedFileStream(const AFileName: string; const ABufferSize, AReadSize: Integer;
   var AConsumer: TBenchConsumer);
@@ -82,128 +62,7 @@ begin
   end;
 end;
 
-{ Plain Windows API }
-
-procedure ReadWithReadFile(const AFileName: string; const AReadSize: DWORD; const ASequentialScanHint: Boolean;
-  var AConsumer: TBenchConsumer);
-var
-  LHandle: THandle;
-  LBuffer: Pointer;
-  LRead: DWORD;
-  LFlags: DWORD;
-begin
-  LFlags := FILE_ATTRIBUTE_NORMAL;
-  if ASequentialScanHint then
-    LFlags := LFlags or FILE_FLAG_SEQUENTIAL_SCAN;
-
-  LBuffer := VirtualAlloc(nil, AReadSize, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
-  try
-    LHandle := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, LFlags, 0);
-    if LHandle = INVALID_HANDLE_VALUE then
-      RaiseLastOSError;
-    try
-      repeat
-        if not ReadFile(LHandle, LBuffer^, AReadSize, LRead, nil) then
-          RaiseLastOSError;
-        if LRead > 0 then
-          AConsumer.Consume(LBuffer, LRead);
-      until LRead = 0;
-    finally
-      CloseHandle(LHandle);
-    end;
-  finally
-    VirtualFree(LBuffer, 0, MEM_RELEASE);
-  end;
-end;
-
-// Classic asynchronous I/O without IoRing: ABufferCount overlapped ReadFile
-// calls in flight, consumed in order. The fair "is IoRing better than what
-// Windows always had?" baseline.
-procedure ReadWithOverlapped(const AFileName: string; const AUnbuffered: Boolean;
-  const ABufferSize, ABufferCount: Cardinal; var AConsumer: TBenchConsumer);
-type
-  TSlot = record
-    Overlapped: TOverlapped;
-    Data: PByte;
-  end;
-var
-  LFlags: DWORD;
-  LHandle: THandle;
-  LSize: Int64;
-  LMemory: PByte;
-  LSlots: array of TSlot;
-  LNextOffset: Int64;
-  LOutstanding: Cardinal;
-  LHead: Cardinal;
-  LIndex: Cardinal;
-  LBytes: DWORD;
-  LDummy: DWORD;
-
-  procedure Issue(const ASlot: Cardinal);
-  var
-    LEvent: THandle;
-  begin
-    LEvent := LSlots[ASlot].Overlapped.hEvent;
-    FillChar(LSlots[ASlot].Overlapped, SizeOf(TOverlapped), 0);
-    LSlots[ASlot].Overlapped.hEvent := LEvent;
-    LSlots[ASlot].Overlapped.Offset := DWORD(LNextOffset);
-    LSlots[ASlot].Overlapped.OffsetHigh := DWORD(LNextOffset shr 32);
-    if not ReadFile(LHandle, LSlots[ASlot].Data^, ABufferSize, LDummy, @LSlots[ASlot].Overlapped) then
-      if GetLastError <> ERROR_IO_PENDING then
-        RaiseLastOSError;
-    Inc(LNextOffset, ABufferSize);
-    Inc(LOutstanding);
-  end;
-
-begin
-  LFlags := FILE_ATTRIBUTE_NORMAL or FILE_FLAG_OVERLAPPED or FILE_FLAG_SEQUENTIAL_SCAN;
-  if AUnbuffered then
-    LFlags := LFlags or FILE_FLAG_NO_BUFFERING;
-
-  LSize := FileSizeOf(AFileName);
-  LMemory := VirtualAlloc(nil, NativeUInt(ABufferSize) * ABufferCount, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
-  SetLength(LSlots, ABufferCount);
-  LHandle := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, LFlags, 0);
-  if LHandle = INVALID_HANDLE_VALUE then
-    RaiseLastOSError;
-  try
-    for LIndex := 0 to ABufferCount - 1 do
-    begin
-      LSlots[LIndex].Data := LMemory + NativeUInt(LIndex) * ABufferSize;
-      LSlots[LIndex].Overlapped.hEvent := CreateEvent(nil, True, False, nil);
-    end;
-
-    LNextOffset := 0;
-    LOutstanding := 0;
-    for LIndex := 0 to ABufferCount - 1 do
-      if LNextOffset < LSize then
-        Issue(LIndex);
-
-    LHead := 0;
-    while LOutstanding > 0 do
-    begin
-      if not GetOverlappedResult(LHandle, LSlots[LHead].Overlapped, LBytes, True) then
-      begin
-        if GetLastError <> ERROR_HANDLE_EOF then
-          RaiseLastOSError;
-        LBytes := 0;
-      end;
-      Dec(LOutstanding);
-      if LBytes > 0 then
-        AConsumer.Consume(LSlots[LHead].Data, LBytes);
-      if LNextOffset < LSize then
-        Issue(LHead);
-      LHead := (LHead + 1) mod ABufferCount;
-    end;
-  finally
-    // Nothing is in flight here (the loop waited for everything), except
-    // after an error: CloseHandle cancels the rest
-    CloseHandle(LHandle);
-    for LIndex := 0 to ABufferCount - 1 do
-      CloseHandle(LSlots[LIndex].Overlapped.hEvent);
-    VirtualFree(LMemory, 0, MEM_RELEASE);
-  end;
-end;
+{ Threads }
 
 // Starts a thread that reads [AFrom, ATo) of the file into AResult
 function StartPartReader(const AFileName: string; const AReadSize: DWORD; const AFrom, ATo: Int64;
@@ -276,45 +135,6 @@ begin
     LThreads[LIndex].Free;
     AConsumer.Merge(LResults[LIndex]);
   end;
-end;
-
-{ IoRing }
-
-function ReadWithIORingStream(const AFileName: string; const AOptions: TIORingSequentialReaderOptions;
-  var AConsumer: TBenchConsumer): UInt64;
-var
-  LStream: TSequentialReadOnlyFileStream;
-  LBuffer: TBytes;
-  LRead: Integer;
-begin
-  SetLength(LBuffer, STREAM_READ_SIZE);
-  LStream := TSequentialReadOnlyFileStream.Create(AFileName, AOptions);
-  try
-    repeat
-      LRead := LStream.Read(LBuffer[0], STREAM_READ_SIZE);
-      if LRead > 0 then
-        AConsumer.Consume(@LBuffer[0], LRead);
-    until LRead = 0;
-    Result := LStream.Stats.Stalls;
-  finally
-    LStream.Free;
-  end;
-end;
-
-function ReadWithIORingZeroCopy(const AFileName: string; const AOptions: TIORingSequentialReaderOptions;
-  const ABufferSize, ABufferCount: Cardinal; var AConsumer: TBenchConsumer): UInt64;
-var
-  LReader: TIORingSequentialReader;
-  LData: PByte;
-  LLength: NativeInt;
-begin
-  LReader.Open(AFileName, AOptions, ABufferSize, ABufferCount);
-  while LReader.TryAcquireChunk(LData, LLength) do
-  begin
-    AConsumer.Consume(LData, LLength);
-    LReader.ReleaseChunk;
-  end;
-  Result := LReader.Stats.Stalls;
 end;
 
 { Contender lists }

@@ -1,6 +1,7 @@
 # Delphi.IOUring – Design Specification
 
-Status: **Draft v0.8** (2026-10-22) – Milestone 1 complete (Phases 1–5):
+Status: **Draft v0.9** (2026-10-22) – Milestone 1 complete, Milestone 2
+(Free Pascal) done for Win32 (§12.1). Milestone 1 (Phases 1–5):
 complete Windows API unit, core ring (implementation notes in §5.2),
 sequential reader (notes in §7), read-only stream (notes in §8.1),
 benchmarks ([Benchmarks.md](Benchmarks.md)). Things marked **[DECIDE]**
@@ -354,8 +355,9 @@ Rules for the managed (owning) records:
   and the dynamic-array field). Fine for owners, too much for per-operation
   values – as planned. A plain `const` parameter of type `TIORing` is passed
   by reference (no copy, no `Assign`), the same as `const [ref]`; tested in
-  Delphi. FPC 3.2.2 compiles the operator declarations; its runtime behaviour
-  is tested in Milestone 2.
+  Delphi. **[VERIFIED]** in Milestone 2 for FPC 3.2.2 (Win32): `Initialize`,
+  `Finalize` (end of scope closes and waits) and `Copy` (raises) work, and
+  `const` as well as `constref` parameters pass the original (no copy).
 
 ### 4.2 Lighter alternatives to RTL classes (idea for later)
 
@@ -750,10 +752,13 @@ function-pointer variables) and the per-call cost is one indirect jump, the
 same as a normal import. The library's `Available` check uses
 `GetProcAddress` for `QueryIoRingCapabilities`, so the check itself can
 never fail with a delay-load error. **[VERIFIED]** FPC 3.2.2 does **not**
-support `delayed` ("`;` expected but `DELAYED` found"). For now the keyword is
-written as `{$IFNDEF FPC}delayed{$ENDIF}`, so an FPC build imports statically
-and needs IoRing to start. Milestone 2 replaces that with a `GetProcAddress`
-table behind `{$IFDEF FPC}`.
+support `delayed` ("`;` expected but `DELAYED` found"). So in FPC the
+`external … delayed` part is left out (`{$IFNDEF FPC}`), and each function is
+a small wrapper in the implementation section that looks the real function up
+with `GetProcAddress` on its first call and keeps the pointer (Milestone 2).
+An FPC program therefore also starts on Windows without IoRing. A function
+the OS does not have returns `E_NOTIMPL` (`IsIoRingOpSupported`: False)
+instead of raising Delphi's delay-load error. The extra call costs about 1 ns.
 
 ABI risks – **[VERIFIED]** in Phase 1: record sizes and offsets match on Delphi
 Win32 and Win64 and on FPC 3.2.2 i386; records passed by value work on Win32
@@ -1136,7 +1141,11 @@ opt-in, C not planned.
    version slower.
 2. **Free Pascal / Lazarus on Windows** – same sources compile with the latest
    FPC/Lazarus (currently Lazarus 5.0 RC1 with FPC 3.2.2). This proves the
-   code is portable before any Linux work starts.
+   code is portable before any Linux work starts. **State 2026-10-22:** the
+   whole library compiles with FPC 3.2.2 and all 101 FPC tests pass on Win32;
+   speed is the same as with Delphi. Win64 waits for the 64-bit FPC compiler.
+   The FPC tests are separate FPCUnit units (`Source/UnitTests/FPC`), built
+   with `Source/Build-FPC.ps1`.
 3. **Linux through Free Pascal** (x86-64, AArch64) – new `Posix` backend; the
    upper layers should then compile unchanged.
 
@@ -1167,7 +1176,15 @@ Where `{$IFDEF FPC}` is accepted (and only there):
   `Windows`).
 - Managed-record operator declarations.
 - `Delphi.IOUring.Atomics` internals.
-- The API unit's import mechanism, if FPC lacks `delayed`.
+- The API unit's import mechanism (FPC has no `delayed`, §6.3).
+
+Found while porting (FPC 3.2.2), worth remembering:
+- `for` loop counters cannot be 64-bit on 32-bit targets.
+- A procedural variable in an expression is *called*; to pass the variable
+  itself use an untyped `var` parameter (or `@@`).
+- Hex literals above `High(Int64)` are read as signed: write `UInt64($…)`.
+- The FPC Windows unit lacks some functions Delphi's has (`GetFileSizeEx`,
+  `CancelIoEx`): declare them locally.
 
 No `{$IFDEF VERxxx}` for Delphi versions. Delphi 10.4–12 may work but are not
 tested.
@@ -1216,3 +1233,5 @@ tested.
 | 10 | 2026-10-22 | **Lock-free / wait-free** algorithms (CAS etc.) for the engine's hot paths, each justified by a benchmark (§10.5). |
 | 11 | 2026-10-22 | Compiler/platform order: **Delphi 13 Windows → latest FPC/Lazarus Windows → Linux via FPC**. Language baseline = what both Delphi 13 and the latest FPC support (§12). |
 | 12 | 2026-10-22 | Lighter replacements for RTL containers: **idea only**, not planned until profiling shows a need (§4.2). |
+| 13 | 2026-10-22 | Free Pascal tests are **separate FPCUnit test units** (`Source/UnitTests/FPC`), not a shared source with the DUnitX tests. |
+| 14 | 2026-10-22 | In FPC the IoRing functions are **looked up with `GetProcAddress` on first use** (no `delayed` in FPC 3.2.2); a missing function returns `E_NOTIMPL`. |
