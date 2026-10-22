@@ -37,7 +37,8 @@ Source/
   UnitTests/
     Delphi.IOUring.UnitTests.dpr/.dproj      DUnitX console runner (Delphi)
     Delphi.IOUring.UnitTests.FPC.lpi/.lpr    FPCUnit console runner (Milestone 2)
-    Tests.Backend.Windows.API.pas
+    Tests.Backend.Windows.API.Layout.pas     record layouts + helpers
+    Tests.Backend.Windows.API.pas            live API calls
     Tests.Ring.pas
     Tests.SequentialReader.pas
     Tests.Streams.pas
@@ -64,28 +65,28 @@ Source/
 
 `Delphi.IOUring.Backend.Windows.API` – everything in Design §6.2, standalone (Design §6.1):
 
-- [ ] All types, constants (incl. the 8 `IORING_E_*` codes), records, `P…` pointer types.
-- [ ] All 16 functions as `stdcall; external kernel32 … delayed`.
-- [ ] The 4 helper functions (`IoRingHandleRefFromHandle`, …) as `inline` functions.
-- [ ] Each declaration commented with minimum IoRing version (+ Microsoft Learn link where a page exists).
-- [ ] Tests (`Tests.Backend.Windows.API`) – the unit is tested on its own, without the rest of the library:
-  - [ ] `SizeOf` and field offsets of every record on Win32 and Win64 equal the C layout.
-  - [ ] Helpers produce the right `Kind` and values.
-  - [ ] `QueryIoRingCapabilities` succeeds; log version/sizes/flags.
-  - [ ] `CreateIoRing(V4)` → `GetIoRingInfo` (check power-of-two rounding and CQ ≥ 2 × SQ) → `CloseIoRing`.
-  - [ ] `IsIoRingOpSupported` for every `IORING_OP_CODE`.
-  - [ ] `SetIoRingCompletionEvent`: event signalled on empty → non-empty; `NULL` clears it.
-  - [ ] Round-trip: one small read → `SubmitIoRing(wait 1)` → `PopIoRingCompletion` returns our `UserData`; then `S_FALSE` on empty queue.
-  - [ ] **Raw read spike**: read known test file at several offsets with a raw buffer ref, verify bytes. Run on **Win32** too – this is the by-value record ABI proof (Design §6.3 risk 2).
-  - [ ] Same with `BuildIoRingRegisterFileHandles` + `BuildIoRingRegisterBuffers`; sparse entries.
-  - [ ] `BuildIoRingWriteFile` + `BuildIoRingFlushFile` + read-back.
-  - [ ] `BuildIoRingReadFileScatter` / `BuildIoRingWriteFileGather`: record the actual restrictions (buffered vs unbuffered, segment size) (Design §2.1 [VERIFY]).
-  - [ ] `BuildIoRingCancelRequest` on a long-running read; observe both completions.
-  - [ ] Error codes: SQ full → `IORING_E_SUBMISSION_QUEUE_FULL`; oversubmit → `IORING_E_COMPLETION_QUEUE_TOO_FULL`; wait timeout → record the real HRESULT (Design §2.1 [VERIFY]); concurrent submit from two threads → `IORING_E_SUBMIT_IN_PROGRESS`.
-  - [ ] Read at EOF / across EOF: record the exact HRESULT and `Information` values (Design §5.5 [VERIFY]).
-  - [ ] File opened with and without `FILE_FLAG_OVERLAPPED` – does IoRing require it? Record result.
+- [x] All types, constants (incl. the 8 `IORING_E_*` codes), records, `P…` pointer types.
+- [x] All 16 functions as `stdcall; external kernel32 … delayed` (`delayed` only for Delphi: FPC 3.2.2 does not support it).
+- [x] The 4 helper functions (`IoRingHandleRefFromHandle`, …) as `inline` functions.
+- [x] Each declaration commented with minimum IoRing version (+ Microsoft Learn link where a page exists).
+- [x] Tests (`Tests.Backend.Windows.API.Layout` and `Tests.Backend.Windows.API`, 35 tests) – the unit is tested on its own, without the rest of the library:
+  - [x] `SizeOf` and field offsets of every record on Win32 and Win64 equal the C layout.
+  - [x] Helpers produce the right `Kind` and values.
+  - [x] `QueryIoRingCapabilities` succeeds; log version/sizes/flags.
+  - [x] `CreateIoRing(V4)` → `GetIoRingInfo` (check power-of-two rounding and CQ ≥ 2 × SQ) → `CloseIoRing`.
+  - [x] `IsIoRingOpSupported` for every `IORING_OP_CODE`.
+  - [x] `SetIoRingCompletionEvent`: event signalled on empty → non-empty; `NULL` clears it.
+  - [x] Round-trip: one small read → `SubmitIoRing(wait 1)` → `PopIoRingCompletion` returns our `UserData`; then `S_FALSE` on empty queue.
+  - [x] **Raw read spike**: read known test file at several offsets with a raw buffer ref, verify bytes. Run on **Win32** too – this is the by-value record ABI proof (Design §6.3 risk 2).
+  - [x] Same with `BuildIoRingRegisterFileHandles` + `BuildIoRingRegisterBuffers`; sparse entries.
+  - [x] `BuildIoRingWriteFile` + `BuildIoRingFlushFile` + read-back.
+  - [x] `BuildIoRingReadFileScatter` / `BuildIoRingWriteFileGather`: record the actual restrictions (buffered vs unbuffered, segment size) (Design §2.1 [VERIFY]).
+  - [x] `BuildIoRingCancelRequest` on a long-running read; observe both completions.
+  - [x] Error codes: SQ full → `IORING_E_SUBMISSION_QUEUE_FULL`; oversubmit → `IORING_E_COMPLETION_QUEUE_TOO_FULL`; wait timeout → record the real HRESULT (Design §2.1 [VERIFY]); concurrent submit from two threads → `IORING_E_SUBMIT_IN_PROGRESS`.
+  - [x] Read at EOF / across EOF: record the exact HRESULT and `Information` values (Design §5.5 [VERIFY]).
+  - [x] File opened with and without `FILE_FLAG_OVERLAPPED` – does IoRing require it? Record result.
 
-**Done when:** all tests pass on Win32 and Win64. Answers to the [VERIFY] items are written back into Design.md.
+**Done when:** all tests pass on Win32 and Win64. Answers to the [VERIFY] items are written back into Design.md. **Done 2026-10-22** – 49 tests pass on Win32 and Win64; the API unit also compiles with FPC 3.2.2 (i386) with identical record layouts.
 
 ### Phase 2 – Core abstraction (Layer 1)
 

@@ -1,9 +1,10 @@
 # Delphi.IOUring – Design Specification
 
-Status: **Draft v0.3** (2026-10-22) – nothing implemented yet. Things marked
-**[DECIDE]** need an answer from the project owner; things marked **[VERIFY]**
-must be proven by a spike or unit test before building on them. Decisions
-already made are listed in §15.
+Status: **Draft v0.4** (2026-10-22) – Phase 1 (complete Windows API unit)
+implemented. Things marked **[DECIDE]** need an answer from the project owner;
+things marked **[VERIFY]** must be proven by a spike or unit test before
+building on them, and become **[VERIFIED]** with the answer once a test proves
+them. Decisions already made are listed in §15.
 
 ---
 
@@ -124,8 +125,20 @@ Error codes (`winerror.h`, facility 0x46):
 
 Learn also names `IORING_E_WAIT_TIMEOUT`, `IORING_E_UNKNOWN_VERSION` and
 `IORING_E_UNKNOWN_REQUIRED_FLAG`, which do not exist in the SDK headers.
-[VERIFY] the actual HRESULT `SubmitIoRing` returns when the wait times out
-(expected: `HRESULT_FROM_WIN32(WAIT_TIMEOUT)` = 0x80070102).
+**[VERIFIED]** what Windows really returns (Windows 11 build 26300, tests in
+`Tests.Backend.Windows.API`):
+
+| Situation | Result |
+| --- | --- |
+| `CreateIoRing` with an unknown version | `IORING_E_VERSION_NOT_SUPPORTED` |
+| `CreateIoRing` with SQ size > max | `IORING_E_SUBMISSION_QUEUE_TOO_BIG` |
+| `Build*` with a full SQ | `IORING_E_SUBMISSION_QUEUE_FULL` |
+| `SubmitIoRing` when the CQ can't take all completions | `IORING_E_COMPLETION_QUEUE_TOO_FULL`; the entries stay in the SQ and can be submitted after popping |
+| `SubmitIoRing` whose wait times out | `HRESULT_FROM_WIN32(ERROR_TIMEOUT)` = **0x800705B4** (not `WAIT_TIMEOUT`). The entries **are** submitted, but `submittedEntries` is **not written**. |
+| `SubmitIoRing` while another thread is waiting inside `SubmitIoRing` on the same ring | `IORING_E_SUBMIT_IN_PROGRESS` |
+| `PopIoRingCompletion` on an empty CQ | `S_FALSE`, and the `IORING_CQE` is **zeroed** (Learn says "unmodified") |
+| Cancelled operation | its own completion is `HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED)`; the cancel entry completes with `S_OK` |
+| `IsIoRingOpSupported` on a V4 ring | `TRUE` for all op codes, `IORING_OP_NOP` included |
 
 Important semantics:
 
@@ -170,9 +183,15 @@ Important semantics:
   the IoRing gain comes from.
 - `IORING_CREATE_SKIP_BUILDER_PARAM_CHECKS` (advisory flag) skips argument
   validation in `Build*` – a possible release-mode speed option.
-- Scatter/gather: the classic `ReadFileScatter` requires
-  `FILE_FLAG_NO_BUFFERING` and page-sized segments; [VERIFY] whether the
-  IoRing versions have the same restrictions.
+- Scatter/gather: **[VERIFIED]** like the classic `ReadFileScatter`, the
+  IoRing versions need a handle opened with `FILE_FLAG_NO_BUFFERING` and
+  page-sized, page-aligned segments. On a buffered handle `Build*` succeeds
+  but the completion is `E_INVALIDARG`.
+- **[VERIFIED]** File handles opened **without** `FILE_FLAG_OVERLAPPED` work
+  too. (Whether the I/O on them is still fully asynchronous is not tested.)
+- **[VERIFIED]** A thread that waits inside `SubmitIoRing` blocks all other
+  submits on that ring. So when more than one thread may submit, wait with the
+  completion event, never with `SubmitIoRing(…, waitOperations > 0, …)`.
 - **No socket support**, files only.
 
 ### 2.2 Linux io_uring (for the later FPC/Linux backend)
@@ -542,8 +561,9 @@ Usage styles, from fastest/most manual to most convenient:
   never raises for them – helpers (`ReadAt`, streams) do.
 - EOF is not an error: Windows returns `HRESULT_FROM_WIN32(ERROR_HANDLE_EOF)`
   (0x80070026) for reads at/after EOF; Linux returns `res = 0`.
-  `IsEndOfFile` normalizes it. [VERIFY Windows behaviour for a read that
-  *starts before* EOF and crosses it – expected: success with short count]
+  `IsEndOfFile` normalizes it. **[VERIFIED]** A read that starts before EOF
+  and crosses it completes with `S_OK` and a short count; a read starting at
+  or after EOF completes with 0x80070026 and 0 bytes.
 
 ### 5.6 Availability
 
@@ -671,11 +691,16 @@ function IoRingHandleRefFromHandle(const AHandle: THandle): IORING_HANDLE_REF; i
 function-pointer variables) and the per-call cost is one indirect jump, the
 same as a normal import. The library's `Available` check uses
 `GetProcAddress` for `QueryIoRingCapabilities`, so the check itself can
-never fail with a delay-load error. [VERIFY] that FPC 3.2.2 supports
-`delayed` for Windows targets; if not, the FPC build uses a `GetProcAddress`
+never fail with a delay-load error. **[VERIFIED]** FPC 3.2.2 does **not**
+support `delayed` ("`;` expected but `DELAYED` found"). For now the keyword is
+written as `{$IFNDEF FPC}delayed{$ENDIF}`, so an FPC build imports statically
+and needs IoRing to start. Milestone 2 replaces that with a `GetProcAddress`
 table behind `{$IFDEF FPC}`.
 
-ABI risks **[VERIFY]** – each gets a unit test before anything else is built:
+ABI risks – **[VERIFIED]** in Phase 1: record sizes and offsets match on Delphi
+Win32 and Win64 and on FPC 3.2.2 i386; records passed by value work on Win32
+and Win64 (reads, writes, registered buffers and scatter/gather return the
+right data). Original notes:
 
 1. `SizeOf` and field offsets of every record on Win32 and Win64 match the C
    layout above (in Delphi **and** later in FPC).
