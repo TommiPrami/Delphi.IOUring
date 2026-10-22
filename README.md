@@ -20,7 +20,7 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Core ring `TIORing` (`Delphi.IOUring`) | done, tested |
 | Read-ahead reader `TIORingSequentialReader` | done, tested |
 | `TSequentialReadOnlyFileStream` | done, tested, benchmarked |
-| Free Pascal / Lazarus on Windows | Win32 done: FPC 3.2.2, 101 tests pass, same speed as Delphi. Win64 waits for the 64-bit FPC compiler. |
+| Free Pascal / Lazarus on Windows | done: FPC 3.2.2, Win32 and Win64, 101 tests pass, same speed as Delphi |
 | I/O engine (threads, many requests in flight), write stream | planned |
 | Linux `io_uring` through Free Pascal | planned |
 
@@ -31,8 +31,8 @@ See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
 - **Windows 11 24H2 or newer** (IoRing version 4), Win32 or Win64.
   On older Windows the programs still start; `IORingAvailable` returns False
   and creating a ring raises `EIORingNotSupported`.
-- **Delphi 13**, or **Free Pascal 3.2.2** (Lazarus 5.0) – FPC tested on Win32
-  so far. Older Delphi versions may work but are not tested.
+- **Delphi 13**, or **Free Pascal 3.2.2** (Lazarus 5.0). Older Delphi versions
+  may work but are not tested.
 
 ## Usage
 

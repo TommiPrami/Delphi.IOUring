@@ -1,7 +1,7 @@
 # Delphi.IOUring – Design Specification
 
-Status: **Draft v0.9** (2026-10-22) – Milestone 1 complete, Milestone 2
-(Free Pascal) done for Win32 (§12.1). Milestone 1 (Phases 1–5):
+Status: **Draft v1.0** (2026-10-22) – Milestones 1 and 2 complete: Delphi 13 and
+Free Pascal 3.2.2 on Windows, Win32 and Win64 (§12.1). Milestone 1 (Phases 1–5):
 complete Windows API unit, core ring (implementation notes in §5.2),
 sequential reader (notes in §7), read-only stream (notes in §8.1),
 benchmarks ([Benchmarks.md](Benchmarks.md)). Things marked **[DECIDE]**
@@ -355,7 +355,7 @@ Rules for the managed (owning) records:
   and the dynamic-array field). Fine for owners, too much for per-operation
   values – as planned. A plain `const` parameter of type `TIORing` is passed
   by reference (no copy, no `Assign`), the same as `const [ref]`; tested in
-  Delphi. **[VERIFIED]** in Milestone 2 for FPC 3.2.2 (Win32): `Initialize`,
+  Delphi. **[VERIFIED]** in Milestone 2 for FPC 3.2.2 (Win32, Win64): `Initialize`,
   `Finalize` (end of scope closes and waits) and `Copy` (raises) work, and
   `const` as well as `constref` parameters pass the original (no copy).
 
@@ -1142,8 +1142,8 @@ opt-in, C not planned.
 2. **Free Pascal / Lazarus on Windows** – same sources compile with the latest
    FPC/Lazarus (currently Lazarus 5.0 RC1 with FPC 3.2.2). This proves the
    code is portable before any Linux work starts. **State 2026-10-22:** the
-   whole library compiles with FPC 3.2.2 and all 101 FPC tests pass on Win32;
-   speed is the same as with Delphi. Win64 waits for the 64-bit FPC compiler.
+   whole library compiles with FPC 3.2.2 and all 101 FPC tests pass on Win32
+   and Win64; speed is the same as with Delphi.
    The FPC tests are separate FPCUnit units (`Source/UnitTests/FPC`), built
    with `Source/Build-FPC.ps1`.
 3. **Linux through Free Pascal** (x86-64, AArch64) – new `Posix` backend; the

@@ -463,7 +463,7 @@ begin
 
   AssertTrue('Completion', LRing.TryPopCompletion(LCompletion));
   AssertTrue(LCompletion.ErrorMessage, LCompletion.Succeeded);
-  AssertEquals('Bytes', Int64(SEGMENT_COUNT * LPage), Int64(LCompletion.BytesTransferred));
+  AssertEquals('Bytes', Int64(SEGMENT_COUNT) * Int64(LPage), Int64(LCompletion.BytesTransferred));
   CheckPattern(LPage, LMemory, SEGMENT_COUNT * LPage);
   for LIndex := 0 to Integer(LPage) - 1 do
     if LGuard[LIndex] <> $AA then

@@ -160,19 +160,19 @@ Source/
 
 - **Phase 6 – Tool set-up**: working FPC/Lazarus with Win64 and Win32 compilers; build scripts for the library and tests.
   - [x] `Source\Build-FPC.ps1 -Project Tests|Benchmarks -Platform Win32|Win64 [-Run]`: calls the compiler binary directly, so it needs no `fpc.exe`, `fpc.cfg` or `lazbuild`.
-  - [x] Lazarus project file for the tests (`Delphi.IOUring.UnitTests.FPC.lpi`) – **not yet opened in Lazarus** (see the note below).
-  - [ ] **Win64:** waiting for a working 64-bit FPC. The Lazarus 5.0 RC1 install in `C:\lazarus` (FPC 3.2.2) only has the 32-bit compiler `ppc386.exe`; `fpc.exe`, `ppcx64.exe`, `lazbuild.exe` and `lazarus.exe` are missing. The owner repairs it; then: `Build-FPC.ps1 -Project Tests -Platform Win64 -Run`.
+  - [x] Lazarus project file for the tests (`Delphi.IOUring.UnitTests.FPC.lpi`): builds with `lazbuild` for `i386-win32` and `x86_64-win64` (output in `bin\` and `lib\`), all tests pass.
+  - [x] **Win64:** the repaired Lazarus 5.0 RC1 install (FPC 3.2.2) has `ppcx64.exe`, `fpc.exe` and `lazbuild.exe`.
 - **Phase 7 – Test runner for FPC**: **decided 2026-10-22: separate FPCUnit tests** (`Source/UnitTests/FPC/Tests.FPC.*`), the same checks as the Delphi test units. The shared helpers (`TestFileHelpers`, `TestPlatformHelpers`) are used by both. A small own console runner on FPCUnit sets the exit code.
   - [x] 101 FPC tests (Delphi has 115 because DUnitX counts each `[TestCase]` separately; the FPC tests loop over the same cases).
 - **Phase 8 – Port**: compile Milestone 1 with FPC; fix only with the allowed `{$IFDEF FPC}` places (Design §12.2).
   - [x] `delayed` replaced for FPC by functions that look themselves up with `GetProcAddress` on first use (Design §6.3), so FPC programs start on Windows without IoRing.
-  - [x] FPC [VERIFY]s answered on Win32: record layouts, records passed by value (stdcall), managed-record operators (`Initialize`/`Finalize`/`Copy`), `const`/`constref` passing without copy – all tested.
-  - [x] **All 101 FPC tests pass on Win32** (FPC 3.2.2). Win64: see Phase 6.
+  - [x] FPC [VERIFY]s answered on Win32 and Win64: record layouts, records passed by value (stdcall), managed-record operators (`Initialize`/`Finalize`/`Copy`), `const`/`constref` passing without copy – all tested.
+  - [x] **All 101 FPC tests pass on Win32 and Win64** (FPC 3.2.2), with `Build-FPC.ps1` and with `lazbuild`.
 - **Phase 9 – FPC benchmarks**:
   - [x] Reading routines moved to `Bench.Readers` (Delphi and FPC); separate small FPC program with the main contenders (the Delphi contender list uses anonymous methods).
-  - [x] Win32, Delphi and FPC run back to back: **the same speed within noise** ([Benchmarks.md](Benchmarks.md#free-pascal)). Win64: see Phase 6.
+  - [x] Win32 and Win64, Delphi and FPC run back to back: **the same speed within noise** ([Benchmarks.md](Benchmarks.md#free-pascal)).
 
-**Done when:** all tests pass with Delphi and FPC on Win32 and Win64. **State 2026-10-22: done for Win32; Win64 waits for the 64-bit FPC compiler.**
+**Done when:** all tests pass with Delphi and FPC on Win32 and Win64. **Done 2026-10-22 – Milestone 2 is complete.** Open small item: FPC shows 15 hints (no warnings) for the library units, all harmless (unused parameters of methods that only raise, variables first set by an API call).
 
 ---
 

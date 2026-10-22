@@ -180,11 +180,12 @@ sequential-scan hint on, registration on).
 ## Free Pascal
 
 Measured 2026-10-22, later the same day (Milestone 2, Phase 9): Free Pascal
-3.2.2, **Win32 only** (the 64-bit FPC compiler is not installed yet), with
-`Source/Benchmarks/FPC` – the same files, consumer and reading routines
-(`Bench.Common`, `Bench.Readers`) as the Delphi program, main contenders only.
-Delphi Win32 and FPC Win32 were run **right after each other**, 1 GiB, 3 runs,
-median MiB/s:
+3.2.2 with `Source/Benchmarks/FPC` – the same files, consumer and reading
+routines (`Bench.Common`, `Bench.Readers`) as the Delphi program, main
+contenders only. Each Delphi/FPC pair was run **right after each other**,
+1 GiB, 3 runs, median MiB/s.
+
+**Win32:**
 
 | Contender | read-through, cold: Delphi | FPC | read-through, warm: Delphi | FPC | work, cold: Delphi | FPC |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -195,17 +196,30 @@ median MiB/s:
 | IoRing stream, 64 KiB reads | 6 009 | 6 497 | 2 782 | 2 761 | 2 972 | 3 043 |
 | **IoRing reader, zero-copy** | **6 576** | **6 561** | **3 172** | **2 970** | **3 068** | **3 046** |
 
-**The library is as fast with Free Pascal as with Delphi** – the differences
-are within the run-to-run noise, and the plain RTL/Windows contenders move by
-the same amounts.
+**Win64** (measured later, after the 64-bit FPC compiler was installed):
+
+| Contender | read-through, cold: Delphi | FPC | read-through, warm: Delphi | FPC | work, cold: Delphi | FPC |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| TFileStream 64 KiB reads | 1 348 | 1 427 | 6 471 | 6 468 | 1 198 | 1 171 |
+| TFileStream 1 MiB reads | 3 494 | 3 621 | 4 445 | 7 191 | 3 295 | 3 249 |
+| ReadFile 1 MiB, sequential scan | 3 391 | 3 630 | 7 017 | 7 236 | 3 287 | 3 277 |
+| Overlapped ReadFile 1 MiB × 8 | 6 726 | 6 362 | 5 983 | 6 783 | 3 730 | 3 682 |
+| IoRing stream, 64 KiB reads | 6 550 | 6 641 | 5 719 | 5 656 | 3 515 | 3 256 |
+| **IoRing reader, zero-copy** | **6 616** | **6 696** | **6 521** | **6 677** | **3 700** | **3 637** |
+
+**The library is as fast with Free Pascal as with Delphi**, on Win32 and on
+Win64 – the differences are within the run-to-run noise (single values such
+as Delphi's warm "TFileStream 1 MiB" jump around in both directions), and the
+plain RTL/Windows contenders move by the same amounts.
 
 Two things learned on the way:
 
-- **Compare only numbers from the same session.** In this afternoon session,
+- **Compare only numbers from the same session.** During the Win32 pair,
   memory-bound work on this machine was about half as fast as in the morning
   for *both* compilers (Delphi warm read-through 3.2 GiB/s instead of 6.2), so
   an FPC run compared with the morning's Delphi numbers looked 2× slower when
-  it was not. Disk-bound cold reads were not affected.
+  it was not. Disk-bound cold reads were not affected. (During the Win64 pair
+  the machine was back to its morning speed.)
 - Free Pascal's `Move` is slower than Delphi's for large blocks (a memory-only
   test, 1 MiB blocks copied and checksummed: FPC 7.0 GiB/s, Delphi 11.1 GiB/s
   on Win32; the checksum loop alone is the same, 13.5 GiB/s). That matters for
@@ -249,10 +263,10 @@ Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.exe --sizes 1,10 --run
 Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.exe --tune --sizes 10 --runs 3
 ```
 
-Free Pascal (Win32; Win64 once `ppcx64.exe` is installed):
+Free Pascal (`-Platform Win32` or `Win64`):
 
 ```
-Source\Build-FPC.ps1 -Project Benchmarks -Platform Win32 -Run -RunArguments '--sizes','1,10','--runs','3'
+Source\Build-FPC.ps1 -Project Benchmarks -Platform Win64 -Run -RunArguments '--sizes','1,10','--runs','3'
 ```
 
 Options: `--dir` (where the test files go; default `%TEMP%\Delphi.IOUring.Bench`),

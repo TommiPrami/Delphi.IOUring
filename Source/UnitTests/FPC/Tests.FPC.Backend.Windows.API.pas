@@ -416,7 +416,7 @@ begin
   LCompletions := PopAll(FRing);
   AssertEquals('Completions', 1, Length(LCompletions));
   CheckResult('Scatter read', S_OK, LCompletions[0].ResultCode);
-  AssertEquals('Bytes', Int64(SEGMENT_COUNT * LPage), Int64(LCompletions[0].Information));
+  AssertEquals('Bytes', Int64(SEGMENT_COUNT) * Int64(LPage), Int64(LCompletions[0].Information));
   for LIndex := 0 to SEGMENT_COUNT - 1 do
     CheckPattern(LPage + UInt64(LIndex) * LPage, LMemory + NativeUInt(SEGMENT_COUNT - 1 - LIndex) * LPage, LPage);
 end;
