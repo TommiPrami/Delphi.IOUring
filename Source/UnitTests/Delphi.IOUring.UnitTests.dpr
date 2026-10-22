@@ -1,4 +1,4 @@
-program Delphi.IOUring.UnitTests;
+﻿program Delphi.IOUring.UnitTests;
 
 {$IFNDEF TESTINSIGHT}
 {$APPTYPE CONSOLE}
@@ -15,8 +15,11 @@ uses
   DUnitX.Loggers.Xml.NUnit,
   {$ENDIF}
   DUnitX.TestFramework,
+  Delphi.IOUring.Backend.Windows.API in '..\Units\Delphi.IOUring.Backend.Windows.API.pas',
   TestFileHelpers in 'TestFileHelpers.pas',
-  Tests.TestFileHelpers in 'Tests.TestFileHelpers.pas';
+  Tests.TestFileHelpers in 'Tests.TestFileHelpers.pas',
+  Tests.Backend.Windows.API.Layout in 'Tests.Backend.Windows.API.Layout.pas',
+  Tests.Backend.Windows.API in 'Tests.Backend.Windows.API.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

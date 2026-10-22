@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{6B0E8A52-3F5C-4D1E-9C2B-7A4D1E0F5C31}</ProjectGuid>
         <ProjectVersion>20.3</ProjectVersion>
@@ -71,8 +71,11 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
+        <DCCReference Include="..\Units\Delphi.IOUring.Backend.Windows.API.pas"/>
         <DCCReference Include="TestFileHelpers.pas"/>
         <DCCReference Include="Tests.TestFileHelpers.pas"/>
+        <DCCReference Include="Tests.Backend.Windows.API.Layout.pas"/>
+        <DCCReference Include="Tests.Backend.Windows.API.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
