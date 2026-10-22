@@ -1,0 +1,625 @@
+unit DUnitX.Tests.CommandLineParser;
+{***************************************************************************}
+{                                                                           }
+{           DUnitX                                                          }
+{                                                                           }
+{           Copyright (C) 2012 Vincent Parrett                              }
+{                                                                           }
+{           vincent@finalbuilder.com                                        }
+{           http://www.finalbuilder.com                                     }
+{                                                                           }
+{                                                                           }
+{***************************************************************************}
+{                                                                           }
+{  Licensed under the Apache License, Version 2.0 (the "License");          }
+{  you may not use this file except in compliance with the License.         }
+{  You may obtain a copy of the License at                                  }
+{                                                                           }
+{      http://www.apache.org/licenses/LICENSE-2.0                           }
+{                                                                           }
+{  Unless required by applicable law or agreed to in writing, software      }
+{  distributed under the License is distributed on an "AS IS" BASIS,        }
+{  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
+{  See the License for the specific language governing permissions and      }
+{  limitations under the License.                                           }
+{                                                                           }
+{***************************************************************************}
+
+interface
+
+{$I DUnitX.inc}
+
+uses
+  DUnitX.TestFramework,
+  DUnitX.CommandLine.Options,
+  DUnitX.CommandLine.Parser;
+
+type
+  TExampleEnum = (
+    enOne,
+    enTwo,
+    enThree
+  );
+
+  TExampleSet = set of TExampleEnum;
+
+  [TestFixture]
+  TCommandLineParserTests = class
+  public
+
+    [Setup]
+    procedure Setup;
+
+    [TearDown]
+    procedure TearDown;
+
+    [Test]
+    procedure Will_Raise_On_Registering_Duplicate_Options;
+
+    [Test]
+    procedure Will_Raise_On_Registering_UnNamed_Option;
+
+    [Test]
+    procedure Test_Single_Option;
+
+    [Test]
+    procedure Will_Generate_Error_For_Unknown_Option;
+
+    [Test]
+    procedure Will_Generate_Error_For_Missing_Value;
+
+    [Test]
+    procedure Can_Register_Unnamed_Parameter;
+
+    [Test]
+    procedure Can_Parse_Unnamed_Parameter;
+
+    [Test]
+    procedure Can_Parse_Multiple_Unnamed_Parameters;
+
+    [Test]
+    procedure Will_Generate_Error_For_Extra_Unamed_Parameter;
+
+    [Test]
+    procedure Can_Parse_Quoted_Value;
+
+    [Test]
+    procedure Will_Raise_For_Missing_Param_File;
+
+    [Test]
+    procedure At_Prefix_Reads_An_Options_File;
+
+    [Test]
+    procedure Can_Parse_Enum_Parameter;
+
+    [Test]
+    procedure Will_Generate_Error_For_Invalid_Enum;
+
+    [Test]
+    procedure Can_Parse_Set_Parameter;
+
+    [Test]
+    procedure Will_Generate_Error_For_Invalid_Set;
+
+    [Test]
+    procedure DontShowIgnored_Uses_Its_Value;
+
+    [Test]
+    procedure FailOnNoTests_Gives_A_Run_With_No_Tests_A_Non_Zero_Exit_Code;
+
+  end;
+
+implementation
+
+uses
+  Classes,
+  SysUtils,
+  IOUtils,
+  DUnitX.CommandLine.OptionDef,
+  DUnitX.OptionsDefinition,
+  DUnitX.RunResults;
+
+{ TCommandLineParserTests }
+
+procedure TCommandLineParserTests.Can_Parse_Enum_Parameter;
+var
+  def : IOptionDefinition;
+  test : TExampleEnum;
+  sList : TStringList;
+  parseResult : ICommandLineParseResult;
+
+begin
+  def := TOptionsRegistry.RegisterOption<TExampleEnum>('test', 't',
+    procedure(value : TExampleEnum)
+    begin
+      test := value;
+    end);
+
+  sList := TStringList.Create;
+  sList.Add('--test:enTwo');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+  finally
+    sList.Free;
+  end;
+  Assert.IsFalse(parseResult.HasErrors);
+{$IFDEF DELPHI_XE2_UP}
+  Assert.AreEqual<TExampleEnum>(enTwo, test);
+{$ENDIF}
+end;
+
+procedure TCommandLineParserTests.Can_Parse_Multiple_Unnamed_Parameters;
+var
+  def : IOptionDefinition;
+  file1 : string;
+  file2 : string;
+  sList : TStringList;
+  parseResult : ICommandLineParseResult;
+  test : boolean;
+begin
+  TOptionsRegistry.RegisterUnNamedOption<string>('the file we want to process',
+    procedure(value : string)
+    begin
+      file1 := value;
+    end);
+
+  TOptionsRegistry.RegisterUnNamedOption<string>('the second file we want to process',
+    procedure(value : string)
+    begin
+      file2 := value;
+    end);
+
+  def := TOptionsRegistry.RegisterOption<boolean>('test', 't',
+    procedure(value : boolean)
+    begin
+      test := value;
+    end);
+  def.HasValue := False;
+
+  sList := TStringList.Create;
+  sList.Add('c:\file1.txt');
+  sList.Add('--test');
+  sList.Add('c:\file2.txt');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+  finally
+    sList.Free;
+  end;
+  Assert.IsFalse(parseResult.HasErrors);
+  Assert.AreEqual('c:\file1.txt', file1);
+  Assert.AreEqual('c:\file2.txt', file2);
+end;
+
+procedure TCommandLineParserTests.Can_Parse_Quoted_Value;
+var
+  test : string;
+  test2 : string;
+  parseResult : ICommandLineParseResult;
+  sList : TStringList;
+begin
+  TOptionsRegistry.RegisterOption<string>('test', 't',
+    procedure(value : string)
+    begin
+      test := value;
+    end);
+
+  TOptionsRegistry.RegisterOption<string>('test2', 't2',
+    procedure(value : string)
+    begin
+      test2 := value;
+    end);
+
+  sList := TStringList.Create;
+  sList.Add('--test:"hello world"');
+  sList.Add('--test2:''hello world''');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+  finally
+    sList.Free;
+  end;
+  Assert.AreEqual('hello world', test);
+  Assert.AreEqual('hello world', test2);
+end;
+
+procedure TCommandLineParserTests.Can_Parse_Set_Parameter;
+var
+  def : IOptionDefinition;
+  test : TExampleSet;
+  sList : TStringList;
+  parseResult : ICommandLineParseResult;
+
+begin
+  def := TOptionsRegistry.RegisterOption<TExampleSet>('test', 't',
+    procedure(value : TExampleSet)
+    begin
+      test := value;
+    end);
+
+  sList := TStringList.Create;
+  sList.Add('--test:[enOne,enThree]');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+  finally
+    sList.Free;
+  end;
+  Assert.IsFalse(parseResult.HasErrors);
+{$IFDEF DELPHI_XE2_UP}
+  Assert.AreEqual<TExampleSet>(test, [enOne, enThree]);
+{$ENDIF}
+end;
+
+procedure TCommandLineParserTests.Can_Parse_Unnamed_Parameter;
+var
+  def : IOptionDefinition;
+  res : string;
+  sList : TStringList;
+  parseResult : ICommandLineParseResult;
+begin
+  def := TOptionsRegistry.RegisterUnNamedOption<string>('the file we want to process',
+    procedure(value : string)
+    begin
+      res := value;
+    end);
+
+  sList := TStringList.Create;
+  sList.Add('c:\test.txt');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+  finally
+    sList.Free;
+  end;
+
+  Assert.AreEqual('c:\test.txt', res);
+end;
+
+procedure TCommandLineParserTests.Can_Register_Unnamed_Parameter;
+var
+  def : IOptionDefinition;
+begin
+  def := TOptionsRegistry.RegisterUnNamedOption<string>('the file we want to process',
+    procedure(value : string)
+    begin
+    end);
+
+  Assert.IsTrue(def.IsUnnamed);
+
+end;
+
+procedure TCommandLineParserTests.Setup;
+begin
+  TOptionsRegistry.RegisteredOptions.Clear;
+  TOptionsRegistry.RegisteredUnamedOptions.Clear;
+end;
+
+procedure TCommandLineParserTests.TearDown;
+begin
+  TOptionsRegistry.RegisteredOptions.Clear;
+  TOptionsRegistry.RegisteredUnamedOptions.Clear;
+end;
+
+procedure TCommandLineParserTests.Test_Single_Option;
+var
+  def : IOptionDefinition;
+  result : boolean;
+  parseResult : ICommandLineParseResult;
+  sList : TStringList;
+begin
+  def := TOptionsRegistry.RegisterOption<boolean>('test', 't',
+    procedure(value : boolean)
+    begin
+      result := value;
+    end);
+  def.HasValue := False;
+
+  sList := TStringList.Create;
+  sList.Add('--test');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+  finally
+    sList.Free;
+  end;
+  Assert.IsTrue(result);
+
+end;
+
+procedure TCommandLineParserTests.Will_Generate_Error_For_Extra_Unamed_Parameter;
+var
+  file1 : string;
+  sList : TStringList;
+  parseResult : ICommandLineParseResult;
+  test : string;
+begin
+  TOptionsRegistry.RegisterUnNamedOption<string>('the file we want to process',
+    procedure(value : string)
+    begin
+      file1 := value;
+    end);
+
+  TOptionsRegistry.RegisterOption<string>('test', 't',
+    procedure(value : string)
+    begin
+      test := value;
+    end);
+  //  def.HasValue := False;
+
+  sList := TStringList.Create;
+  sList.Add('c:\file1.txt');
+  sList.Add('--test:hello');
+  sList.Add('c:\file2.txt');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+    TDUnitX.CurrentRunner.Log(parseResult.ErrorText);
+  finally
+    sList.Free;
+  end;
+  Assert.IsTrue(parseResult.HasErrors);
+  Assert.AreEqual('c:\file1.txt', file1);
+  Assert.AreEqual('hello', test);
+end;
+
+procedure TCommandLineParserTests.Will_Generate_Error_For_Missing_Value;
+var
+  def : IOptionDefinition;
+  result : boolean;
+  parseResult : ICommandLineParseResult;
+  sList : TStringList;
+begin
+  def := TOptionsRegistry.RegisterOption<boolean>('test', 't',
+    procedure(value : boolean)
+    begin
+      result := value;
+    end);
+  def.HasValue := True;
+
+  sList := TStringList.Create;
+  sList.Add('--test');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+    TDUnitX.CurrentRunner.Log(parseResult.ErrorText);
+  finally
+    sList.Free;
+  end;
+  Assert.IsTrue(parseResult.HasErrors);
+end;
+
+procedure TCommandLineParserTests.Will_Generate_Error_For_Unknown_Option;
+var
+  parseResult : ICommandLineParseResult;
+  sList : TStringList;
+begin
+  sList := TStringList.Create;
+  sList.Add('--blah');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+    TDUnitX.CurrentRunner.Log(parseResult.ErrorText);
+  finally
+    sList.Free;
+  end;
+  Assert.IsTrue(parseResult.HasErrors);
+
+end;
+
+procedure TCommandLineParserTests.Will_Raise_For_Missing_Param_File;
+var
+  def : IOptionDefinition;
+  parseResult : ICommandLineParseResult;
+  sList : TStringList;
+begin
+  def := TOptionsRegistry.RegisterOption<boolean>('options', 'o', nil);
+  def.IsOptionFile := true;
+  sList := TStringList.Create;
+  sList.Add('--options:"x:\blah blah.txt"');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+    TDUnitX.CurrentRunner.Log(parseResult.ErrorText);
+  finally
+    sList.Free;
+  end;
+  Assert.IsTrue(parseResult.HasErrors);
+end;
+
+procedure TCommandLineParserTests.At_Prefix_Reads_An_Options_File;
+var
+  def : IOptionDefinition;
+  fromFile : boolean;
+  fileName : string;
+  parseResult : ICommandLineParseResult;
+  sList : TStringList;
+begin
+  def := TOptionsRegistry.RegisterOption<string>('options', 'o', nil);
+  def.IsOptionFile := true;
+  fromFile := false;
+  def := TOptionsRegistry.RegisterOption<boolean>('fromfile', 'ff',
+    procedure(value : boolean)
+    begin
+      fromFile := value;
+    end);
+  def.HasValue := False;
+
+  //A full path, so the name has a drive colon in it.
+  fileName := TPath.Combine(TPath.GetTempPath, 'DUnitX.Tests.At_Prefix_Options.txt');
+  sList := TStringList.Create;
+  try
+    sList.Add('--fromfile');
+    sList.SaveToFile(fileName);
+    sList.Clear;
+    sList.Add('@' + fileName);
+    parseResult := TOptionsRegistry.Parse(sList);
+  finally
+    sList.Free;
+    DeleteFile(fileName);
+  end;
+  Assert.IsFalse(parseResult.HasErrors, parseResult.ErrorText);
+  Assert.IsTrue(fromFile, 'the option in the file was not read');
+end;
+
+procedure TCommandLineParserTests.Will_Raise_On_Registering_Duplicate_Options;
+var
+  result : boolean;
+begin
+  //same long names
+  Assert.WillRaise(
+    procedure
+    begin
+      TOptionsRegistry.RegisterOption<boolean>('test', 't',
+        procedure(value : boolean)
+        begin
+          result := value;
+        end);
+      TOptionsRegistry.RegisterOption<boolean>('test', 't',
+        procedure(value : boolean)
+        begin
+          result := value;
+        end);
+
+    end);
+
+  //same short names
+  Assert.WillRaise(
+    procedure
+    begin
+      TOptionsRegistry.RegisterOption<boolean>('test', 't',
+        procedure(value : boolean)
+        begin
+          result := value;
+        end);
+      TOptionsRegistry.RegisterOption<boolean>('t', 'blah',
+        procedure(value : boolean)
+        begin
+          result := value;
+        end);
+
+    end);
+
+end;
+
+procedure TCommandLineParserTests.Will_Raise_On_Registering_UnNamed_Option;
+begin
+  //same long names
+  Assert.WillRaise(
+    procedure
+    begin
+      TOptionsRegistry.RegisterOption<boolean>('', 't',
+        procedure(value : boolean)
+        begin
+        end);
+
+    end);
+end;
+
+procedure TCommandLineParserTests.Will_Generate_Error_For_Invalid_Enum;
+var
+  def : IOptionDefinition;
+  test : TExampleEnum;
+  sList : TStringList;
+  parseResult : ICommandLineParseResult;
+
+begin
+  def := TOptionsRegistry.RegisterOption<TExampleEnum>('test', 't',
+    procedure(value : TExampleEnum)
+    begin
+      test := value;
+    end);
+
+  sList := TStringList.Create;
+  sList.Add('--test:enbBlah');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+    TDUnitX.CurrentRunner.Log(parseResult.ErrorText);
+  finally
+    sList.Free;
+  end;
+  Assert.IsTrue(parseResult.HasErrors);
+end;
+
+procedure TCommandLineParserTests.Will_Generate_Error_For_Invalid_Set;
+var
+  def : IOptionDefinition;
+  test : TExampleSet;
+  sList : TStringList;
+  parseResult : ICommandLineParseResult;
+
+begin
+  def := TOptionsRegistry.RegisterOption<TExampleSet>('test', 't',
+    procedure(value : TExampleSet)
+    begin
+      test := value;
+    end);
+
+  sList := TStringList.Create;
+  sList.Add('--test:[enOne,enFoo]');
+  try
+    parseResult := TOptionsRegistry.Parse(sList);
+    TDUnitX.CurrentRunner.Log(parseResult.ErrorText);
+  finally
+    sList.Free;
+  end;
+  Assert.IsTrue(parseResult.HasErrors);
+
+end;
+
+procedure TCommandLineParserTests.DontShowIgnored_Uses_Its_Value;
+var
+  sList : TStringList;
+  parseResult : ICommandLineParseResult;
+  oldValue : boolean;
+begin
+  oldValue := TDUnitX.Options.DontShowIgnored;
+  sList := TStringList.Create;
+  try
+    RegisterOptions;
+
+    TDUnitX.Options.DontShowIgnored := true;
+    sList.Add('--dontshowignored:false');
+    parseResult := TOptionsRegistry.Parse(sList);
+    Assert.IsFalse(parseResult.HasErrors, parseResult.ErrorText);
+    Assert.IsFalse(TDUnitX.Options.DontShowIgnored, '--dontshowignored:false');
+
+    TDUnitX.Options.DontShowIgnored := false;
+    sList.Clear;
+    sList.Add('--dontshowignored');
+    parseResult := TOptionsRegistry.Parse(sList);
+    Assert.IsFalse(parseResult.HasErrors, parseResult.ErrorText);
+    Assert.IsTrue(TDUnitX.Options.DontShowIgnored, '--dontshowignored');
+  finally
+    sList.Free;
+    TDUnitX.Options.DontShowIgnored := oldValue;
+  end;
+end;
+
+procedure TCommandLineParserTests.FailOnNoTests_Gives_A_Run_With_No_Tests_A_Non_Zero_Exit_Code;
+var
+  sList : TStringList;
+  parseResult : ICommandLineParseResult;
+  oldExitMode : TDUnitXExitMode;
+  noTests : IRunResults;
+begin
+  oldExitMode := TDUnitX.Options.ExitMode;
+  noTests := TDUnitXRunResults.Create;
+  sList := TStringList.Create;
+  try
+    RegisterOptions;
+
+    TDUnitX.Options.ExitMode := TDUnitXExitMode.Simple;
+    Assert.AreEqual(EXIT_OK, TDUnitX.ExitCodeFor(noTests), 'by default a run with no tests still exits 0');
+
+    sList.Add('--failonnotests');
+    parseResult := TOptionsRegistry.Parse(sList);
+    Assert.IsFalse(parseResult.HasErrors, parseResult.ErrorText);
+    Assert.AreEqual(EXIT_ERRORS, TDUnitX.ExitCodeFor(noTests), 'Simple');
+
+    TDUnitX.Options.ExitMode := TDUnitXExitMode.Bitmask;
+    Assert.AreNotEqual(EXIT_OK, TDUnitX.ExitCodeFor(noTests), 'Bitmask');
+  finally
+    sList.Clear;
+    sList.Add('--failonnotests:false');
+    TOptionsRegistry.Parse(sList);
+    sList.Free;
+    TDUnitX.Options.ExitMode := oldExitMode;
+  end;
+end;
+
+initialization
+  TDUnitX.RegisterTestFixture(TCommandLineParserTests);
+end.
+
