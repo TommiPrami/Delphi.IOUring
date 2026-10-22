@@ -1060,6 +1060,49 @@ collect requests from all threads into a few rings. That is the engine.
 
 ### 10.4 Engine APIs (sketch)
 
+**Phase 13 decisions (2026-10-22, before coding; for review):**
+
+- `TIORingEngine` (class, unit `Delphi.IOUring.Engine`):
+  `Create(AMaxRequests = 1024, ASubmissionQueueSize = 256)` – request pool of
+  `AMaxRequests` slots, request queue of the same size (so enqueue never
+  fails), one ring, one I/O thread.
+- `ReadAsync(AFile: THandle; var ABuffer; ACount; AOffset; AUserData = 0;
+  AOnComplete = nil): TIORingRequestHandle`, `WriteAsync(… const ABuffer …)`,
+  `FlushAsync(AFile; AMode = rfmDefault; …)`. Buffer and handle must stay
+  valid until the request completes. When all slots are in use, the call
+  sleeps until one is free (slot-release counter + `WaitWhileEqual`).
+- `Wait(H, out ACompletion: TIORingCompletion, ATimeout): Boolean` – returns
+  the result (`UserData` = the caller's value) and frees the slot; False =
+  timeout (handle stays valid); stale handle raises `EIORingError`. Also
+  `TryGetResult` (timeout 0) and `WaitAll`.
+- `AOnComplete: procedure(const ACompletion: TIORingCompletion) of object` –
+  runs on the I/O thread; the request then frees itself and the call returns
+  an empty handle. Exceptions in it are caught and counted.
+- `BeginBatch` / `EndBatch` (per thread, threadvar): requests started in
+  between do not wake the I/O thread; `EndBatch` wakes it once, so they go to
+  the ring in one submit.
+- Payload per slot: operation, flush mode, file handle, buffer, count,
+  offset, caller's `UserData`, callback, result code, bytes, position in the
+  I/O thread's in-flight list.
+- I/O thread loop: take requests from the queue and prepare them (one that
+  does not fit waits in a "deferred" slot) → one `Submit(0)` → pop all
+  completions → sleep only if nothing happened: set the sleeping flag with
+  `Exchange`, look at the queue once more, then
+  `WaitForMultipleObjects({wake event, ring completion event})`. Producers set
+  the wake event only if they `Exchange` the sleeping flag from 1 to 0.
+- `Destroy`: stop accepting requests (counter of threads inside the start
+  calls), cancel queued requests without starting them, `PrepareCancel` every
+  request in the ring (cancel operations use `UserData` 0), wait for all
+  completions, then let threads still in `Wait` (they wake with "cancelled")
+  leave (counter) before freeing the pool. Cancelled =
+  `HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED)` (new constant
+  `IORING_RESULT_CANCELLED` and `TIORingCompletion.IsCancelled`).
+- Stats (written by the I/O thread, read with `LoadAcquire`): requests,
+  completed, failed, cancelled, submits, sleeps, callback errors.
+- Not in Phase 13: cancelling one request, registered files/buffers. Known
+  limit: if the ring itself fails (a system call error, not an I/O error),
+  the I/O thread stops.
+
 - `ReadAsync / WriteAsync / FlushAsync(...) : TIORingRequestHandle`, `Wait`,
   `WaitAll`, `TryGetResult`.
 - `BeginBatch / EndBatch`: many requests from one thread go into the queue as
