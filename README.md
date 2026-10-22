@@ -20,8 +20,9 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Core ring `TIORing` (`Delphi.IOUring`) | done, tested |
 | Read-ahead reader `TIORingSequentialReader` | done, tested |
 | `TSequentialReadOnlyFileStream` | done, tested, benchmarked |
-| Free Pascal / Lazarus on Windows | done: FPC 3.2.2, Win32 and Win64, 101 tests pass, same speed as Delphi |
-| I/O engine (threads, many requests in flight), write stream | planned |
+| Free Pascal / Lazarus on Windows | done: FPC 3.2.2, Win32 and Win64, all tests pass, same speed as Delphi |
+| Atomics for the engine (`Delphi.IOUring.Atomics`: CAS, acquire/release, wait/wake) | done, tested (Delphi and FPC) |
+| I/O engine (threads, many requests in flight), write stream | in progress |
 | Linux `io_uring` through Free Pascal | planned |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
@@ -108,6 +109,8 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
 - Tests, Delphi: `Source\UnitTests\Delphi.IOUring.UnitTests.dproj` (DUnitX, Win32 and Win64).
 - Tests, Free Pascal: `Source\Build-FPC.ps1 -Project Tests -Platform Win32 -Run`
   (FPCUnit; calls the compiler directly, no `fpc.exe` or `lazbuild` needed).
+  Add `-Optimize` to build them with `-O3`; the multi-thread tests mean most
+  that way (with Delphi: the Release configuration).
   Lazarus project: `Source\UnitTests\FPC\Delphi.IOUring.UnitTests.FPC.lpi`.
 - Benchmarks: `Source\Benchmarks\Delphi.IOUring.Benchmarks.dproj`, and for Free
   Pascal `Source\Build-FPC.ps1 -Project Benchmarks` – see

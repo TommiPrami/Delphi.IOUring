@@ -26,7 +26,8 @@ uses
   Tests.FPC.Backend.Windows.API,
   Tests.FPC.Ring,
   Tests.FPC.SequentialReader,
-  Tests.FPC.Streams;
+  Tests.FPC.Streams,
+  Tests.FPC.Atomics;
 
 type
   // TComponent: interface without reference counting, as TTestResult expects

@@ -19,6 +19,10 @@
 .PARAMETER FpcDir
     The FPC folder of the Lazarus installation. Default C:\lazarus\fpc\3.2.2.
 
+.PARAMETER Optimize
+    Tests only: compile with -O3 too. The atomics tests mean most with
+    optimization on. (Benchmarks are always optimized.)
+
 .PARAMETER Run
     Run the program after a successful build. The exit code is the program's.
 
@@ -27,6 +31,9 @@
 
 .EXAMPLE
     .\Build-FPC.ps1 -Project Tests -Platform Win32 -Run
+
+.EXAMPLE
+    .\Build-FPC.ps1 -Project Tests -Platform Win64 -Optimize -Run
 
 .EXAMPLE
     .\Build-FPC.ps1 -Project Benchmarks -Run -RunArguments '--sizes','1,10','--runs','3'
@@ -38,6 +45,7 @@ param(
     [ValidateSet('Win32', 'Win64')]
     [string] $Platform = 'Win32',
     [string] $FpcDir = 'C:\lazarus\fpc\3.2.2',
+    [switch] $Optimize,
     [switch] $Run,
     [string[]] $RunArguments = @()
 )
@@ -73,6 +81,9 @@ if ($Project -eq 'Tests') {
     $programFile = 'Delphi.IOUring.UnitTests.FPC.lpr'
     $extraUnits = @(Join-Path $sourceDir 'UnitTests')       # TestFileHelpers, TestPlatformHelpers
     $codeOptions = @('-g', '-gl')                            # debug info with line numbers
+    if ($Optimize) {
+        $codeOptions += '-O3'
+    }
 } else {
     $projectDir = Join-Path $sourceDir 'Benchmarks\FPC'
     $programFile = 'Delphi.IOUring.Benchmarks.FPC.lpr'

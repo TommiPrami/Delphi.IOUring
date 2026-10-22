@@ -1,10 +1,11 @@
 # Delphi.IOUring – Design Specification
 
-Status: **Draft v1.0** (2026-10-22) – Milestones 1 and 2 complete: Delphi 13 and
+Status: **Draft v1.1** (2026-10-22) – Milestones 1 and 2 complete: Delphi 13 and
 Free Pascal 3.2.2 on Windows, Win32 and Win64 (§12.1). Milestone 1 (Phases 1–5):
 complete Windows API unit, core ring (implementation notes in §5.2),
 sequential reader (notes in §7), read-only stream (notes in §8.1),
-benchmarks ([Benchmarks.md](Benchmarks.md)). Things marked **[DECIDE]**
+benchmarks ([Benchmarks.md](Benchmarks.md)). Milestone 3 started: the
+atomics unit (Phase 10, notes in §10.6). Things marked **[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
 **[VERIFIED]** with the answer once a test proves them. Decisions already made
@@ -234,7 +235,7 @@ barrier. That is the shape of the core API. Everything outside the subset
  │   Delphi.IOUring.SequentialReader  TIORingSequentialReader (record)   │
  │   later: Delphi.IOUring.Engine     I/O thread(s), request pool,        │
  │                                    read streams, overlap handling      │
- │   later: Delphi.IOUring.Atomics    CAS / fences / wait-on-address      │
+ │   Delphi.IOUring.Atomics           CAS / fences / wait-on-address      │
  ├────────────────────────────────────────────────────────────────────────┤
  │ Layer 1 – Core abstraction (OS independent, records)                   │
  │   Delphi.IOUring.Backend.Custom    shared types, constants, errors     │
@@ -260,7 +261,7 @@ Unit responsibilities:
 | `Delphi.IOUring` *(new)* | `TIORing` = the platform ring type (compile-time alias), `IORingAvailable`, blocking helpers | Custom + platform unit via `{$IFDEF}` |
 | `Delphi.IOUring.SequentialReader` *(new)* | Read-ahead engine, usable without streams | `Delphi.IOUring` |
 | `Delphi.IOUring.Streams` | `TStream` descendants | SequentialReader |
-| `Delphi.IOUring.Atomics` *(later)* | One place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5) | RTL |
+| `Delphi.IOUring.Atomics` *(new)* | `TAtomic`: one place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5, §10.6) | RTL only |
 | `Delphi.IOUring.Engine` *(later)* | §10, §11 | `Delphi.IOUring`, Atomics |
 
 The "all OS-specific code lives in the `Backend.<OS>` units" rule still holds:
@@ -1089,6 +1090,70 @@ Lock-free is not automatically faster: under low contention a slim lock
 against a lock-based version before it is accepted; if the lock wins or
 ties, the lock stays.
 
+### 10.6 Atomics unit – implementation notes (Phase 10)
+
+`Delphi.IOUring.Atomics` has one type, `TAtomic`: a record with only static
+class methods (nothing to create). Most methods are `inline`.
+
+| Group | Methods | Types |
+| --- | --- | --- |
+| Read-modify-write, full barrier | `CompareExchange`, `TryCompareExchange`, `Exchange` (return the old value); `FetchAdd` (old value); `Increment`, `Decrement` (new value) | `Integer`, `Cardinal`, `Int64`, `UInt64`; `Pointer` for the first three |
+| Ordered load / store | `LoadAcquire`, `StoreRelease` | the same five types |
+| Other | `FullBarrier`, `CpuPause` | – |
+| Sleep / wake | `WaitWhileEqual` (with timeout), `WakeOne`, `WakeAll` | 32-bit only – the Linux futex has the same limit |
+
+`NativeInt` / `NativeUInt` variables pick the 32-bit or 64-bit versions by
+themselves (both compilers). Only the `Integer` and `Int64` versions have
+their own code; the others call them through a typecast of the same size.
+Constants: `IORING_CACHE_LINE_SIZE = 64`, `IORING_WAIT_INFINITE`.
+
+| | Delphi | Free Pascal |
+| --- | --- | --- |
+| CAS, exchange, add | intrinsics (`AtomicCmpExchange`, `AtomicExchange`, `AtomicIncrement`), 64-bit also on Win32 | RTL `Interlocked*` (calls). i386 has no 64-bit versions at all: `CompareExchange(Int64)` is `LOCK CMPXCHG8B` in assembler, 64-bit exchange/add are CAS loops |
+| 64-bit load / store on Win32 | one SSE move (assembler) | the same |
+| 64-bit store on x64 | plain store | 1-instruction assembler routine (see below) |
+| `FullBarrier` | `MemoryBarrier` | `LOCK OR [ESP/RSP], 0` |
+| `CpuPause` | `YieldProcessor` (`PAUSE`) | `PAUSE` in assembler |
+| Sleep / wake | `WaitOnAddress`, `WakeByAddressSingle`, `WakeByAddressAll` from `api-ms-win-core-synch-l1-2-0.dll` (Windows 8+), normal import | the same |
+
+The unit stops with a compile error on CPUs other than x86/x64 (they need
+real acquire/release barriers – Milestone 4) and on systems other than
+Windows (futex – Milestone 4).
+
+Findings **[VERIFIED]**:
+
+- **A plain 64-bit read on Win32 can see half of a write.** One thread
+  switches a value between `$00000000FFFFFFFF` and `$FFFFFFFF00000000`,
+  another reads it 2 million times: plain reads saw a mixed value 49–5 381
+  times per run, `LoadAcquire` never. On Win64 plain reads were always whole.
+- **FPC x64 writes a 64-bit constant that does not fit in 32 bits as two
+  32-bit stores** (`movl $0,(%rax)` + `movl $-1,4(%rax)`), with and without
+  optimization. After inlining, `StoreRelease(X, $FFFFFFFF00000000)` became
+  such a store, and the test above found 4 244 half-written values. Fix: on
+  FPC x64 the 64-bit `StoreRelease` is a 1-instruction assembler routine (the
+  value arrives in a register). Delphi Win64 puts the constant in a register
+  and writes it with one store (checked in the machine code, with and
+  without optimization).
+- **Neither compiler keeps a shared value in a register across loop
+  rounds.** FPC's code at `-O3` and `-O4` reads the variable again in every
+  round (checked in the assembler output). The test
+  `Spin_SeesWriteOfOtherThread` (a loop without any call in it) passes with
+  Delphi Release and FPC `-O3`.
+- **`WaitOnAddress` spins briefly before it sleeps** (seen from the timing):
+  two threads passing a turn back and forth with wait/wake need only
+  ~0.15–0.3 µs per hand-over, which is too fast for a kernel sleep. So a
+  waiter that is woken quickly costs no system call; the ping-pong test
+  holds every 16th turn for 200 µs so that the other thread really sleeps
+  and must be woken.
+
+Tests: `Tests.Atomics` (DUnitX) and `Tests.FPC.Atomics` (FPCUnit), 20 each:
+every method for every type (64-bit values have different upper and lower
+halves); counters from 4 threads that must come out exact; the half-write
+test; release/acquire hand-over of data 100 000 times; the spin-loop test;
+wait timeout, wake one, wake all; ping-pong without lost wake-ups. They pass
+with Delphi Debug and Release, and with FPC with and without `-O3`
+(`Build-FPC.ps1 -Optimize`), Win32 and Win64.
+
 ---
 
 ## 11. Overlapping reads and writes (later) – options
@@ -1142,10 +1207,11 @@ opt-in, C not planned.
 2. **Free Pascal / Lazarus on Windows** – same sources compile with the latest
    FPC/Lazarus (currently Lazarus 5.0 RC1 with FPC 3.2.2). This proves the
    code is portable before any Linux work starts. **State 2026-10-22:** the
-   whole library compiles with FPC 3.2.2 and all 101 FPC tests pass on Win32
-   and Win64; speed is the same as with Delphi.
+   whole library compiles with FPC 3.2.2 and all FPC tests pass on Win32
+   and Win64 (101 at the end of Milestone 2, 121 after Phase 10); speed is
+   the same as with Delphi.
    The FPC tests are separate FPCUnit units (`Source/UnitTests/FPC`), built
-   with `Source/Build-FPC.ps1`.
+   with `Source/Build-FPC.ps1` (`-Optimize` adds `-O3`).
 3. **Linux through Free Pascal** (x86-64, AArch64) – new `Posix` backend; the
    upper layers should then compile unchanged.
 
@@ -1184,7 +1250,14 @@ Found while porting (FPC 3.2.2), worth remembering:
   itself use an untyped `var` parameter (or `@@`).
 - Hex literals above `High(Int64)` are read as signed: write `UInt64($…)`.
 - The FPC Windows unit lacks some functions Delphi's has (`GetFileSizeEx`,
-  `CancelIoEx`): declare them locally.
+  `CancelIoEx`, `WaitOnAddress`): declare them locally.
+- On x64, FPC writes a 64-bit constant that does not fit in 32 bits as two
+  32-bit stores. Harmless in normal code, wrong for a value another thread
+  reads at the same time – shared 64-bit values are written only through
+  `TAtomic` (§10.6).
+- `-O3` adds data-flow warnings ("does not seem to be initialized") that
+  the default build does not show; build the tests with
+  `Build-FPC.ps1 -Optimize` now and then.
 
 No `{$IFDEF VERxxx}` for Delphi versions. Delphi 10.4–12 may work but are not
 tested.

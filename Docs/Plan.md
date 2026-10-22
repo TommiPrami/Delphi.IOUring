@@ -32,9 +32,9 @@ Source/
     Delphi.IOUring.Backend.Posix.pas         TLinuxIORing (Milestone 4)
     Delphi.IOUring.SequentialReader.pas      read-ahead engine (record)        (new)
     Delphi.IOUring.Streams.pas               TStream descendants
-    Delphi.IOUring.Atomics.pas               CAS / fences / wait-on-address    (Milestone 3)
+    Delphi.IOUring.Atomics.pas               TAtomic: CAS / fences / wait-wake (new)
     Delphi.IOUring.Engine.pas                I/O thread(s), request pool       (Milestone 3)
-  Build-FPC.ps1                              builds/runs the FPC tests or benchmark (no fpc.exe/lazbuild needed)
+  Build-FPC.ps1                              builds/runs the FPC tests or benchmark (no fpc.exe/lazbuild needed; -Optimize)
   UnitTests/
     Delphi.IOUring.UnitTests.dpr/.dproj      DUnitX console runner (Delphi)
     FPC/                                     Free Pascal tests (FPCUnit), separate from the DUnitX ones
@@ -45,6 +45,7 @@ Source/
     Tests.Ring.pas                           the core ring (TIORing)
     Tests.SequentialReader.pas               the read-ahead reader
     Tests.Streams.pas                        TSequentialReadOnlyFileStream
+    Tests.Atomics.pas                        TAtomic, incl. multi-thread stress
     TestFileHelpers.pas                      generates deterministic test files
     TestPlatformHelpers.pas                  files, pipes, page memory for tests
   Benchmarks/
@@ -179,6 +180,12 @@ Source/
 ## Milestone 3 – I/O engine (Design §10, §11) – Delphi and FPC
 
 - **Phase 10 – Atomics unit**: `Delphi.IOUring.Atomics` (CAS 32/64 incl. Win32 64-bit CAS, exchange, add, load-acquire/store-release, pause, wait/wake on address), tests incl. multi-thread stress.
+  - [x] `TAtomic` (record, static methods): `CompareExchange`, `TryCompareExchange`, `Exchange`, `FetchAdd`, `Increment`, `Decrement`, `LoadAcquire`, `StoreRelease` for `Integer`, `Cardinal`, `Int64`, `UInt64` (and `Pointer`); `FullBarrier`, `CpuPause`; `WaitWhileEqual` / `WakeOne` / `WakeAll` on 32-bit values (Design §10.6).
+  - [x] Win32: 64-bit CAS is `LOCK CMPXCHG8B` (own assembler for FPC; Delphi's intrinsic does it itself); 64-bit load/store is one SSE move.
+  - [x] Tests `Tests.Atomics` / `Tests.FPC.Atomics` (20 each): every method and type; exact counters from 4 threads; no half-written 64-bit values; release/acquire hand-over; a spin loop sees another thread's write; wait timeout, wake one / all, ping-pong without lost wake-ups.
+  - [x] Also run with optimization on: Delphi Release, FPC `-O3` (new switch `Build-FPC.ps1 -Optimize`). This found a real FPC x64 problem – a 64-bit constant written as two 32-bit stores – now fixed (Design §10.6).
+
+  **Done 2026-10-22** – Delphi 135 tests and FPC 121 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 11 – Request pool**: fixed array of plain records, states, `NativeUInt` handle packing (index + generation, Win32 layout), lock-free free list with ABA tag. Stale-handle tests, multi-thread stress.
 - **Phase 12 – Lock-free request queue**: bounded array queue with per-cell sequence numbers, cache-line padding. Benchmark against an SRW-lock queue; keep whichever wins (Design §10.5).
 - **Phase 13 – Engine with one I/O thread**: I/O thread loop (drain → prepare → one submit → reap → notify), sleep/wake protocol without syscalls when busy, `WaitOnAddress` waiting, `BeginBatch`/`EndBatch`, clean shutdown with requests in flight (every request completes: ok / error / cancelled). Stress test: many producer threads, random reads, all data verified. Stats counters.
@@ -199,5 +206,6 @@ Source/
 
 ## Immediate next step
 
-Start Phase 0 + Phase 1. The Win32 by-value ABI spike in Phase 1 is the first
-real risk and decides some details in Design §6.3.
+Phase 11 – the request pool: fixed array of records, handles with index +
+generation, and the lock-free free list (Treiber stack with an ABA tag, built
+on `TAtomic.CompareExchange` of 64 bits).

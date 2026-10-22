@@ -150,6 +150,7 @@ function TWindowsIoRingApiTests.FindCompletion(const ACompletions: TCompletionAr
 var
   LIndex: Integer;
 begin
+  Result := Default(IORING_CQE);
   for LIndex := 0 to High(ACompletions) do
     if ACompletions[LIndex].UserData = AUserData then
       Exit(ACompletions[LIndex]);

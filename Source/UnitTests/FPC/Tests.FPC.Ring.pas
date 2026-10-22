@@ -318,6 +318,8 @@ begin
   for LSlot := 0 to SLOT_COUNT - 1 do
   begin
     SetLength(LBuffers[LSlot], MAX_READ_SIZE);
+    LOffsets[LSlot] := 0;
+    LLengths[LSlot] := 0;
     LBusy[LSlot] := False;
     LFreeSlots[LSlot] := LSlot;
   end;
