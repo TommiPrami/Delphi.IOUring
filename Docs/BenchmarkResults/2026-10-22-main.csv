@@ -1,0 +1,403 @@
+timestamp,platform,size_gib,scenario,cache,contender,run,seconds,mib_per_s,user_ms,kernel_ms,stalls,checksum_ok
+2026-10-22 11:39:02,Win64,1,read-through,cold,"TFileStream 64 KiB reads",1,0.5861,1747.1,0.0,46.9,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"TFileStream 1 MiB reads",1,0.4009,2554.5,15.6,93.8,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,0.4021,2546.3,93.8,156.3,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"ReadFile 1 MiB, sequential scan",1,0.4010,2553.4,15.6,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",1,0.3983,2571.0,31.3,93.8,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8",1,0.1522,6729.4,31.3,31.3,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"4 threads, ReadFile 1 MiB",1,0.1581,6477.1,78.1,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing stream, 64 KiB reads",1,0.1544,6633.7,62.5,31.3,781,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing reader, zero-copy",1,0.1564,6549.3,46.9,15.6,892,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",1,0.1537,6662.9,31.3,31.3,903,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",1,0.2812,3642.1,31.3,31.3,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",1,0.2827,3622.8,0.0,0.0,1020,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing reader, zero-copy, unbuffered",1,0.2798,3659.9,0.0,0.0,1024,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"TFileStream 64 KiB reads",2,0.7633,1341.5,78.1,156.3,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"TFileStream 1 MiB reads",2,0.2864,3575.0,31.3,46.9,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,0.2912,3516.2,0.0,78.1,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"ReadFile 1 MiB, sequential scan",2,0.2898,3533.4,46.9,93.8,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",2,0.2925,3500.3,15.6,156.3,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8",2,0.1518,6743.8,15.6,31.3,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"4 threads, ReadFile 1 MiB",2,0.1620,6319.5,93.8,62.5,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing stream, 64 KiB reads",2,0.1549,6609.9,15.6,31.3,791,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing reader, zero-copy",2,0.1577,6493.2,46.9,31.3,887,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",2,0.1534,6674.5,31.3,31.3,993,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",2,0.2857,3584.0,15.6,31.3,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",2,0.2858,3582.7,15.6,15.6,1022,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing reader, zero-copy, unbuffered",2,0.2503,4090.7,15.6,0.0,1016,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"TFileStream 64 KiB reads",3,0.7283,1406.1,62.5,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"TFileStream 1 MiB reads",3,0.2944,3478.3,31.3,62.5,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,0.2907,3522.0,0.0,140.6,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"ReadFile 1 MiB, sequential scan",3,0.2892,3540.3,15.6,62.5,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",3,0.2899,3532.5,46.9,93.8,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8",3,0.1521,6733.2,15.6,46.9,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"4 threads, ReadFile 1 MiB",3,0.1690,6058.8,62.5,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing stream, 64 KiB reads",3,0.1536,6668.0,46.9,15.6,814,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing reader, zero-copy",3,0.1531,6690.5,62.5,0.0,903,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",3,0.1569,6528.4,31.3,15.6,880,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",3,0.2821,3629.8,31.3,15.6,0,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",3,0.2816,3636.2,46.9,0.0,1024,True
+2026-10-22 11:39:02,Win64,1,read-through,cold,"IoRing reader, zero-copy, unbuffered",3,0.2173,4711.7,46.9,15.6,1013,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"TFileStream 64 KiB reads",1,0.1522,6727.8,46.9,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"TFileStream 1 MiB reads",1,0.1371,7471.5,15.6,125.0,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,0.1497,6842.0,62.5,78.1,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"ReadFile 1 MiB, sequential scan",1,0.1404,7293.1,31.3,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",1,0.1329,7706.3,31.3,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"Overlapped ReadFile 1 MiB x 8",1,0.1414,7243.8,31.3,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"4 threads, ReadFile 1 MiB",1,0.0580,17668.8,62.5,125.0,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"IoRing stream, 64 KiB reads",1,0.1653,6195.0,46.9,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"IoRing reader, zero-copy",1,0.1482,6910.9,15.6,140.6,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",1,0.1500,6827.1,31.3,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"TFileStream 64 KiB reads",2,0.1535,6672.9,0.0,156.3,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"TFileStream 1 MiB reads",2,0.1362,7520.1,31.3,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,0.1525,6716.9,15.6,125.0,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"ReadFile 1 MiB, sequential scan",2,0.1371,7470.3,31.3,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",2,0.1346,7609.4,46.9,93.8,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"Overlapped ReadFile 1 MiB x 8",2,0.1407,7276.4,31.3,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"4 threads, ReadFile 1 MiB",2,0.0577,17737.7,93.8,93.8,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"IoRing stream, 64 KiB reads",2,0.1692,6053.2,46.9,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"IoRing reader, zero-copy",2,0.1502,6819.2,46.9,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",2,0.1453,7048.1,15.6,125.0,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"TFileStream 64 KiB reads",3,0.1533,6680.1,31.3,125.0,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"TFileStream 1 MiB reads",3,0.1391,7362.2,31.3,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,0.1533,6679.4,31.3,125.0,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"ReadFile 1 MiB, sequential scan",3,0.1344,7616.6,31.3,93.8,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",3,0.1356,7554.2,15.6,125.0,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"Overlapped ReadFile 1 MiB x 8",3,0.1472,6955.5,31.3,125.0,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"4 threads, ReadFile 1 MiB",3,0.0571,17947.1,125.0,31.3,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"IoRing stream, 64 KiB reads",3,0.1662,6159.5,46.9,125.0,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"IoRing reader, zero-copy",3,0.1478,6929.6,31.3,109.4,0,True
+2026-10-22 11:39:02,Win64,1,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",3,0.1463,6999.1,0.0,156.3,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"TFileStream 64 KiB reads",1,0.7122,1437.9,281.3,109.4,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"TFileStream 1 MiB reads",1,0.3317,3086.8,218.8,93.8,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,0.3329,3075.7,218.8,125.0,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"ReadFile 1 MiB, sequential scan",1,0.3228,3172.1,218.8,78.1,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"ReadFile 1 MiB, no sequential-scan hint",1,0.3222,3178.0,218.8,93.8,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"Overlapped ReadFile 1 MiB x 8",1,0.2722,3762.2,203.1,62.5,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing stream, 64 KiB reads",1,0.2862,3577.5,218.8,62.5,1,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing reader, zero-copy",1,0.2727,3755.2,265.6,15.6,2,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing reader, zero-copy, no seq.-scan hint",1,0.2712,3775.3,218.8,62.5,3,True
+2026-10-22 11:39:02,Win64,1,work,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",1,0.2814,3639.1,265.6,15.6,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing stream, 64 KiB reads, unbuffered",1,0.2838,3608.5,250.0,0.0,398,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing reader, zero-copy, unbuffered",1,0.2648,3866.6,203.1,15.6,415,True
+2026-10-22 11:39:02,Win64,1,work,cold,"TFileStream 64 KiB reads",2,0.8582,1193.2,265.6,187.5,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"TFileStream 1 MiB reads",2,0.3290,3112.6,234.4,78.1,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,0.3309,3094.5,281.3,46.9,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"ReadFile 1 MiB, sequential scan",2,0.3223,3177.4,234.4,93.8,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"ReadFile 1 MiB, no sequential-scan hint",2,0.3361,3047.2,281.3,46.9,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"Overlapped ReadFile 1 MiB x 8",2,0.2665,3841.8,218.8,31.3,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing stream, 64 KiB reads",2,0.2878,3558.1,234.4,62.5,1,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing reader, zero-copy",2,0.2713,3774.0,234.4,31.3,3,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing reader, zero-copy, no seq.-scan hint",2,0.2718,3767.3,218.8,46.9,3,True
+2026-10-22 11:39:02,Win64,1,work,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",2,0.2615,3916.1,187.5,15.6,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing stream, 64 KiB reads, unbuffered",2,0.2682,3817.4,218.8,46.9,1,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing reader, zero-copy, unbuffered",2,0.2557,4005.4,234.4,15.6,2,True
+2026-10-22 11:39:02,Win64,1,work,cold,"TFileStream 64 KiB reads",3,0.8378,1222.2,296.9,93.8,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"TFileStream 1 MiB reads",3,0.3296,3106.3,265.6,46.9,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,0.3350,3057.0,328.1,15.6,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"ReadFile 1 MiB, sequential scan",3,0.3219,3180.9,250.0,46.9,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"ReadFile 1 MiB, no sequential-scan hint",3,0.3284,3117.8,218.8,109.4,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"Overlapped ReadFile 1 MiB x 8",3,0.2724,3758.9,203.1,46.9,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing stream, 64 KiB reads",3,0.2889,3544.1,218.8,62.5,4,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing reader, zero-copy",3,0.2682,3818.1,203.1,62.5,1,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing reader, zero-copy, no seq.-scan hint",3,0.2719,3765.7,234.4,31.3,2,True
+2026-10-22 11:39:02,Win64,1,work,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",3,0.2836,3610.6,203.1,62.5,0,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing stream, 64 KiB reads, unbuffered",3,0.2796,3662.4,250.0,31.3,324,True
+2026-10-22 11:39:02,Win64,1,work,cold,"IoRing reader, zero-copy, unbuffered",3,0.2763,3706.3,187.5,46.9,792,True
+2026-10-22 11:39:02,Win64,1,work,warm,"TFileStream 64 KiB reads",1,0.3594,2849.1,250.0,109.4,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"TFileStream 1 MiB reads",1,0.3487,2936.5,296.9,46.9,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,0.3593,2849.7,250.0,109.4,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"ReadFile 1 MiB, sequential scan",1,0.3437,2979.6,218.8,125.0,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"ReadFile 1 MiB, no sequential-scan hint",1,0.3434,2981.8,171.9,156.3,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"Overlapped ReadFile 1 MiB x 8",1,0.3534,2897.7,281.3,78.1,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"IoRing stream, 64 KiB reads",1,0.3748,2732.1,234.4,140.6,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"IoRing reader, zero-copy",1,0.3584,2857.1,250.0,93.8,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"IoRing reader, zero-copy, no seq.-scan hint",1,0.3536,2895.5,218.8,140.6,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"TFileStream 64 KiB reads",2,0.3613,2834.0,203.1,156.3,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"TFileStream 1 MiB reads",2,0.3416,2997.3,171.9,171.9,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,0.3565,2872.5,203.1,156.3,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"ReadFile 1 MiB, sequential scan",2,0.3447,2971.0,265.6,62.5,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"ReadFile 1 MiB, no sequential-scan hint",2,0.3438,2978.9,281.3,62.5,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"Overlapped ReadFile 1 MiB x 8",2,0.3555,2880.7,281.3,78.1,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"IoRing stream, 64 KiB reads",2,0.3762,2721.6,250.0,125.0,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"IoRing reader, zero-copy",2,0.3539,2893.4,234.4,109.4,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"IoRing reader, zero-copy, no seq.-scan hint",2,0.3535,2896.8,203.1,156.3,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"TFileStream 64 KiB reads",3,0.3619,2829.8,296.9,62.5,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"TFileStream 1 MiB reads",3,0.3445,2972.5,234.4,109.4,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,0.3584,2857.3,250.0,109.4,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"ReadFile 1 MiB, sequential scan",3,0.3411,3001.7,250.0,93.8,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"ReadFile 1 MiB, no sequential-scan hint",3,0.3395,3016.2,281.3,62.5,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"Overlapped ReadFile 1 MiB x 8",3,0.3540,2892.9,250.0,93.8,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"IoRing stream, 64 KiB reads",3,0.3771,2715.4,281.3,93.8,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"IoRing reader, zero-copy",3,0.3550,2884.2,234.4,109.4,0,True
+2026-10-22 11:39:02,Win64,1,work,warm,"IoRing reader, zero-copy, no seq.-scan hint",3,0.3618,2830.5,281.3,62.5,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"TFileStream 64 KiB reads",1,6.1043,1677.5,281.3,1015.6,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"TFileStream 1 MiB reads",1,4.0820,2508.6,468.8,1000.0,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,4.0457,2531.1,578.1,843.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"ReadFile 1 MiB, sequential scan",1,4.0530,2526.5,187.5,1140.6,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",1,4.0605,2521.9,250.0,890.6,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8",1,1.5158,6755.7,250.0,234.4,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"4 threads, ReadFile 1 MiB",1,1.5854,6458.9,453.1,1078.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing stream, 64 KiB reads",1,1.5143,6762.1,500.0,187.5,9181,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing reader, zero-copy",1,1.5134,6766.3,343.8,234.4,9069,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",1,1.5145,6761.2,281.3,234.4,9057,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",1,1.5111,6776.7,312.5,203.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",1,1.5157,6755.9,500.0,125.0,10031,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing reader, zero-copy, unbuffered",1,1.5082,6789.7,312.5,125.0,10221,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"TFileStream 64 KiB reads",2,7.0917,1443.9,328.1,1171.9,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"TFileStream 1 MiB reads",2,4.0433,2532.6,312.5,1062.5,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,4.0174,2548.9,437.5,796.9,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"ReadFile 1 MiB, sequential scan",2,4.0608,2521.7,343.8,1218.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",2,4.0569,2524.1,281.3,843.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8",2,1.5154,6757.3,375.0,218.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"4 threads, ReadFile 1 MiB",2,1.5692,6525.6,375.0,1218.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing stream, 64 KiB reads",2,1.5154,6757.2,609.4,171.9,8994,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing reader, zero-copy",2,1.5191,6741.0,281.3,234.4,8864,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",2,1.5167,6751.5,421.9,203.1,9182,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",2,1.5135,6765.7,250.0,281.3,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",2,1.5126,6770.0,515.6,140.6,10092,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing reader, zero-copy, unbuffered",2,1.5106,6778.9,359.4,140.6,10152,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"TFileStream 64 KiB reads",3,5.9325,1726.1,468.8,1203.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"TFileStream 1 MiB reads",3,4.0941,2501.2,265.6,921.9,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,4.0450,2531.5,421.9,890.6,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"ReadFile 1 MiB, sequential scan",3,4.0685,2516.9,421.9,1078.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",3,4.0575,2523.7,312.5,1218.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8",3,1.5153,6757.8,421.9,281.3,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"4 threads, ReadFile 1 MiB",3,1.6138,6345.1,500.0,1203.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing stream, 64 KiB reads",3,1.5220,6728.2,515.6,203.1,8679,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing reader, zero-copy",3,1.5151,6758.5,250.0,265.6,9145,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",3,1.5275,6703.6,296.9,437.5,6890,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",3,1.5275,6703.9,296.9,265.6,0,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",3,1.5099,6782.1,546.9,156.3,10136,True
+2026-10-22 11:39:02,Win64,10,read-through,cold,"IoRing reader, zero-copy, unbuffered",3,1.5125,6770.1,343.8,171.9,10122,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"TFileStream 64 KiB reads",1,1.5465,6621.5,312.5,1234.4,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"TFileStream 1 MiB reads",1,1.3673,7489.1,218.8,1140.6,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,1.5243,6718.0,437.5,1062.5,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"ReadFile 1 MiB, sequential scan",1,1.3698,7475.6,250.0,1125.0,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",1,1.3688,7480.8,234.4,1109.4,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"Overlapped ReadFile 1 MiB x 8",1,1.4176,7223.2,281.3,1125.0,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"4 threads, ReadFile 1 MiB",1,0.5303,19308.6,296.9,1625.0,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"IoRing stream, 64 KiB reads",1,1.6363,6258.0,421.9,1171.9,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"IoRing reader, zero-copy",1,1.4479,7072.3,203.1,1234.4,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",1,1.4412,7105.1,296.9,1125.0,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"TFileStream 64 KiB reads",2,1.5336,6677.2,203.1,1343.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"TFileStream 1 MiB reads",2,1.3623,7516.8,281.3,1078.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,1.5007,6823.6,406.3,1078.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"ReadFile 1 MiB, sequential scan",2,1.3334,7679.3,234.4,1093.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",2,1.3769,7437.0,218.8,1156.3,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"Overlapped ReadFile 1 MiB x 8",2,1.4168,7227.4,203.1,1203.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"4 threads, ReadFile 1 MiB",2,0.5489,18654.5,296.9,1656.3,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"IoRing stream, 64 KiB reads",2,1.6728,6121.5,328.1,1343.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"IoRing reader, zero-copy",2,1.4730,6951.7,265.6,1203.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",2,1.4557,7034.5,250.0,1203.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"TFileStream 64 KiB reads",3,1.5343,6674.1,250.0,1265.6,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"TFileStream 1 MiB reads",3,1.3751,7446.8,250.0,1093.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,1.5121,6772.0,406.3,1109.4,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"ReadFile 1 MiB, sequential scan",3,1.3485,7593.8,203.1,1109.4,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",3,1.3256,7724.9,250.0,1078.1,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"Overlapped ReadFile 1 MiB x 8",3,1.3794,7423.4,218.8,1140.6,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"4 threads, ReadFile 1 MiB",3,0.5227,19590.7,390.6,1468.8,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"IoRing stream, 64 KiB reads",3,1.6248,6302.3,546.9,1031.3,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"IoRing reader, zero-copy",3,1.4454,7084.8,265.6,1187.5,0,True
+2026-10-22 11:39:02,Win64,10,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",3,1.4609,7009.5,296.9,1140.6,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"TFileStream 64 KiB reads",1,0.5660,1809.3,62.5,93.8,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"TFileStream 1 MiB reads",1,0.4078,2511.3,15.6,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,0.2979,3437.9,78.1,171.9,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"ReadFile 1 MiB, sequential scan",1,0.2871,3567.0,31.3,140.6,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",1,0.2871,3567.0,62.5,93.8,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8",1,0.1526,6709.0,15.6,46.9,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"4 threads, ReadFile 1 MiB",1,0.1651,6202.2,93.8,78.1,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing stream, 64 KiB reads",1,0.1553,6593.2,109.4,15.6,721,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing reader, zero-copy",1,0.1535,6673.0,46.9,15.6,824,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",1,0.1535,6672.9,31.3,15.6,805,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",1,0.1526,6708.2,31.3,31.3,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",1,0.1521,6734.4,62.5,46.9,1024,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing reader, zero-copy, unbuffered",1,0.1550,6607.9,15.6,62.5,936,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"TFileStream 64 KiB reads",2,0.6916,1480.6,109.4,93.8,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"TFileStream 1 MiB reads",2,0.2917,3510.3,31.3,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,0.2825,3624.9,15.6,156.3,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"ReadFile 1 MiB, sequential scan",2,0.2944,3478.8,62.5,31.3,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",2,0.2958,3461.9,15.6,140.6,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8",2,0.1525,6714.7,15.6,0.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"4 threads, ReadFile 1 MiB",2,0.1629,6284.4,46.9,140.6,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing stream, 64 KiB reads",2,0.1531,6687.9,31.3,46.9,760,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing reader, zero-copy",2,0.1527,6704.9,125.0,0.0,923,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",2,0.1548,6615.5,46.9,15.6,917,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",2,0.2575,3977.3,31.3,31.3,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",2,0.1521,6730.8,78.1,31.3,1023,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing reader, zero-copy, unbuffered",2,0.1521,6733.9,78.1,0.0,1024,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"TFileStream 64 KiB reads",3,0.7042,1454.2,93.8,62.5,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"TFileStream 1 MiB reads",3,0.2988,3426.9,62.5,109.4,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,0.2924,3502.6,46.9,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"ReadFile 1 MiB, sequential scan",3,0.2944,3478.6,31.3,78.1,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",3,0.2941,3481.9,31.3,93.8,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8",3,0.1543,6637.3,31.3,15.6,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"4 threads, ReadFile 1 MiB",3,0.1585,6459.4,46.9,171.9,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing stream, 64 KiB reads",3,0.1535,6670.8,109.4,0.0,665,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing reader, zero-copy",3,0.1526,6709.6,93.8,15.6,839,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",3,0.1562,6557.4,62.5,15.6,767,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",3,0.2781,3682.2,31.3,62.5,0,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",3,0.2198,4658.5,62.5,15.6,994,True
+2026-10-22 11:42:43,Win32,1,read-through,cold,"IoRing reader, zero-copy, unbuffered",3,0.1521,6734.2,31.3,31.3,1024,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"TFileStream 64 KiB reads",1,0.1814,5644.5,78.1,93.8,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"TFileStream 1 MiB reads",1,0.1627,6293.1,15.6,140.6,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,0.1772,5778.1,15.6,156.3,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"ReadFile 1 MiB, sequential scan",1,0.1646,6220.1,31.3,140.6,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",1,0.1598,6407.0,31.3,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"Overlapped ReadFile 1 MiB x 8",1,0.1688,6067.4,78.1,93.8,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"4 threads, ReadFile 1 MiB",1,0.0641,15972.4,78.1,140.6,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"IoRing stream, 64 KiB reads",1,0.1978,5176.2,62.5,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"IoRing reader, zero-copy",1,0.1730,5917.6,46.9,140.6,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",1,0.1786,5734.9,46.9,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"TFileStream 64 KiB reads",2,0.2188,4680.4,15.6,171.9,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"TFileStream 1 MiB reads",2,0.1716,5968.1,62.5,109.4,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,0.1921,5329.6,62.5,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"ReadFile 1 MiB, sequential scan",2,0.1797,5698.7,46.9,140.6,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",2,0.1677,6106.8,31.3,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"Overlapped ReadFile 1 MiB x 8",2,0.1854,5521.7,78.1,109.4,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"4 threads, ReadFile 1 MiB",2,0.0649,15787.3,109.4,62.5,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"IoRing stream, 64 KiB reads",2,0.1971,5195.0,93.8,93.8,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"IoRing reader, zero-copy",2,0.1785,5736.4,78.1,93.8,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",2,0.1738,5891.8,0.0,187.5,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"TFileStream 64 KiB reads",3,0.1850,5535.3,31.3,156.3,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"TFileStream 1 MiB reads",3,0.1690,6057.8,31.3,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,0.1761,5814.2,31.3,156.3,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"ReadFile 1 MiB, sequential scan",3,0.1654,6190.1,62.5,93.8,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",3,0.1631,6276.9,46.9,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"Overlapped ReadFile 1 MiB x 8",3,0.1766,5798.1,46.9,125.0,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"4 threads, ReadFile 1 MiB",3,0.0694,14756.2,125.0,62.5,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"IoRing stream, 64 KiB reads",3,0.1985,5157.8,125.0,78.1,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"IoRing reader, zero-copy",3,0.1748,5858.2,46.9,109.4,0,True
+2026-10-22 11:42:43,Win32,1,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",3,0.1766,5798.6,78.1,109.4,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"TFileStream 64 KiB reads",1,0.7331,1396.7,296.9,140.6,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"TFileStream 1 MiB reads",1,0.3434,2981.7,312.5,31.3,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,0.3500,2925.4,203.1,140.6,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"ReadFile 1 MiB, sequential scan",1,0.3392,3018.9,218.8,109.4,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"ReadFile 1 MiB, no sequential-scan hint",1,0.3349,3057.2,250.0,93.8,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"Overlapped ReadFile 1 MiB x 8",1,0.2923,3503.2,281.3,15.6,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing stream, 64 KiB reads",1,0.3069,3336.4,250.0,46.9,1,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing reader, zero-copy",1,0.2959,3460.4,281.3,15.6,3,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing reader, zero-copy, no seq.-scan hint",1,0.2937,3486.4,250.0,46.9,3,True
+2026-10-22 11:42:43,Win32,1,work,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",1,0.3239,3161.8,218.8,31.3,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing stream, 64 KiB reads, unbuffered",1,0.3241,3159.7,281.3,0.0,953,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing reader, zero-copy, unbuffered",1,0.2949,3472.9,218.8,31.3,393,True
+2026-10-22 11:42:43,Win32,1,work,cold,"TFileStream 64 KiB reads",2,0.7443,1375.8,265.6,46.9,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"TFileStream 1 MiB reads",2,0.3465,2955.4,296.9,15.6,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,0.3585,2856.0,250.0,46.9,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"ReadFile 1 MiB, sequential scan",2,0.3421,2993.5,203.1,93.8,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"ReadFile 1 MiB, no sequential-scan hint",2,0.3424,2990.5,203.1,125.0,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"Overlapped ReadFile 1 MiB x 8",2,0.2966,3452.5,234.4,46.9,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing stream, 64 KiB reads",2,0.3124,3277.4,296.9,0.0,1,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing reader, zero-copy",2,0.2930,3495.1,265.6,31.3,1,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing reader, zero-copy, no seq.-scan hint",2,0.2985,3430.5,250.0,46.9,2,True
+2026-10-22 11:42:43,Win32,1,work,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",2,0.2829,3619.4,265.6,0.0,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing stream, 64 KiB reads, unbuffered",2,0.2929,3496.0,250.0,31.3,1,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing reader, zero-copy, unbuffered",2,0.2743,3733.6,250.0,15.6,1,True
+2026-10-22 11:42:43,Win32,1,work,cold,"TFileStream 64 KiB reads",3,0.8622,1187.6,296.9,93.8,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"TFileStream 1 MiB reads",3,0.3414,2999.7,218.8,109.4,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,0.3492,2932.8,281.3,62.5,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"ReadFile 1 MiB, sequential scan",3,0.3368,3040.3,250.0,93.8,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"ReadFile 1 MiB, no sequential-scan hint",3,0.3370,3038.2,265.6,62.5,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"Overlapped ReadFile 1 MiB x 8",3,0.2972,3445.0,281.3,15.6,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing stream, 64 KiB reads",3,0.3174,3226.4,312.5,0.0,1,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing reader, zero-copy",3,0.2948,3473.9,265.6,31.3,2,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing reader, zero-copy, no seq.-scan hint",3,0.2953,3467.1,218.8,78.1,2,True
+2026-10-22 11:42:43,Win32,1,work,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",3,0.2800,3656.7,265.6,0.0,0,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing stream, 64 KiB reads, unbuffered",3,0.2873,3563.8,281.3,15.6,3,True
+2026-10-22 11:42:43,Win32,1,work,cold,"IoRing reader, zero-copy, unbuffered",3,0.2723,3760.4,250.0,15.6,1,True
+2026-10-22 11:42:43,Win32,1,work,warm,"TFileStream 64 KiB reads",1,0.3833,2671.6,203.1,171.9,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"TFileStream 1 MiB reads",1,0.3684,2779.7,234.4,125.0,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,0.3822,2679.0,234.4,140.6,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"ReadFile 1 MiB, sequential scan",1,0.3614,2833.8,312.5,62.5,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"ReadFile 1 MiB, no sequential-scan hint",1,0.3653,2803.3,281.3,62.5,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"Overlapped ReadFile 1 MiB x 8",1,0.3729,2746.4,296.9,78.1,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"IoRing stream, 64 KiB reads",1,0.3922,2610.8,250.0,140.6,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"IoRing reader, zero-copy",1,0.3749,2731.4,296.9,78.1,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"IoRing reader, zero-copy, no seq.-scan hint",1,0.3738,2739.4,203.1,171.9,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"TFileStream 64 KiB reads",2,0.3813,2685.7,296.9,62.5,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"TFileStream 1 MiB reads",2,0.3664,2795.0,281.3,93.8,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,0.3798,2696.2,328.1,46.9,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"ReadFile 1 MiB, sequential scan",2,0.3672,2788.9,187.5,171.9,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"ReadFile 1 MiB, no sequential-scan hint",2,0.3684,2779.2,265.6,109.4,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"Overlapped ReadFile 1 MiB x 8",2,0.3731,2744.4,234.4,140.6,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"IoRing stream, 64 KiB reads",2,0.4056,2524.5,312.5,93.8,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"IoRing reader, zero-copy",2,0.3881,2638.2,281.3,109.4,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"IoRing reader, zero-copy, no seq.-scan hint",2,0.3785,2705.2,296.9,78.1,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"TFileStream 64 KiB reads",3,0.3891,2631.4,265.6,125.0,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"TFileStream 1 MiB reads",3,0.3681,2782.1,328.1,31.3,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,0.3804,2691.7,265.6,125.0,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"ReadFile 1 MiB, sequential scan",3,0.3676,2785.8,234.4,109.4,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"ReadFile 1 MiB, no sequential-scan hint",3,0.3607,2838.9,281.3,78.1,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"Overlapped ReadFile 1 MiB x 8",3,0.3717,2754.8,218.8,156.3,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"IoRing stream, 64 KiB reads",3,0.3959,2586.7,296.9,93.8,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"IoRing reader, zero-copy",3,0.3723,2750.8,203.1,156.3,0,True
+2026-10-22 11:42:43,Win32,1,work,warm,"IoRing reader, zero-copy, no seq.-scan hint",3,0.3759,2723.9,312.5,46.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"TFileStream 64 KiB reads",1,5.8727,1743.7,390.6,1296.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"TFileStream 1 MiB reads",1,4.0848,2506.9,453.1,937.5,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,4.0899,2503.7,687.5,968.8,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"ReadFile 1 MiB, sequential scan",1,4.0389,2535.3,421.9,828.1,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",1,4.0591,2522.7,546.9,1031.3,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8",1,1.5166,6752.0,546.9,234.4,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"4 threads, ReadFile 1 MiB",1,1.6033,6387.0,578.1,1156.3,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing stream, 64 KiB reads",1,1.5176,6747.5,890.6,140.6,7654,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing reader, zero-copy",1,1.5159,6755.1,515.6,265.6,8950,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",1,1.5189,6741.6,562.5,93.8,8954,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",1,1.5093,6784.6,531.3,281.3,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",1,1.5104,6779.4,781.3,156.3,10102,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing reader, zero-copy, unbuffered",1,1.5110,6776.8,531.3,109.4,10168,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"TFileStream 64 KiB reads",2,6.9018,1483.7,562.5,1171.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"TFileStream 1 MiB reads",2,4.0707,2515.6,515.6,796.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,4.0719,2514.8,718.8,1156.3,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"ReadFile 1 MiB, sequential scan",2,3.8263,2676.2,328.1,1109.4,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",2,4.0727,2514.3,390.6,1234.4,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8",2,1.5153,6757.7,484.4,250.0,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"4 threads, ReadFile 1 MiB",2,1.5673,6533.7,546.9,1218.8,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing stream, 64 KiB reads",2,1.5256,6712.3,656.3,234.4,7564,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing reader, zero-copy",2,1.5202,6736.0,500.0,265.6,8448,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",2,1.5183,6744.2,625.0,203.1,8073,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",2,1.5066,6796.6,562.5,234.4,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",2,1.5081,6790.0,703.1,171.9,10206,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing reader, zero-copy, unbuffered",2,1.5141,6763.2,484.4,140.6,10022,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"TFileStream 64 KiB reads",3,6.8933,1485.5,625.0,734.4,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"TFileStream 1 MiB reads",3,3.9902,2566.3,406.3,968.8,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,4.0695,2516.3,593.8,906.3,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"ReadFile 1 MiB, sequential scan",3,3.8092,2688.2,484.4,1093.8,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"ReadFile 1 MiB, no sequential-scan hint",3,4.0557,2524.9,500.0,953.1,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8",3,1.5101,6781.0,609.4,171.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"4 threads, ReadFile 1 MiB",3,1.5867,6453.7,703.1,1046.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing stream, 64 KiB reads",3,1.5129,6768.6,703.1,265.6,7793,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing reader, zero-copy",3,1.5405,6647.2,562.5,250.0,5544,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing reader, zero-copy, no seq.-scan hint",3,1.5284,6699.7,609.4,265.6,5855,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"Overlapped ReadFile 1 MiB x 8, unbuffered",3,1.5113,6775.7,468.8,265.6,0,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing stream, 64 KiB reads, unbuffered",3,1.5623,6554.2,750.0,250.0,9666,True
+2026-10-22 11:42:43,Win32,10,read-through,cold,"IoRing reader, zero-copy, unbuffered",3,1.5111,6776.4,562.5,156.3,10139,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"TFileStream 64 KiB reads",1,1.7635,5806.8,484.4,1265.6,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"TFileStream 1 MiB reads",1,1.5602,6563.2,406.3,1140.6,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,1.7071,5998.3,687.5,1015.6,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"ReadFile 1 MiB, sequential scan",1,1.5617,6557.1,421.9,1125.0,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",1,1.5833,6467.5,515.6,1046.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"Overlapped ReadFile 1 MiB x 8",1,1.6744,6115.8,515.6,1125.0,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"4 threads, ReadFile 1 MiB",1,0.5769,17749.7,359.4,1640.6,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"IoRing stream, 64 KiB reads",1,1.8829,5438.3,750.0,1093.8,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"IoRing reader, zero-copy",1,1.6859,6073.8,437.5,1218.8,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",1,1.6704,6130.2,328.1,1312.5,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"TFileStream 64 KiB reads",2,1.7656,5799.7,484.4,1265.6,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"TFileStream 1 MiB reads",2,1.6591,6171.9,296.9,1343.8,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",2,1.7510,5848.0,578.1,1171.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"ReadFile 1 MiB, sequential scan",2,1.6106,6358.0,593.8,1015.6,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",2,1.5820,6472.8,468.8,1062.5,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"Overlapped ReadFile 1 MiB x 8",2,1.6352,6262.1,500.0,1109.4,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"4 threads, ReadFile 1 MiB",2,0.5877,17424.8,578.1,1609.4,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"IoRing stream, 64 KiB reads",2,1.9509,5248.9,703.1,1218.8,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"IoRing reader, zero-copy",2,1.7560,5831.6,515.6,1171.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",2,1.7464,5863.4,546.9,1171.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"TFileStream 64 KiB reads",3,1.8241,5613.8,593.8,1171.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"TFileStream 1 MiB reads",3,1.6751,6113.2,546.9,1140.6,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",3,1.8009,5686.0,656.3,1078.1,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"ReadFile 1 MiB, sequential scan",3,1.5947,6421.1,562.5,1031.3,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"ReadFile 1 MiB, no sequential-scan hint",3,1.5884,6446.6,484.4,1093.8,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"Overlapped ReadFile 1 MiB x 8",3,1.6332,6270.0,531.3,1078.1,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"4 threads, ReadFile 1 MiB",3,0.5731,17866.8,484.4,1750.0,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"IoRing stream, 64 KiB reads",3,1.8856,5430.6,765.6,1078.1,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"IoRing reader, zero-copy",3,1.6947,6042.4,468.8,1171.9,0,True
+2026-10-22 11:42:43,Win32,10,read-through,warm,"IoRing reader, zero-copy, no seq.-scan hint",3,1.6687,6136.4,562.5,1109.4,0,True

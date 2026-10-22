@@ -1,0 +1,106 @@
+timestamp,platform,size_gib,scenario,cache,contender,run,seconds,mib_per_s,user_ms,kernel_ms,stalls,checksum_ok
+2026-10-22 11:46:40,Win64,10,read-through,cold,"TFileStream 64 KiB reads",1,6.0344,1696.9,281.3,1328.1,0,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 2",1,3.6103,2836.4,250.0,390.6,39596,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 4",1,2.3865,4290.9,234.4,671.9,30248,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 8",1,1.6357,6260.5,453.1,453.1,15832,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 16",1,1.6301,6281.7,359.4,421.9,13351,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 32",1,1.6000,6400.2,421.9,359.4,12676,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 2",1,2.4702,4145.5,265.6,296.9,10207,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 4",1,1.5283,6700.2,312.5,218.8,10078,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 8",1,1.5152,6758.1,421.9,203.1,9000,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 16",1,1.5145,6761.2,468.8,156.3,6594,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 32",1,1.5180,6745.6,484.4,203.1,5521,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 2",1,2.3175,4418.6,265.6,109.4,2557,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 4",1,1.5924,6430.5,406.3,46.9,2205,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 8",1,1.5763,6496.3,656.3,156.3,1311,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 16",1,1.5410,6645.2,781.3,171.9,1614,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 32",1,1.5849,6460.9,953.1,203.1,266,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 8, fixed read-ahead",1,1.5328,6680.6,390.6,328.1,4822,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 8, no registration",1,1.5978,6408.9,750.0,281.3,4234,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 2",1,3.6426,2811.2,328.1,296.9,35447,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 4",1,2.0985,4879.6,281.3,296.9,28138,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 8",1,1.5098,6782.5,250.0,421.9,40012,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 16",1,1.5230,6723.6,328.1,406.3,40119,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 32",1,1.5083,6789.3,265.6,421.9,40012,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 2",1,1.7150,5970.7,359.4,140.6,9986,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 4",1,1.5090,6786.1,328.1,125.0,10214,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 8",1,1.5127,6769.3,359.4,109.4,10096,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 16",1,1.5095,6783.7,265.6,187.5,9962,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 32",1,1.5150,6759.1,234.4,265.6,10095,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 2",1,1.5097,6783.0,234.4,78.1,2558,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 4",1,1.5090,6786.0,359.4,78.1,2552,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 8",1,1.5132,6767.3,328.1,125.0,2545,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 16",1,1.5217,6729.3,437.5,62.5,2513,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 32",1,1.5308,6689.2,390.6,78.1,2476,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 8, fixed read-ahead",1,1.5179,6746.1,328.1,109.4,10127,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 8, no registration",1,1.5106,6778.8,234.4,281.3,10082,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"TFileStream 64 KiB reads",2,7.0347,1455.6,265.6,1250.0,0,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 2",2,3.5952,2848.2,281.3,406.3,39632,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 4",2,2.7491,3724.9,312.5,500.0,36242,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 8",2,1.6446,6226.5,296.9,359.4,15553,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 16",2,1.5861,6456.0,406.3,375.0,14127,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 32",2,1.7031,6012.7,390.6,375.0,10027,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 2",2,2.5428,4027.1,250.0,437.5,10206,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 4",2,1.6239,6306.0,328.1,187.5,9444,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 8",2,1.5365,6664.6,421.9,250.0,5831,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 16",2,1.5321,6683.8,500.0,343.8,5471,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 32",2,1.5506,6603.7,546.9,171.9,5739,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 2",2,2.4649,4154.3,359.4,125.0,2558,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 4",2,1.6487,6210.8,500.0,31.3,2065,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 8",2,1.5686,6528.2,656.3,93.8,1394,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 16",2,1.5359,6667.0,781.3,109.4,1668,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 32",2,1.5604,6562.5,1000.0,187.5,249,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 8, fixed read-ahead",2,1.5276,6703.4,421.9,234.4,5016,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 8, no registration",2,1.5499,6607.1,546.9,156.3,5782,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 2",2,3.6100,2836.5,343.8,218.8,35428,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 4",2,2.1040,4867.0,437.5,250.0,28227,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 8",2,1.5195,6739.2,375.0,281.3,39743,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 16",2,1.5162,6753.6,234.4,375.0,40142,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 32",2,1.5118,6773.4,218.8,421.9,39951,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 2",2,1.6980,6030.5,234.4,109.4,9984,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 4",2,1.5089,6786.3,312.5,93.8,10230,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 8",2,1.5121,6772.0,187.5,187.5,10215,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 16",2,1.5093,6784.8,328.1,140.6,10120,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 32",2,1.5150,6758.9,281.3,140.6,10006,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 2",2,1.5072,6794.1,218.8,93.8,2559,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 4",2,1.5109,6777.6,312.5,78.1,2537,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 8",2,1.5125,6770.4,281.3,156.3,2538,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 16",2,1.5193,6739.8,437.5,62.5,2512,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 32",2,1.5287,6698.6,390.6,93.8,2533,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 8, fixed read-ahead",2,1.5143,6762.2,281.3,140.6,10042,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 8, no registration",2,1.5094,6784.3,328.1,203.1,10123,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"TFileStream 64 KiB reads",3,7.1103,1440.2,312.5,1343.8,0,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 2",3,3.6337,2818.0,250.0,546.9,39542,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 4",3,2.8175,3634.4,250.0,390.6,38218,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 8",3,1.6515,6200.4,296.9,390.6,15557,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 16",3,1.6095,6362.3,250.0,437.5,14478,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 256 KiB x 32",3,1.6630,6157.6,406.3,343.8,10293,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 2",3,2.5303,4046.9,359.4,390.6,10220,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 4",3,1.5613,6558.8,250.0,250.0,9846,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 8",3,1.5296,6694.4,421.9,234.4,6167,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 16",3,1.5134,6766.0,328.1,203.1,4866,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 32",3,1.5710,6517.9,734.4,125.0,5368,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 2",3,2.4156,4239.2,375.0,156.3,2556,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 4",3,1.6464,6219.6,484.4,171.9,2103,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 8",3,1.5636,6549.0,703.1,125.0,1406,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 16",3,1.5382,6657.2,671.9,125.0,1689,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 4096 KiB x 32",3,1.5536,6591.1,1000.0,140.6,265,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 8, fixed read-ahead",3,1.5284,6699.9,359.4,234.4,5098,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"buffered 1024 KiB x 8, no registration",3,1.5547,6586.6,406.3,343.8,5712,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 2",3,3.6233,2826.1,234.4,250.0,35445,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 4",3,2.1009,4874.1,406.3,312.5,28289,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 8",3,1.5104,6779.7,234.4,437.5,40080,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 16",3,1.5120,6772.6,390.6,296.9,39999,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 256 KiB x 32",3,1.5109,6777.2,281.3,406.3,39813,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 2",3,1.6899,6059.6,328.1,62.5,10012,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 4",3,1.5125,6770.0,328.1,93.8,10228,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 8",3,1.5101,6781.0,265.6,156.3,10147,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 16",3,1.5142,6762.6,265.6,171.9,10102,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 32",3,1.5134,6766.4,312.5,171.9,10062,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 2",3,1.5079,6790.8,265.6,125.0,2559,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 4",3,1.5147,6760.3,312.5,31.3,2555,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 8",3,1.5114,6775.1,375.0,125.0,2560,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 16",3,1.5176,6747.4,343.8,93.8,2530,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 4096 KiB x 32",3,1.5321,6683.5,343.8,125.0,2525,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 8, fixed read-ahead",3,1.5122,6771.5,359.4,93.8,10133,True
+2026-10-22 11:46:40,Win64,10,read-through,cold,"unbuffered 1024 KiB x 8, no registration",3,1.5114,6775.1,328.1,234.4,10086,True
