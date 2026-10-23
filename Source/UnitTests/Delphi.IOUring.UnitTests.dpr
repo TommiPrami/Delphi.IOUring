@@ -21,6 +21,7 @@ uses
   Delphi.IOUring in '..\Units\Delphi.IOUring.pas',
   Delphi.IOUring.SequentialReader in '..\Units\Delphi.IOUring.SequentialReader.pas',
   Delphi.IOUring.Streams in '..\Units\Delphi.IOUring.Streams.pas',
+  Delphi.IOUring.SequentialWriter in '..\Units\Delphi.IOUring.SequentialWriter.pas',
   Delphi.IOUring.Atomics in '..\Units\Delphi.IOUring.Atomics.pas',
   Delphi.IOUring.RequestPool in '..\Units\Delphi.IOUring.RequestPool.pas',
   Delphi.IOUring.RequestQueue in '..\Units\Delphi.IOUring.RequestQueue.pas',
@@ -40,7 +41,8 @@ uses
   Tests.RequestQueue in 'Tests.RequestQueue.pas',
   Tests.Engine in 'Tests.Engine.pas',
   Tests.BlockReader in 'Tests.BlockReader.pas',
-  Tests.EngineOverlap in 'Tests.EngineOverlap.pas';
+  Tests.EngineOverlap in 'Tests.EngineOverlap.pas',
+  Tests.SequentialWriter in 'Tests.SequentialWriter.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

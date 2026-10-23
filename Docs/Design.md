@@ -1,16 +1,17 @@
 ﻿# Delphi.IOUring – Design Specification
 
-Status: **Draft v1.1** (2026-10-22) – Milestones 1 and 2 complete: Delphi 13 and
+Status: **Draft v1.2** (2026-10-23) – Milestones 1, 2 and 3 complete: Delphi 13 and
 Free Pascal 3.2.2 on Windows, Win32 and Win64 (§12.1). Milestone 1 (Phases 1–5):
 complete Windows API unit, core ring (implementation notes in §5.2),
 sequential reader (notes in §7), read-only stream (notes in §8.1),
-benchmarks ([Benchmarks.md](Benchmarks.md)). Milestone 3 started: the
+benchmarks ([Benchmarks.md](Benchmarks.md)). Milestone 3: the
 atomics unit (Phase 10, notes in §10.6), the request pool (Phase 11, notes
 in §10.7), the request queue (Phase 12, notes in §10.8), the engine with one
 I/O thread (Phase 13, notes in §10.9), the block reader (Phase 14, notes in
 §10.10), several I/O threads (Phase 15, measurements in §10.11, notes in
-§10.12) and the overlap rule (Phase 16, decisions in §11, notes in §10.13).
-Things marked **[DECIDE]**
+§10.12), the overlap rule (Phase 16, decisions in §11, notes in §10.13) and
+the write stream (Phase 17, §8.2) – Milestone 3 is complete. Things marked
+**[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
 **[VERIFIED]** with the answer once a test proves them. Decisions already made
@@ -211,6 +212,21 @@ Important semantics:
   for small reads of cached data, synchronous `ReadFile` is faster than one
   IoRing thread; the engine with 2–4 I/O threads beats it (Phase 15,
   §10.12).
+- **[VERIFIED]** **Writes are mostly done inside the submit call**, not in
+  the background (Phase 17 probe: 2 GiB written in sequence in 1 MiB pieces,
+  8 in flight, Delphi Win64):
+
+  | Way of writing | Time inside `SubmitIoRing` | Speed |
+  | --- | --- | ---: |
+  | Buffered (new file or overwriting) | all of it: Windows copies into the file cache right there | ~5 GB/s, like `TFileStream`; ~2 GB/s with `FlushFileBuffers` |
+  | Unbuffered, extending a new file | all of it: Windows does extending writes synchronously | 3.9 GB/s |
+  | Unbuffered, file size set first (`SetEndOfFile`) | all of it (the space past the "valid data length" must be zeroed) | 4.2–4.4 GB/s |
+  | Unbuffered, overwriting data that exists | 0.06 of 0.32 s: truly asynchronous | 6.5 GB/s (the disk) |
+
+  So for writing in the background, the submit itself must happen on
+  another thread – the engine's I/O thread. Truly asynchronous unbuffered
+  writes to a new file would need `SetFileValidData` (an administrator
+  privilege, and it exposes old disk contents): not for a library default.
 - **[VERIFIED]** A thread that waits inside `SubmitIoRing` blocks all other
   submits on that ring. So when more than one thread may submit, wait with the
   completion event, never with `SubmitIoRing(…, waitOperations > 0, …)`.
@@ -280,7 +296,8 @@ Unit responsibilities:
 | `Delphi.IOUring.Backend.Posix` | `TLinuxIORing` record, built on the Posix API unit | Custom, Posix.API |
 | `Delphi.IOUring` *(new)* | `TIORing` = the platform ring type (compile-time alias), `IORingAvailable`, blocking helpers | Custom + platform unit via `{$IFDEF}` |
 | `Delphi.IOUring.SequentialReader` *(new)* | Read-ahead engine, usable without streams | `Delphi.IOUring` |
-| `Delphi.IOUring.Streams` | `TStream` descendants | SequentialReader |
+| `Delphi.IOUring.SequentialWriter` *(new)* | `TIORingSequentialWriter`: write-behind through an engine, usable without streams (§8.2) | `Delphi.IOUring`, Engine |
+| `Delphi.IOUring.Streams` | `TStream` descendants: the read stream and the write stream | SequentialReader, SequentialWriter, Engine |
 | `Delphi.IOUring.Atomics` *(new)* | `TAtomic`: one place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5, §10.6) | RTL only |
 | `Delphi.IOUring.RequestPool` *(new)* | `TIORingRequestPool` (request slots, states, handles, waiting) and `TIORingFreeList` (lock-free stack) (§10.3, §10.7) | `Delphi.IOUring`, Atomics |
 | `Delphi.IOUring.RequestQueue` *(new)* | `TIORingRequestQueue`: bounded lock-free queue from the producers to an I/O thread (§10.5, §10.8) | `Delphi.IOUring`, Atomics |
@@ -998,10 +1015,172 @@ code catching `EStreamError` keeps working.
   and `TStreamReader.ReadLine` (20 000 lines). A second `CopyFrom(S, 0)` after
   reading raises (it would need a rewind).
 
-### 8.2 Later stream classes (each its own specific class)
+### 8.2 `TSequentialWriteOnlyFileStream` – Phase 17 decisions
 
-- `TSequentialWriteOnlyFileStream` – write-behind: `Write` copies into a
-  buffer, full buffers are submitted, `Destroy`/`Flush` waits for all.
+Write-behind: `Write` copies into a buffer; a full buffer is written in the
+background while the caller fills the next one.
+
+**Through the engine, not an own ring.** Windows does buffered writes, and
+unbuffered writes that extend a file, *inside* the submit call (§2.1). A
+writer that submitted on the caller's thread – as the read stream does with
+its own ring – would do all the work there itself. So full buffers go to an
+engine (`WriteAsync`), and its I/O thread does the submit while the caller
+goes on.
+
+- By default the writer makes **its own engine** (1 I/O thread, requests =
+  buffer count + 2). Or it takes a **shared engine** (not owned) – for many
+  files at once. *(Decided 2026-10-23.)*
+- Its own writes never overlap, so it needs no overlap rule. A program that
+  reads the file back while it is being written gives a shared engine with
+  `orKeepOrder`.
+
+**Two parts, as on the read side:**
+
+- `TIORingSequentialWriter` (unit `Delphi.IOUring.SequentialWriter`): a
+  managed record that does the work.
+- `TSequentialWriteOnlyFileStream = class(TStream)` in
+  `Delphi.IOUring.Streams`, a thin wrapper.
+
+```pascal
+type
+  TIORingSequentialWriterOption = (
+    swoUnbuffered      // FILE_FLAG_NO_BUFFERING: past the file cache
+  );
+  TIORingSequentialWriterOptions = set of TIORingSequentialWriterOption;
+
+  TIORingSequentialWriter = record
+    // Creates the file, or empties it if it exists. AEngine = nil: an own engine
+    procedure Open(const AFileName: string; const AOptions: TIORingSequentialWriterOptions = [];
+      const ABufferSize: Cardinal = 1024 * 1024; const ABufferCount: Cardinal = 8;
+      const AEngine: TIORingEngine = nil);
+    // Copying API (used by the stream): full buffers go out at once
+    procedure Write(const ABuffer; const ACount: NativeInt);
+    // Zero-copy API: the free part of the current buffer; fill it, then say how much
+    procedure AcquireBuffer(out AData: PByte; out ACapacity: NativeInt);
+    procedure CommitBuffer(const ALength: NativeInt);
+    // Sends the partly filled buffer and waits for all writes; AToDisk: also
+    // FlushFileBuffers (slow: 2 instead of 5 GB/s in the probe)
+    procedure Flush(const AToDisk: Boolean = False);
+    // Flush(False), cut the file to its size (unbuffered), close
+    procedure Close;
+    property Position: Int64;      // bytes accepted
+    property Stats: TIORingWriterStats;   // writes, bytes, waits for a free buffer
+  end;
+```
+
+**Errors.** `Write` returns before the data is written, so a failed write
+(for example a full disk) can only be reported later. The first failure is
+kept – the error and the file offset – and raises **`EWriteError`** (an
+`EStreamError`, as with `TStream.WriteBuffer`) at the next `Write`, `Flush`
+or `Close`, and again at every later call: after a failed write the file's
+content is unknown. **`Free` raises too**, if a failure was never reported –
+after it has released everything. `TBufferedFileStream.Destroy` behaves the
+same; the safe way is `Flush` before `Free`. *(Decided 2026-10-23.)*
+
+**The stream.** `Create(AFileName, …)` and `Create(AFileName, AEngine, …)`;
+it creates the file or empties it, like `TFileStream.Create(…, fmCreate)`,
+and other programs may read it meanwhile, not write. A file that cannot be
+created raises `EFCreateError` with `TFileStream`'s message. `Read` raises;
+`Seek`/`Position` only to the current position (as in the read stream);
+`Size` = `Position`; `SetSize` raises; `Flush(AToDisk)` is public. `Free`
+waits for all writes but does not flush to the disk – like `TFileStream`:
+the data is in the file cache, and Windows writes it soon.
+
+**Unbuffered** (`swoUnbuffered`): the buffer size must be a multiple of the
+sector size (checked). The last, partly filled buffer is written rounded up
+to whole sectors, and `Close` cuts the file to its real size. It leaves the
+file cache alone (for huge files) and was faster to the disk than buffered
+writing plus `FlushFileBuffers` in the probe (3.9–4.4 against 2 GB/s).
+
+**Left out of the first version:** appending to an existing file; setting
+the expected size first (+10 % for unbuffered writes in the probe, nothing
+for buffered); `SetFileValidData` (an administrator privilege); writing at
+other positions (that is what the engine is for).
+
+**Tests:** written data read back – sizes around the buffer size (0, 1, size
+– 1, size, size + 1, many MiB), pieces from 1 byte to several buffers; the
+zero-copy API; `Flush` and `Flush(True)`; unbuffered with a cut last buffer;
+a failed write raises at the next call, again later, and at `Free` (writing
+through a handle without write access gives a failing write); several
+writers on one shared engine; `TStream` use: `CopyFrom`, `TStreamWriter`,
+`SaveToStream`; `Position`/`Seek` rules; `EFCreateError`.
+
+**Benchmark:** 1 and 10 GiB against `TFileStream` (64 KiB and 1 MiB writes)
+and `TBufferedFileStream`; only writing, and with 200 µs of CPU work per MiB;
+time until `Free` returns, and with `FlushFileBuffers`. Expected, honestly:
+with nothing else to do, no gain – one thread copies into the file cache
+either way, and the stream's own copy costs a little. The gain comes with
+work: the writing then happens while the program works. Unbuffered writing
+also keeps the file cache free.
+
+#### Implementation notes (Phase 17)
+
+Built as decided above: `Delphi.IOUring.SequentialWriter` (the record) and
+`TSequentialWriteOnlyFileStream` in `Delphi.IOUring.Streams`. Where the code
+adds to the decisions:
+
+- **Buffers in turn.** The buffers in flight are always the oldest ones,
+  followed by the one being filled. So a free buffer is always the next one
+  after the writes in flight, "wait for a buffer" is "wait for the oldest
+  write", and finished writes are collected oldest first, after every full
+  buffer, at almost no cost (`TryGetResult` until the first unfinished one).
+- **`Flush` with a partly filled buffer** writes that part (unbuffered:
+  rounded up to whole sectors, the rest zeroed, then the file is cut to its
+  size) and waits for it – but the buffer stays the current one. When it is
+  full, it is written again, whole, at the same offset. So every write still
+  starts where a buffer starts (sector-aligned for unbuffered writes); the
+  price is that at most one buffer per `Flush` is written twice.
+- **Errors:** the record raises `EIORingError` (with the Windows error code),
+  like the reader and the engine; the stream turns it into `EWriteError`.
+  `Write`, `CommitBuffer` and `Flush` raise a kept failure every time;
+  `Close` raises it after it has released everything. The record's
+  automatic cleanup at the end of scope (`Finalize`) still writes the rest but
+  cannot raise. `ErrorReported` tells whether the failure has been raised
+  once; the stream's destructor raises only if not.
+- **A destructor that raises** leaves the object's own memory unfreed in
+  Delphi (the compiler frees it only after a destructor that returns); the
+  stream releases everything else first. The test frees it by hand with
+  `FreeInstance`.
+- **New platform calls:** `TIORingPlatform.CreateFileForWrite` (create or
+  empty, write access, others may read, overlapped, optionally unbuffered)
+  and `SetFileSize` (`SetFileInformationByHandle`, which works on overlapped
+  handles).
+- **Its own engine:** one I/O thread, buffer count + 2 requests, so starting
+  a write never waits for a free request. A shared engine must allow at least
+  as many requests as the writer has buffers (checked).
+
+**Tests:** `Tests.SequentialWriter` (DUnitX) and `Tests.FPC.SequentialWriter`
+(FPCUnit), 25 each:
+
+- **The record (16):** sizes around the buffer size (0, 1, size – 1, size,
+  size + 1, many buffers, 1 MiB + 5) with 3 buffers used again and again;
+  pieces from 1 byte to 50 000; 20 MiB with the default buffers; the
+  zero-copy API with 0, all and parts of the buffer; `Flush` puts a partly
+  filled buffer into the file and the next writes follow it; `Flush(True)`;
+  unbuffered with a cut last buffer, and with a `Flush` in between; failed
+  writes (a byte-range lock on the file through a second handle makes
+  Windows refuse them) – a later `Write` raises, `Flush` raises and again,
+  `Close` raises; bad arguments; wrong call order; the end of scope still
+  writes the rest; stats; 4 writers in parallel on one shared engine.
+- **The stream (9):** `WriteBuffer` and `CopyFrom`; `TStringList.SaveToStream`
+  (20 000 lines); `Position`, `Size` and `Seek`; `Read` and `Size :=` raise;
+  `EFCreateError`; a failed write raises `EWriteError` at `Flush` and later,
+  and then `Free` does not; a failure never seen raises at `Free`; a shared
+  engine; unbuffered.
+
+All pass with Delphi Debug and Release and FPC with and without `-O3`, Win32
+and Win64, and the Delphi tests report no memory leak.
+
+**Benchmark** (Benchmarks.md, "Writing"): writing alone gains nothing, as
+expected – Windows copies into the file cache in one thread either way.
+With 200 µs of work per MiB, a 1 GiB file was written 25–45 % sooner than
+with `TFileStream` (10 GiB: 3–21 %; there Windows slows every writer down to
+the disk's speed). Unbuffered, the data is on the disk soonest (1 GiB in
+0.26–0.55 s against 0.62–0.96 s buffered plus a flush) and with a third of
+the CPU time.
+
+### 8.3 Later stream classes (each its own specific class)
+
 - A random-access class – mostly convenience; random I/O gains come from
   batching, which `TStream` can't express. The real tool for that is the
   engine's batched API (§10).
@@ -2060,3 +2239,4 @@ tested.
 | 13 | 2026-10-22 | Free Pascal tests are **separate FPCUnit test units** (`Source/UnitTests/FPC`), not a shared source with the DUnitX tests. |
 | 14 | 2026-10-22 | In FPC the IoRing functions are **looked up with `GetProcAddress` on first use** (no `delayed` in FPC 3.2.2); a missing function returns `E_NOTIMPL`. |
 | 15 | 2026-10-23 | **Overlap rules in the engine: an option** (`orKeepOrder`, §11). For one file handle, requests that touch the same bytes take effect in start order; conflicting later requests are held back, and the requests of a handle are routed to one I/O thread. The core ring keeps no rules (A). |
+| 16 | 2026-10-23 | **The write stream writes through an engine** (its own by default, or a shared one): Windows does buffered writes inside the submit call, so the submit must happen on another thread (§2.1, §8.2). A failed background write raises at the next call, and at `Free` if it was never raised. |

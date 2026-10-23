@@ -6,7 +6,8 @@ Windows (and later `io_uring` on Linux through Free Pascal).
 The first ready part is a **read-only, sequential file stream with read-ahead**:
 while your code works on one block, the next blocks are already being read.
 It is a `TStream`, so it can replace `TFileStream` where a file is read from
-start to end.
+start to end. Its counterpart writes in the background, and an I/O engine
+serves many threads with many requests in flight.
 
 On a fast NVMe disk, a 10 GiB file not in the file cache is read at the full
 speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
@@ -27,7 +28,7 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | I/O engine `TIORingEngine` (`Delphi.IOUring.Engine`: many threads, one or more I/O threads, many requests in flight) | done, tested, benchmarked through the block reader |
 | Block reader `TIORingBlockReader` (`Delphi.IOUring.BlockReader`: blocks known in advance, read ahead, neighbours merged, handed out in order) | done, tested, benchmarked |
 | Overlap rule of the engine (`orKeepOrder`: per file handle, requests that touch the same bytes take effect in start order) | done, tested, measured |
-| Write stream | planned |
+| Write stream `TSequentialWriteOnlyFileStream` and writer `TIORingSequentialWriter` (writing in the background) | done, tested, benchmarked |
 | Linux `io_uring` through Free Pascal | planned |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
@@ -86,6 +87,37 @@ begin
   end;
 end;
 ```
+
+### Writing in the background
+
+```pascal
+uses
+  Delphi.IOUring.Streams;
+
+var
+  LStream: TSequentialWriteOnlyFileStream;
+begin
+  LStream := TSequentialWriteOnlyFileStream.Create('out.dat');   // creates or empties the file
+  try
+    // Write, WriteBuffer, CopyFrom, SaveToStream ... as with TFileStream
+    LStream.Flush;                    // optional: shows errors of earlier writes here
+  finally
+    LStream.Free;                     // waits for the writes
+  end;
+end;
+```
+
+`Write` copies into a buffer; full buffers (8 × 1 MiB) are written by an I/O
+thread while your code goes on. That pays off when the program also works on
+the data – then the writing happens meanwhile (a 1 GiB file was written
+25–45 % sooner than with `TFileStream`,
+[Benchmarks](Docs/Benchmarks.md#writing-phase-17)); for writing alone it is
+as fast as `TFileStream`. Because a write fails after `Write` has returned, its
+error comes later as `EWriteError`: at a later `Write`, at `Flush`, or at
+`Free`. `[swoUnbuffered]` writes past the file cache. Write-only and
+forward-only, like the read stream the other way round. Without a stream:
+`TIORingSequentialWriter` (`Delphi.IOUring.SequentialWriter`), also with a
+zero-copy API.
 
 ### The engine (many threads)
 
@@ -201,7 +233,8 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
   (lock-free against a lock): `Delphi.IOUring.Benchmarks.Structures.dproj`, or
   `Build-FPC.ps1 -Project Structures`. Blocks known in advance (the block
   reader and the engine): `Delphi.IOUring.Benchmarks.Blocks.dproj`, or
-  `Build-FPC.ps1 -Project Blocks`.
+  `Build-FPC.ps1 -Project Blocks`. Writing (the write stream):
+  `Delphi.IOUring.Benchmarks.Writes.dproj`, or `Build-FPC.ps1 -Project Writes`.
 
 ## License
 

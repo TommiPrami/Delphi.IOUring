@@ -6,7 +6,8 @@ The engine's data structures (Phase 11 and later) have a benchmark of their
 own: [Engine structures](#engine-structures-phase-11), and so has the engine
 with the block reader: [Blocks known in advance](#blocks-known-in-advance-phase-14),
 [Several I/O threads](#several-io-threads-phase-15) and
-[Overlap rule](#overlap-rule-phase-16).
+[Overlap rule](#overlap-rule-phase-16); writing has its own:
+[Writing](#writing-phase-17).
 
 ## Short version
 
@@ -60,6 +61,11 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
   costs about 3 % when few requests overlap, 20 % when two thirds of them
   have to wait, and up to 6.5 % for reads alone. With the rule, one file uses
   one I/O thread.
+- **Writing (Phase 17):** the write stream writes in the background. When
+  the program also works on the data, a 1 GiB file is written **25–45 %
+  sooner** than with `TFileStream` (10 GiB: 3–21 %, where the disk is the
+  limit); for writing alone there is no gain. Unbuffered, the data is on the
+  disk soonest and with a third of the CPU time.
 
 ## Machine
 
@@ -588,6 +594,59 @@ for read-only work, or when the program keeps overlapping requests apart
 itself, leave it off – it costs up to 6.5 %, and one file then uses one I/O
 thread.
 
+## Writing (Phase 17)
+
+Writing a new file front to back, 1 GiB and 10 GiB: the write stream
+`TSequentialWriteOnlyFileStream` (8 × 1 MiB buffers, its own engine, 64 KiB
+writes; also unbuffered) against `TFileStream` (64 KiB and 1 MiB writes) and
+`TBufferedFileStream` (1 MiB buffer, 64 KiB writes; Delphi only). Two
+scenarios: *writing only*, and *with work* – 200 µs of CPU time per MiB
+before it is written (the program computes the data). Two times per run:
+**written** – until the stream is freed (buffered data may still be in the
+file cache) – and **+ flush** – until the data is on the disk
+(`FlushFileBuffers` afterwards). A new file every run. Median of 3 runs.
+Measured 2026-10-23, same machine. Raw data:
+[2026-10-23-writes.csv](BenchmarkResults/2026-10-23-writes.csv).
+
+Seconds, Delphi, Win64:
+
+| Contender | 1 GiB, written | + flush | 1 GiB with work, written | + flush | 10 GiB, written | + flush | 10 GiB with work, written | + flush |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| TFileStream, 64 KiB writes | 0.29 | 0.62 | 0.71 | 1.08 | 5.30 | 7.26 | 7.40 | 8.73 |
+| TFileStream, 1 MiB writes | 0.32 | 0.65 | 0.57 | 0.96 | 4.39 | 7.15 | 5.05 | 7.03 |
+| TBufferedFileStream | 0.39 | 0.73 | 0.64 | 1.07 | 5.33 | 7.56 | 5.45 | 7.89 |
+| Write stream | 0.37 | 0.70 | **0.43** | **0.85** | 5.27 | 7.64 | **4.49** | **6.82** |
+| Write stream, unbuffered | **0.26** | **0.26** | **0.32** | **0.32** | 5.76 | **5.77** | 5.42 | **5.42** |
+
+With work, time until written – the write stream against the better
+`TFileStream` (1 MiB writes), all four builds:
+
+| Build | 1 GiB | 10 GiB |
+| --- | ---: | ---: |
+| Delphi Win64 | 0.43 vs 0.57 s (–25 %) | 4.49 vs 5.05 s (–11 %) |
+| FPC Win64 | 0.25 vs 0.44 s (–43 %) | 4.31 vs 5.42 s (–20 %) |
+| Delphi Win32 | 0.31 vs 0.56 s (–45 %) | 5.38 vs 5.54 s (–3 %) |
+| FPC Win32 | 0.24 vs 0.43 s (–44 %) | 4.67 vs 5.90 s (–21 %) |
+
+What the numbers say:
+
+- **Writing only: no gain**, as expected. Windows copies into the file cache
+  in one thread either way (Design §2.1), and the stream's own copy costs a
+  little: 1 GiB took 0.24–0.37 s, `TFileStream` 0.22–0.32 s.
+- **With work: the writing happens meanwhile.** 1 GiB was written 25–45 %
+  sooner than with `TFileStream`; with 10 GiB 3–21 % – there the disk is the
+  limit, see the next point.
+- **Big files: the disk sets the pace.** Windows cannot keep 10 GiB of
+  unwritten data in the file cache; it slows every writer down to what the
+  disk takes (about 2 GB/s here). And the disk itself writes fewer GB/s once
+  its fast write cache is full – which also made the unbuffered 1 GiB runs
+  slower (0.49–0.55 s) in the builds that ran after the first 10 GiB runs.
+- **Unbuffered: on the disk soonest, with little CPU time.** The data is on
+  the disk when `Free` returns: 1 GiB in 0.26–0.55 s against 0.62–0.96 s for
+  buffered writing plus a flush; 10 GiB in 5.4–5.9 s against 6.3–7.6 s, with
+  a third of the CPU time (1.0–1.8 s against 2.6–5.1 s) – no copy into the
+  file cache. Use it for big files that are not read back soon.
+
 ## Known limits of these measurements
 
 - **One machine, one very fast disk.** The NVMe drive has low latency, so
@@ -659,4 +718,13 @@ Blocks known in advance (about 1.5 minutes per build; options `--dir`,
 ```
 Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Blocks.exe --runs 3 --csv blocks.csv
 Source\Build-FPC.ps1 -Project Blocks -Platform Win64 -Run
+```
+
+Writing a file (options `--dir`, `--sizes` (GiB, default 1,10), `--runs`,
+`--work-us` (default 200), `--csv`; it needs as much free space as the
+largest size):
+
+```
+Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Writes.exe --sizes 1,10 --runs 3 --csv writes.csv
+Source\Build-FPC.ps1 -Project Writes -Platform Win64 -Run
 ```

@@ -78,6 +78,7 @@
         <DCCReference Include="..\Units\Delphi.IOUring.pas"/>
         <DCCReference Include="..\Units\Delphi.IOUring.SequentialReader.pas"/>
         <DCCReference Include="..\Units\Delphi.IOUring.Streams.pas"/>
+        <DCCReference Include="..\Units\Delphi.IOUring.SequentialWriter.pas"/>
         <DCCReference Include="..\Units\Delphi.IOUring.Atomics.pas"/>
         <DCCReference Include="..\Units\Delphi.IOUring.RequestPool.pas"/>
         <DCCReference Include="..\Units\Delphi.IOUring.RequestQueue.pas"/>
@@ -98,6 +99,7 @@
         <DCCReference Include="Tests.Engine.pas"/>
         <DCCReference Include="Tests.BlockReader.pas"/>
         <DCCReference Include="Tests.EngineOverlap.pas"/>
+        <DCCReference Include="Tests.SequentialWriter.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

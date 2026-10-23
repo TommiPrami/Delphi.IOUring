@@ -32,7 +32,8 @@ uses
   Tests.FPC.RequestQueue,
   Tests.FPC.Engine,
   Tests.FPC.BlockReader,
-  Tests.FPC.EngineOverlap;
+  Tests.FPC.EngineOverlap,
+  Tests.FPC.SequentialWriter;
 
 type
   // TComponent: interface without reference counting, as TTestResult expects

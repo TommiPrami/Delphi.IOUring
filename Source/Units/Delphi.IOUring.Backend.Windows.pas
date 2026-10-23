@@ -148,6 +148,11 @@ type
     // ASequentialHint = FILE_FLAG_SEQUENTIAL_SCAN.
     class function OpenFileForRead(const AFileName: string; const AUnbuffered,
       ASequentialHint: Boolean): THandle; static;
+    // Creates the file, or empties it if it exists; write access, others may
+    // read meanwhile, overlapped. AUnbuffered = FILE_FLAG_NO_BUFFERING.
+    class function CreateFileForWrite(const AFileName: string; const AUnbuffered: Boolean): THandle; static;
+    // Makes the file ASize bytes long (cuts it, or extends it with zeros)
+    class procedure SetFileSize(const AHandle: THandle; const ASize: Int64); static;
     class procedure CloseFile(const AHandle: THandle); static;
     class function GetFileSize(const AHandle: THandle): Int64; static;
     // Logical sector size of the file's volume: unbuffered I/O must use
@@ -705,12 +710,23 @@ type
     ByteOffsetForPartitionAlignment: ULONG;
   end;
 
+  // FILE_END_OF_FILE_INFO
+  TFileEndOfFileInfo = record
+    EndOfFile: Int64;
+  end;
+
 const
+  FILE_INFO_CLASS_END_OF_FILE_INFO = 6;  // FILE_INFO_BY_HANDLE_CLASS.FileEndOfFileInfo
   FILE_INFO_CLASS_STORAGE_INFO = 16;  // FILE_INFO_BY_HANDLE_CLASS.FileStorageInfo
   DEFAULT_SECTOR_SIZE = 4096;
 
 function GetFileInformationByHandleEx(hFile: THandle; FileInformationClass: Integer;
   lpFileInformation: Pointer; dwBufferSize: DWORD): BOOL; stdcall; external kernel32;
+
+// Own import: works on any handle, also overlapped ones (no file position)
+function IORingSetFileInformationByHandle(hFile: THandle; FileInformationClass: Integer;
+  lpFileInformation: Pointer; dwBufferSize: DWORD): BOOL; stdcall; external kernel32
+  name 'SetFileInformationByHandle';
 
 // Own import: FPC's Windows unit does not declare GetFileSizeEx
 function IORingGetFileSizeEx(hFile: THandle; out lpFileSize: Int64): BOOL; stdcall;
@@ -742,6 +758,28 @@ begin
     OPEN_EXISTING, LFlags, 0);
   if Result = INVALID_HANDLE_VALUE then
     raise EIORingError.CreateNative(LastErrorAsHResult, 'Open "' + AFileName + '"');
+end;
+
+class function TWindowsIORingPlatform.CreateFileForWrite(const AFileName: string; const AUnbuffered: Boolean): THandle;
+var
+  LFlags: DWORD;
+begin
+  LFlags := FILE_ATTRIBUTE_NORMAL or FILE_FLAG_OVERLAPPED;
+  if AUnbuffered then
+    LFlags := LFlags or FILE_FLAG_NO_BUFFERING;
+
+  Result := CreateFile(PChar(AFileName), GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, LFlags, 0);
+  if Result = INVALID_HANDLE_VALUE then
+    raise EIORingError.CreateNative(LastErrorAsHResult, 'Create "' + AFileName + '"');
+end;
+
+class procedure TWindowsIORingPlatform.SetFileSize(const AHandle: THandle; const ASize: Int64);
+var
+  LInfo: TFileEndOfFileInfo;
+begin
+  LInfo.EndOfFile := ASize;
+  if not IORingSetFileInformationByHandle(AHandle, FILE_INFO_CLASS_END_OF_FILE_INFO, @LInfo, SizeOf(LInfo)) then
+    raise EIORingError.CreateNative(LastErrorAsHResult, 'Set the file size');
 end;
 
 class procedure TWindowsIORingPlatform.CloseFile(const AHandle: THandle);

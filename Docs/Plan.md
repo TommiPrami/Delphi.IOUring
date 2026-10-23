@@ -31,7 +31,8 @@ Source/
     Delphi.IOUring.Backend.Posix.API.pas     100 % io_uring API translation (Milestone 4)
     Delphi.IOUring.Backend.Posix.pas         TLinuxIORing (Milestone 4)
     Delphi.IOUring.SequentialReader.pas      read-ahead engine (record)        (new)
-    Delphi.IOUring.Streams.pas               TStream descendants
+    Delphi.IOUring.SequentialWriter.pas      write-behind through an engine (record) (new)
+    Delphi.IOUring.Streams.pas               TStream descendants: read stream, write stream
     Delphi.IOUring.Atomics.pas               TAtomic: CAS / fences / wait-wake (new)
     Delphi.IOUring.RequestPool.pas           request slots, handles, lock-free free list (new)
     Delphi.IOUring.RequestQueue.pas          lock-free queue: producers -> I/O thread (new)
@@ -53,6 +54,8 @@ Source/
     Tests.RequestQueue.pas                   request queue, incl. wrap-around and producer/consumer stress
     Tests.Engine.pas                         the engine: results, waiting, callbacks, batches, Destroy, stress
     Tests.BlockReader.pas                    the block reader: order, merging, end of file, errors, shared engine
+    Tests.EngineOverlap.pas                  the overlap rule: order cases, pipes, model tests
+    Tests.SequentialWriter.pas               the writer and the write stream: round trips, Flush, unbuffered, failed writes
     TestFileHelpers.pas                      generates deterministic test files
     TestPlatformHelpers.pas                  files, pipes, page memory for tests
     TestThreadHelpers.pas                    starting threads together, busy waiting (Delphi tests)
@@ -68,6 +71,9 @@ Source/
     Bench.Blocks.pas                         blocks known in advance: block reader vs TFileStream/ReadFile (Delphi + FPC)
     Delphi.IOUring.Benchmarks.Blocks.dpr/.dproj       runs Bench.Blocks (Delphi)
     FPC/Delphi.IOUring.Benchmarks.Blocks.FPC.lpr      runs Bench.Blocks (FPC)
+    Bench.Writes.pas                         writing a file: write stream vs TFileStream/TBufferedFileStream (Delphi + FPC)
+    Delphi.IOUring.Benchmarks.Writes.dpr/.dproj       runs Bench.Writes (Delphi)
+    FPC/Delphi.IOUring.Benchmarks.Writes.FPC.lpr      runs Bench.Writes (FPC)
   3rdParty/DUnitX
 ```
 
@@ -253,6 +259,13 @@ Source/
 
   **Done 2026-10-23** – Delphi 224 tests and FPC 210 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 17 – `TSequentialWriteOnlyFileStream`** (write-behind; can use the engine or its own ring).
+  - [x] Measured first (Design §2.1): Windows does buffered writes, and unbuffered writes that extend a file, inside the submit call. So the writes go through an engine – its I/O thread does the submit – and not through a ring of the caller's thread.
+  - [x] Decided and built (Design §8.2): `Delphi.IOUring.SequentialWriter` – `TIORingSequentialWriter`, a managed record with its own engine by default or a shared one; copying `Write` and zero-copy `AcquireBuffer`/`CommitBuffer`; `Flush(AToDisk)`; unbuffered option with a cut last buffer. `TSequentialWriteOnlyFileStream` in `Delphi.IOUring.Streams`. A failed background write raises at the next call (`EWriteError` in the stream), and at `Free` if it was never raised.
+  - [x] New platform calls: `CreateFileForWrite`, `SetFileSize`.
+  - [x] Tests `Tests.SequentialWriter` / `Tests.FPC.SequentialWriter` (25 each): round trips around the buffer size and with pieces of every size, zero-copy, `Flush`, unbuffered, failed writes (made with a byte-range lock), bad arguments, wrong call order, end of scope, stats, a shared engine with 4 writers, and the stream with `CopyFrom`, `SaveToStream`, `Seek` rules and errors.
+  - [x] Benchmark: new program `Delphi.IOUring.Benchmarks.Writes` (Delphi and FPC, `Build-FPC.ps1 -Project Writes`) – 1 and 10 GiB against `TFileStream` and `TBufferedFileStream`, writing only and with CPU work. With work, 1 GiB was written **25–45 % sooner** (10 GiB: 3–21 %, the disk is the limit); writing alone gains nothing; unbuffered gets the data onto the disk soonest with a third of the CPU time ([Benchmarks.md](Benchmarks.md#writing-phase-17)).
+
+  **Done 2026-10-23** – Delphi 249 tests and FPC 235 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets. **Milestone 3 is complete.**
 
 ---
 
@@ -266,7 +279,7 @@ Source/
 
 ## Immediate next step
 
-Phases 14, 15 and 16 are done. Next: **Phase 17 – the write stream**
-(`TSequentialWriteOnlyFileStream`, writing in the background), the last
-phase of Milestone 3. It can use the engine with `orKeepOrder`, so that a
-program may read back what it has just written.
+Milestone 3 is complete (Phases 10–17). Next: **Milestone 4 – Linux through
+Free Pascal**, starting with Phase 18: the complete `linux/io_uring.h`
+translation (`Delphi.IOUring.Backend.Posix.API`, Design §6.4) with its
+layout tests. Development can start on WSL2 (x86-64).

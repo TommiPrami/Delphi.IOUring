@@ -1,0 +1,217 @@
+timestamp,compiler,platform,size_gib,scenario,contender,run,written_s,flushed_s,cpu_ms
+2026-10-23 13:50:07,Delphi,Win64,1,writing only,"TFileStream, 64 KiB writes",1,0.2924,0.6153,390.6
+2026-10-23 13:50:07,Delphi,Win64,1,writing only,"TFileStream, 1 MiB writes",1,0.2321,0.5453,296.9
+2026-10-23 13:50:08,Delphi,Win64,1,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",1,0.2497,0.5499,359.4
+2026-10-23 13:50:09,Delphi,Win64,1,writing only,"Write stream, 64 KiB writes",1,0.2374,0.5423,343.8
+2026-10-23 13:50:09,Delphi,Win64,1,writing only,"Write stream, unbuffered, 64 KiB writes",1,0.2512,0.2536,125.0
+2026-10-23 13:50:09,Delphi,Win64,1,writing only,"TFileStream, 64 KiB writes",2,0.2805,0.5910,375.0
+2026-10-23 13:50:10,Delphi,Win64,1,writing only,"TFileStream, 1 MiB writes",2,0.3442,0.6520,437.5
+2026-10-23 13:50:11,Delphi,Win64,1,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",2,0.3888,0.7284,484.4
+2026-10-23 13:50:11,Delphi,Win64,1,writing only,"Write stream, 64 KiB writes",2,0.3738,0.7027,468.8
+2026-10-23 13:50:12,Delphi,Win64,1,writing only,"Write stream, unbuffered, 64 KiB writes",2,0.2622,0.2636,187.5
+2026-10-23 13:50:12,Delphi,Win64,1,writing only,"TFileStream, 64 KiB writes",3,0.3293,0.7203,484.4
+2026-10-23 13:50:13,Delphi,Win64,1,writing only,"TFileStream, 1 MiB writes",3,0.3169,0.8173,421.9
+2026-10-23 13:50:14,Delphi,Win64,1,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",3,0.4082,0.8116,562.5
+2026-10-23 13:50:15,Delphi,Win64,1,writing only,"Write stream, 64 KiB writes",3,0.4080,0.7471,609.4
+2026-10-23 13:50:15,Delphi,Win64,1,writing only,"Write stream, unbuffered, 64 KiB writes",3,0.2768,0.2788,109.4
+2026-10-23 13:50:16,Delphi,Win64,1,with work,"TFileStream, 64 KiB writes",1,0.6633,1.0341,765.6
+2026-10-23 13:50:17,Delphi,Win64,1,with work,"TFileStream, 1 MiB writes",1,0.5181,0.9274,687.5
+2026-10-23 13:50:18,Delphi,Win64,1,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",1,0.6674,1.0766,890.6
+2026-10-23 13:50:19,Delphi,Win64,1,with work,"Write stream, 64 KiB writes",1,0.4332,0.8472,906.3
+2026-10-23 13:50:19,Delphi,Win64,1,with work,"Write stream, unbuffered, 64 KiB writes",1,0.3202,0.3219,437.5
+2026-10-23 13:50:21,Delphi,Win64,1,with work,"TFileStream, 64 KiB writes",2,0.7448,1.2066,968.8
+2026-10-23 13:50:22,Delphi,Win64,1,with work,"TFileStream, 1 MiB writes",2,0.6386,1.0357,765.6
+2026-10-23 13:50:23,Delphi,Win64,1,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",2,0.6366,1.0696,828.1
+2026-10-23 13:50:23,Delphi,Win64,1,with work,"Write stream, 64 KiB writes",2,0.3506,0.7478,796.9
+2026-10-23 13:50:24,Delphi,Win64,1,with work,"Write stream, unbuffered, 64 KiB writes",2,0.3295,0.3312,437.5
+2026-10-23 13:50:25,Delphi,Win64,1,with work,"TFileStream, 64 KiB writes",3,0.7100,1.0832,781.3
+2026-10-23 13:50:26,Delphi,Win64,1,with work,"TFileStream, 1 MiB writes",3,0.5728,0.9611,750.0
+2026-10-23 13:50:27,Delphi,Win64,1,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",3,0.5387,0.8944,562.5
+2026-10-23 13:50:28,Delphi,Win64,1,with work,"Write stream, 64 KiB writes",3,0.4689,0.8569,937.5
+2026-10-23 13:50:28,Delphi,Win64,1,with work,"Write stream, unbuffered, 64 KiB writes",3,0.2944,0.2959,375.0
+2026-10-23 13:50:36,Delphi,Win64,10,writing only,"TFileStream, 64 KiB writes",1,5.2685,6.6274,5109.4
+2026-10-23 13:50:44,Delphi,Win64,10,writing only,"TFileStream, 1 MiB writes",1,4.3893,7.1502,4093.8
+2026-10-23 13:50:53,Delphi,Win64,10,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",1,4.9367,7.5589,4484.4
+2026-10-23 13:51:02,Delphi,Win64,10,writing only,"Write stream, 64 KiB writes",1,5.2246,7.6436,2828.1
+2026-10-23 13:51:07,Delphi,Win64,10,writing only,"Write stream, unbuffered, 64 KiB writes",1,5.7903,5.7941,1453.1
+2026-10-23 13:51:16,Delphi,Win64,10,writing only,"TFileStream, 64 KiB writes",2,5.2959,7.2560,5265.6
+2026-10-23 13:51:24,Delphi,Win64,10,writing only,"TFileStream, 1 MiB writes",2,4.2899,6.8545,4421.9
+2026-10-23 13:51:33,Delphi,Win64,10,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",2,5.3252,7.8732,4765.6
+2026-10-23 13:51:42,Delphi,Win64,10,writing only,"Write stream, 64 KiB writes",2,5.4764,7.7988,3640.6
+2026-10-23 13:51:48,Delphi,Win64,10,writing only,"Write stream, unbuffered, 64 KiB writes",2,5.7638,5.7677,1125.0
+2026-10-23 13:51:57,Delphi,Win64,10,writing only,"TFileStream, 64 KiB writes",3,5.4087,7.8428,5140.6
+2026-10-23 13:52:05,Delphi,Win64,10,writing only,"TFileStream, 1 MiB writes",3,5.2529,7.5448,3953.1
+2026-10-23 13:52:14,Delphi,Win64,10,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",3,6.1037,7.5633,4640.6
+2026-10-23 13:52:22,Delphi,Win64,10,writing only,"Write stream, 64 KiB writes",3,5.2738,6.9858,4718.8
+2026-10-23 13:52:28,Delphi,Win64,10,writing only,"Write stream, unbuffered, 64 KiB writes",3,5.4435,5.4476,1437.5
+2026-10-23 13:52:38,Delphi,Win64,10,with work,"TFileStream, 64 KiB writes",1,7.8242,9.1140,7375.0
+2026-10-23 13:52:46,Delphi,Win64,10,with work,"TFileStream, 1 MiB writes",1,5.0536,7.0305,4937.5
+2026-10-23 13:52:54,Delphi,Win64,10,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",1,5.4474,7.8874,5234.4
+2026-10-23 13:53:02,Delphi,Win64,10,with work,"Write stream, 64 KiB writes",1,4.5374,6.9120,4437.5
+2026-10-23 13:53:08,Delphi,Win64,10,with work,"Write stream, unbuffered, 64 KiB writes",1,5.4667,5.4709,3281.3
+2026-10-23 13:53:17,Delphi,Win64,10,with work,"TFileStream, 64 KiB writes",2,7.4007,8.7264,5546.9
+2026-10-23 13:53:25,Delphi,Win64,10,with work,"TFileStream, 1 MiB writes",2,5.3710,6.7856,4890.6
+2026-10-23 13:53:34,Delphi,Win64,10,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",2,5.4330,7.8958,5859.4
+2026-10-23 13:53:42,Delphi,Win64,10,with work,"Write stream, 64 KiB writes",2,4.4341,6.8216,5859.4
+2026-10-23 13:53:47,Delphi,Win64,10,with work,"Write stream, unbuffered, 64 KiB writes",2,5.4203,5.4232,3312.5
+2026-10-23 13:53:55,Delphi,Win64,10,with work,"TFileStream, 64 KiB writes",3,5.8867,7.4672,5656.3
+2026-10-23 13:54:03,Delphi,Win64,10,with work,"TFileStream, 1 MiB writes",3,4.8153,7.1882,4781.3
+2026-10-23 13:54:11,Delphi,Win64,10,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",3,5.7154,7.5584,5156.3
+2026-10-23 13:54:19,Delphi,Win64,10,with work,"Write stream, 64 KiB writes",3,4.4928,6.7242,4265.6
+2026-10-23 13:54:24,Delphi,Win64,10,with work,"Write stream, unbuffered, 64 KiB writes",3,5.1352,5.1388,3046.9
+2026-10-23 13.54.25,FPC,Win64,1,writing only,"TFileStream, 64 KiB writes",1,0,3018,0,9677,437,5
+2026-10-23 13.54.26,FPC,Win64,1,writing only,"TFileStream, 1 MiB writes",1,0,2221,0,7373,296,9
+2026-10-23 13.54.27,FPC,Win64,1,writing only,"Write stream, 64 KiB writes",1,0,2510,0,7557,390,6
+2026-10-23 13.54.27,FPC,Win64,1,writing only,"Write stream, unbuffered, 64 KiB writes",1,0,5242,0,5284,31,3
+2026-10-23 13.54.28,FPC,Win64,1,writing only,"TFileStream, 64 KiB writes",2,0,2858,0,8579,421,9
+2026-10-23 13.54.29,FPC,Win64,1,writing only,"TFileStream, 1 MiB writes",2,0,2219,0,7916,375,0
+2026-10-23 13.54.30,FPC,Win64,1,writing only,"Write stream, 64 KiB writes",2,0,3295,0,9036,562,5
+2026-10-23 13.54.30,FPC,Win64,1,writing only,"Write stream, unbuffered, 64 KiB writes",2,0,7362,0,7402,125,0
+2026-10-23 13.54.31,FPC,Win64,1,writing only,"TFileStream, 64 KiB writes",3,0,3039,0,9188,515,6
+2026-10-23 13.54.32,FPC,Win64,1,writing only,"TFileStream, 1 MiB writes",3,0,2466,0,8295,312,5
+2026-10-23 13.54.33,FPC,Win64,1,writing only,"Write stream, 64 KiB writes",3,0,2450,0,7922,421,9
+2026-10-23 13.54.33,FPC,Win64,1,writing only,"Write stream, unbuffered, 64 KiB writes",3,0,4920,0,4950,93,8
+2026-10-23 13.54.34,FPC,Win64,1,with work,"TFileStream, 64 KiB writes",1,0,4709,0,9854,531,3
+2026-10-23 13.54.35,FPC,Win64,1,with work,"TFileStream, 1 MiB writes",1,0,4447,0,9876,562,5
+2026-10-23 13.54.36,FPC,Win64,1,with work,"Write stream, 64 KiB writes",1,0,2537,0,8551,640,6
+2026-10-23 13.54.37,FPC,Win64,1,with work,"Write stream, unbuffered, 64 KiB writes",1,0,4971,0,4985,187,5
+2026-10-23 13.54.38,FPC,Win64,1,with work,"TFileStream, 64 KiB writes",2,0,4963,1,1062,515,6
+2026-10-23 13.54.39,FPC,Win64,1,with work,"TFileStream, 1 MiB writes",2,0,4415,0,9662,546,9
+2026-10-23 13.54.40,FPC,Win64,1,with work,"Write stream, 64 KiB writes",2,0,2484,0,7672,593,8
+2026-10-23 13.54.40,FPC,Win64,1,with work,"Write stream, unbuffered, 64 KiB writes",2,0,4965,0,4993,234,4
+2026-10-23 13.54.41,FPC,Win64,1,with work,"TFileStream, 64 KiB writes",3,0,4688,0,9869,562,5
+2026-10-23 13.54.42,FPC,Win64,1,with work,"TFileStream, 1 MiB writes",3,0,4425,1,0060,593,8
+2026-10-23 13.54.43,FPC,Win64,1,with work,"Write stream, 64 KiB writes",3,0,2604,0,8023,531,3
+2026-10-23 13.54.43,FPC,Win64,1,with work,"Write stream, unbuffered, 64 KiB writes",3,0,5147,0,5185,359,4
+2026-10-23 13.54.51,FPC,Win64,10,writing only,"TFileStream, 64 KiB writes",1,5,0893,6,6865,3328,1
+2026-10-23 13.54.57,FPC,Win64,10,writing only,"TFileStream, 1 MiB writes",1,5,1573,6,4377,2453,1
+2026-10-23 13.55.04,FPC,Win64,10,writing only,"Write stream, 64 KiB writes",1,4,1176,6,2409,2609,4
+2026-10-23 13.55.10,FPC,Win64,10,writing only,"Write stream, unbuffered, 64 KiB writes",1,5,1800,5,1838,1234,4
+2026-10-23 13.55.18,FPC,Win64,10,writing only,"TFileStream, 64 KiB writes",2,5,5579,7,2220,3406,3
+2026-10-23 13.55.24,FPC,Win64,10,writing only,"TFileStream, 1 MiB writes",2,4,3902,6,4397,2859,4
+2026-10-23 13.55.31,FPC,Win64,10,writing only,"Write stream, 64 KiB writes",2,3,9508,6,2953,3406,3
+2026-10-23 13.55.36,FPC,Win64,10,writing only,"Write stream, unbuffered, 64 KiB writes",2,5,1020,5,1063,796,9
+2026-10-23 13.55.44,FPC,Win64,10,writing only,"TFileStream, 64 KiB writes",3,5,2183,7,0280,3578,1
+2026-10-23 13.55.52,FPC,Win64,10,writing only,"TFileStream, 1 MiB writes",3,4,3210,6,5728,2765,6
+2026-10-23 13.55.59,FPC,Win64,10,writing only,"Write stream, 64 KiB writes",3,4,4108,6,6853,2562,5
+2026-10-23 13.56.04,FPC,Win64,10,writing only,"Write stream, unbuffered, 64 KiB writes",3,5,0124,5,0166,1125,0
+2026-10-23 13.56.12,FPC,Win64,10,with work,"TFileStream, 64 KiB writes",1,5,9084,7,2739,5718,8
+2026-10-23 13.56.20,FPC,Win64,10,with work,"TFileStream, 1 MiB writes",1,6,1198,7,2418,4906,3
+2026-10-23 13.56.28,FPC,Win64,10,with work,"Write stream, 64 KiB writes",1,4,3286,6,7548,4656,3
+2026-10-23 13.56.33,FPC,Win64,10,with work,"Write stream, unbuffered, 64 KiB writes",1,5,2958,5,2996,3546,9
+2026-10-23 13.56.43,FPC,Win64,10,with work,"TFileStream, 64 KiB writes",2,6,6901,8,5530,5859,4
+2026-10-23 13.56.51,FPC,Win64,10,with work,"TFileStream, 1 MiB writes",2,5,1798,7,1465,5093,8
+2026-10-23 13.56.58,FPC,Win64,10,with work,"Write stream, 64 KiB writes",2,4,3118,6,5766,5703,1
+2026-10-23 13.57.03,FPC,Win64,10,with work,"Write stream, unbuffered, 64 KiB writes",2,5,2611,5,2640,3390,6
+2026-10-23 13.57.12,FPC,Win64,10,with work,"TFileStream, 64 KiB writes",3,6,1871,7,8251,5734,4
+2026-10-23 13.57.20,FPC,Win64,10,with work,"TFileStream, 1 MiB writes",3,5,4176,7,2282,4734,4
+2026-10-23 13.57.28,FPC,Win64,10,with work,"Write stream, 64 KiB writes",3,4,2026,6,6167,5125,0
+2026-10-23 13.57.33,FPC,Win64,10,with work,"Write stream, unbuffered, 64 KiB writes",3,5,3797,5,3827,2781,3
+2026-10-23 13:57:34,Delphi,Win32,1,writing only,"TFileStream, 64 KiB writes",1,0.3003,0.8226,406.3
+2026-10-23 13:57:35,Delphi,Win32,1,writing only,"TFileStream, 1 MiB writes",1,0.2448,0.7704,375.0
+2026-10-23 13:57:35,Delphi,Win32,1,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",1,0.2838,0.8080,375.0
+2026-10-23 13:57:36,Delphi,Win32,1,writing only,"Write stream, 64 KiB writes",1,0.2774,0.8506,484.4
+2026-10-23 13:57:38,Delphi,Win32,1,writing only,"Write stream, unbuffered, 64 KiB writes",1,1.6966,1.7006,296.9
+2026-10-23 13:57:39,Delphi,Win32,1,writing only,"TFileStream, 64 KiB writes",2,0.4906,1.1676,625.0
+2026-10-23 13:57:40,Delphi,Win32,1,writing only,"TFileStream, 1 MiB writes",2,0.4190,1.0676,640.6
+2026-10-23 13:57:41,Delphi,Win32,1,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",2,0.4281,1.0411,656.3
+2026-10-23 13:57:42,Delphi,Win32,1,writing only,"Write stream, 64 KiB writes",2,0.3306,1.1261,500.0
+2026-10-23 13:57:43,Delphi,Win32,1,writing only,"Write stream, unbuffered, 64 KiB writes",2,0.5457,0.5496,171.9
+2026-10-23 13:57:44,Delphi,Win32,1,writing only,"TFileStream, 64 KiB writes",3,0.3215,0.9059,437.5
+2026-10-23 13:57:45,Delphi,Win32,1,writing only,"TFileStream, 1 MiB writes",3,0.2904,0.8591,421.9
+2026-10-23 13:57:46,Delphi,Win32,1,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",3,0.3712,0.9533,484.4
+2026-10-23 13:57:47,Delphi,Win32,1,writing only,"Write stream, 64 KiB writes",3,0.2797,0.9428,468.8
+2026-10-23 13:57:47,Delphi,Win32,1,writing only,"Write stream, unbuffered, 64 KiB writes",3,0.5342,0.5378,140.6
+2026-10-23 13:57:48,Delphi,Win32,1,with work,"TFileStream, 64 KiB writes",1,0.5714,1.2132,718.8
+2026-10-23 13:57:50,Delphi,Win32,1,with work,"TFileStream, 1 MiB writes",1,0.5991,1.2180,781.3
+2026-10-23 13:57:51,Delphi,Win32,1,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",1,0.5473,1.1299,593.8
+2026-10-23 13:57:52,Delphi,Win32,1,with work,"Write stream, 64 KiB writes",1,0.3246,0.8771,859.4
+2026-10-23 13:57:52,Delphi,Win32,1,with work,"Write stream, unbuffered, 64 KiB writes",1,0.5288,0.5316,328.1
+2026-10-23 13:57:54,Delphi,Win32,1,with work,"TFileStream, 64 KiB writes",2,0.5635,1.3513,734.4
+2026-10-23 13:57:55,Delphi,Win32,1,with work,"TFileStream, 1 MiB writes",2,0.5602,1.1457,671.9
+2026-10-23 13:57:56,Delphi,Win32,1,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",2,0.5099,1.0433,656.3
+2026-10-23 13:57:57,Delphi,Win32,1,with work,"Write stream, 64 KiB writes",2,0.2778,0.8438,625.0
+2026-10-23 13:57:57,Delphi,Win32,1,with work,"Write stream, unbuffered, 64 KiB writes",2,0.5021,0.5051,296.9
+2026-10-23 13:57:58,Delphi,Win32,1,with work,"TFileStream, 64 KiB writes",3,0.5342,1.2381,640.6
+2026-10-23 13:57:59,Delphi,Win32,1,with work,"TFileStream, 1 MiB writes",3,0.4516,0.9963,593.8
+2026-10-23 13:58:00,Delphi,Win32,1,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",3,0.5280,1.0863,703.1
+2026-10-23 13:58:01,Delphi,Win32,1,with work,"Write stream, 64 KiB writes",3,0.3051,0.8406,609.4
+2026-10-23 13:58:02,Delphi,Win32,1,with work,"Write stream, unbuffered, 64 KiB writes",3,0.5238,0.5276,312.5
+2026-10-23 13:58:10,Delphi,Win32,10,writing only,"TFileStream, 64 KiB writes",1,5.4457,7.4920,3984.4
+2026-10-23 13:58:19,Delphi,Win32,10,writing only,"TFileStream, 1 MiB writes",1,5.4004,7.3701,3281.3
+2026-10-23 13:58:26,Delphi,Win32,10,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",1,4.9097,6.4960,3828.1
+2026-10-23 13:58:35,Delphi,Win32,10,writing only,"Write stream, 64 KiB writes",1,5.0538,7.1890,4484.4
+2026-10-23 13:58:40,Delphi,Win32,10,writing only,"Write stream, unbuffered, 64 KiB writes",1,5.5034,5.5072,1734.4
+2026-10-23 13:58:48,Delphi,Win32,10,writing only,"TFileStream, 64 KiB writes",2,4.4814,6.8829,4390.6
+2026-10-23 13:58:55,Delphi,Win32,10,writing only,"TFileStream, 1 MiB writes",2,5.9547,7.2979,3500.0
+2026-10-23 13:59:04,Delphi,Win32,10,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",2,4.5004,7.1023,4359.4
+2026-10-23 13:59:12,Delphi,Win32,10,writing only,"Write stream, 64 KiB writes",2,5.7388,7.5718,4343.8
+2026-10-23 13:59:19,Delphi,Win32,10,writing only,"Write stream, unbuffered, 64 KiB writes",2,6.4131,6.4164,1843.8
+2026-10-23 13:59:27,Delphi,Win32,10,writing only,"TFileStream, 64 KiB writes",3,6.0621,7.4356,5218.8
+2026-10-23 13:59:34,Delphi,Win32,10,writing only,"TFileStream, 1 MiB writes",3,5.1630,6.7947,3421.9
+2026-10-23 13:59:42,Delphi,Win32,10,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",3,5.1651,7.2228,3750.0
+2026-10-23 13:59:50,Delphi,Win32,10,writing only,"Write stream, 64 KiB writes",3,4.9642,6.6613,4390.6
+2026-10-23 13:59:56,Delphi,Win32,10,writing only,"Write stream, unbuffered, 64 KiB writes",3,5.8585,5.8627,1828.1
+2026-10-23 14:00:05,Delphi,Win32,10,with work,"TFileStream, 64 KiB writes",1,6.8867,8.3968,6859.4
+2026-10-23 14:00:13,Delphi,Win32,10,with work,"TFileStream, 1 MiB writes",1,6.1586,7.4929,5250.0
+2026-10-23 14:00:22,Delphi,Win32,10,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",1,5.4656,7.3247,5609.4
+2026-10-23 14:00:30,Delphi,Win32,10,with work,"Write stream, 64 KiB writes",1,5.3778,6.9988,6046.9
+2026-10-23 14:00:35,Delphi,Win32,10,with work,"Write stream, unbuffered, 64 KiB writes",1,5.6524,5.6561,3906.3
+2026-10-23 14:00:45,Delphi,Win32,10,with work,"TFileStream, 64 KiB writes",2,6.0435,8.2673,6062.5
+2026-10-23 14:00:53,Delphi,Win32,10,with work,"TFileStream, 1 MiB writes",2,5.5385,7.8938,5953.1
+2026-10-23 14:01:03,Delphi,Win32,10,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",2,5.7900,7.7672,5875.0
+2026-10-23 14:01:09,Delphi,Win32,10,with work,"Write stream, 64 KiB writes",2,5.5100,6.5266,5484.4
+2026-10-23 14:01:15,Delphi,Win32,10,with work,"Write stream, unbuffered, 64 KiB writes",2,5.5382,5.5412,3562.5
+2026-10-23 14:01:23,Delphi,Win32,10,with work,"TFileStream, 64 KiB writes",3,6.0053,7.2722,5406.3
+2026-10-23 14:01:30,Delphi,Win32,10,with work,"TFileStream, 1 MiB writes",3,5.1976,7.0071,4937.5
+2026-10-23 14:01:38,Delphi,Win32,10,with work,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",3,5.3770,6.7732,5281.3
+2026-10-23 14:01:46,Delphi,Win32,10,with work,"Write stream, 64 KiB writes",3,4.3805,6.8087,5093.8
+2026-10-23 14:01:51,Delphi,Win32,10,with work,"Write stream, unbuffered, 64 KiB writes",3,5.4451,5.4482,2968.8
+2026-10-23 14.01.53,FPC,Win32,1,writing only,"TFileStream, 64 KiB writes",1,0,2846,0,8298,359,4
+2026-10-23 14.01.54,FPC,Win32,1,writing only,"TFileStream, 1 MiB writes",1,0,2279,0,7521,359,4
+2026-10-23 14.01.55,FPC,Win32,1,writing only,"Write stream, 64 KiB writes",1,0,2360,0,7806,375,0
+2026-10-23 14.01.55,FPC,Win32,1,writing only,"Write stream, unbuffered, 64 KiB writes",1,0,4824,0,4851,78,1
+2026-10-23 14.01.57,FPC,Win32,1,writing only,"TFileStream, 64 KiB writes",2,0,2713,1,0475,406,3
+2026-10-23 14.01.57,FPC,Win32,1,writing only,"TFileStream, 1 MiB writes",2,0,2503,0,5757,312,5
+2026-10-23 14.01.58,FPC,Win32,1,writing only,"Write stream, 64 KiB writes",2,0,2372,0,5491,390,6
+2026-10-23 14.01.58,FPC,Win32,1,writing only,"Write stream, unbuffered, 64 KiB writes",2,0,4898,0,4926,125,0
+2026-10-23 14.01.59,FPC,Win32,1,writing only,"TFileStream, 64 KiB writes",3,0,3974,0,9645,500,0
+2026-10-23 14.02.00,FPC,Win32,1,writing only,"TFileStream, 1 MiB writes",3,0,2642,0,8704,421,9
+2026-10-23 14.02.01,FPC,Win32,1,writing only,"Write stream, 64 KiB writes",3,0,2644,0,8197,421,9
+2026-10-23 14.02.02,FPC,Win32,1,writing only,"Write stream, unbuffered, 64 KiB writes",3,0,8517,0,8541,171,9
+2026-10-23 14.02.03,FPC,Win32,1,with work,"TFileStream, 64 KiB writes",1,0,5074,1,0552,578,1
+2026-10-23 14.02.04,FPC,Win32,1,with work,"TFileStream, 1 MiB writes",1,0,4295,0,9536,546,9
+2026-10-23 14.02.04,FPC,Win32,1,with work,"Write stream, 64 KiB writes",1,0,2450,0,7765,625,0
+2026-10-23 14.02.05,FPC,Win32,1,with work,"Write stream, unbuffered, 64 KiB writes",1,0,4913,0,4940,265,6
+2026-10-23 14.02.06,FPC,Win32,1,with work,"TFileStream, 64 KiB writes",2,0,5129,1,0471,546,9
+2026-10-23 14.02.07,FPC,Win32,1,with work,"TFileStream, 1 MiB writes",2,0,4445,1,2948,484,4
+2026-10-23 14.02.08,FPC,Win32,1,with work,"Write stream, 64 KiB writes",2,0,2434,0,7680,562,5
+2026-10-23 14.02.08,FPC,Win32,1,with work,"Write stream, unbuffered, 64 KiB writes",2,0,3727,0,3756,281,3
+2026-10-23 14.02.09,FPC,Win32,1,with work,"TFileStream, 64 KiB writes",3,0,5182,0,8289,593,8
+2026-10-23 14.02.10,FPC,Win32,1,with work,"TFileStream, 1 MiB writes",3,0,4338,0,8722,515,6
+2026-10-23 14.02.11,FPC,Win32,1,with work,"Write stream, 64 KiB writes",3,0,2440,0,7878,515,6
+2026-10-23 14.02.11,FPC,Win32,1,with work,"Write stream, unbuffered, 64 KiB writes",3,0,5069,0,5102,312,5
+2026-10-23 14.02.19,FPC,Win32,10,writing only,"TFileStream, 64 KiB writes",1,3,9992,6,4986,3875,0
+2026-10-23 14.02.26,FPC,Win32,10,writing only,"TFileStream, 1 MiB writes",1,4,5215,6,2596,2781,3
+2026-10-23 14.02.33,FPC,Win32,10,writing only,"Write stream, 64 KiB writes",1,4,0459,6,4200,2671,9
+2026-10-23 14.02.38,FPC,Win32,10,writing only,"Write stream, unbuffered, 64 KiB writes",1,5,5487,5,5526,1031,3
+2026-10-23 14.02.46,FPC,Win32,10,writing only,"TFileStream, 64 KiB writes",2,4,8289,6,3703,3437,5
+2026-10-23 14.02.53,FPC,Win32,10,writing only,"TFileStream, 1 MiB writes",2,4,4238,6,2980,2906,3
+2026-10-23 14.03.00,FPC,Win32,10,writing only,"Write stream, 64 KiB writes",2,4,2388,6,7328,2187,5
+2026-10-23 14.03.06,FPC,Win32,10,writing only,"Write stream, unbuffered, 64 KiB writes",2,5,4183,5,4214,984,4
+2026-10-23 14.03.13,FPC,Win32,10,writing only,"TFileStream, 64 KiB writes",3,3,5726,5,9090,3703,1
+2026-10-23 14.03.20,FPC,Win32,10,writing only,"TFileStream, 1 MiB writes",3,4,0255,6,9820,2875,0
+2026-10-23 14.03.28,FPC,Win32,10,writing only,"Write stream, 64 KiB writes",3,4,7841,6,7602,3062,5
+2026-10-23 14.03.33,FPC,Win32,10,writing only,"Write stream, unbuffered, 64 KiB writes",3,5,5083,5,5115,1156,3
+2026-10-23 14.03.42,FPC,Win32,10,with work,"TFileStream, 64 KiB writes",1,6,7561,8,6068,6187,5
+2026-10-23 14.03.51,FPC,Win32,10,with work,"TFileStream, 1 MiB writes",1,6,6342,7,9326,5390,6
+2026-10-23 14.03.59,FPC,Win32,10,with work,"Write stream, 64 KiB writes",1,5,7536,7,2982,5531,3
+2026-10-23 14.04.04,FPC,Win32,10,with work,"Write stream, unbuffered, 64 KiB writes",1,5,2723,5,2758,3265,6
+2026-10-23 14.04.12,FPC,Win32,10,with work,"TFileStream, 64 KiB writes",2,6,1450,7,4515,5421,9
+2026-10-23 14.04.20,FPC,Win32,10,with work,"TFileStream, 1 MiB writes",2,5,5172,6,8578,4687,5
+2026-10-23 14.04.26,FPC,Win32,10,with work,"Write stream, 64 KiB writes",2,3,4471,5,8193,4906,3
+2026-10-23 14.04.32,FPC,Win32,10,with work,"Write stream, unbuffered, 64 KiB writes",2,5,4462,5,4501,3484,4
+2026-10-23 14.04.40,FPC,Win32,10,with work,"TFileStream, 64 KiB writes",3,5,7422,7,1324,5625,0
+2026-10-23 14.04.48,FPC,Win32,10,with work,"TFileStream, 1 MiB writes",3,5,9008,7,2563,4859,4
+2026-10-23 14.04.55,FPC,Win32,10,with work,"Write stream, 64 KiB writes",3,4,6723,6,4774,6093,8
+2026-10-23 14.05.01,FPC,Win32,10,with work,"Write stream, unbuffered, 64 KiB writes",3,5,7654,5,7688,3203,1
