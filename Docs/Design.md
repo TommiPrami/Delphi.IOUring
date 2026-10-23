@@ -1,6 +1,6 @@
 ﻿# Delphi.IOUring – Design Specification
 
-Status: **Draft v1.2** (2026-10-23) – Milestones 1, 2 and 3 complete: Delphi 13 and
+Status: **Draft v1.3** (2026-10-23) – Milestones 1, 2 and 3 complete: Delphi 13 and
 Free Pascal 3.2.2 on Windows, Win32 and Win64 (§12.1). Milestone 1 (Phases 1–5):
 complete Windows API unit, core ring (implementation notes in §5.2),
 sequential reader (notes in §7), read-only stream (notes in §8.1),
@@ -10,7 +10,9 @@ in §10.7), the request queue (Phase 12, notes in §10.8), the engine with one
 I/O thread (Phase 13, notes in §10.9), the block reader (Phase 14, notes in
 §10.10), several I/O threads (Phase 15, measurements in §10.11, notes in
 §10.12), the overlap rule (Phase 16, decisions in §11, notes in §10.13) and
-the write stream (Phase 17, §8.2) – Milestone 3 is complete. Things marked
+the write stream (Phase 17, §8.2) – Milestone 3 is complete. Milestone 4
+(Linux through Free Pascal) has started: the Linux API unit (Phase 18, notes
+in §6.4). Things marked
 **[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
@@ -819,12 +821,118 @@ right data). Original notes:
      (`Kind, Value`) which is binary-identical on the stack. Either way the
      cost is a few extra pushes – not a meaningful performance hit.
 
-### 6.4 Linux API unit (later)
+### 6.4 Linux API unit (Phase 18)
 
 Same rules: complete translation of the `linux/io_uring.h` user API of a
 pinned kernel version (all opcodes, SQE/CQE layouts, setup/enter/register
 flags, `io_uring_params`, offsets structs, register opcodes, feature flags),
 plus the three syscall wrappers. x86-64 and AArch64 only.
+
+**Facts found before Phase 18** (WSL2, Ubuntu 24.04, kernel 6.18, FPC 3.2.2,
+2026-10-23):
+
+- **[VERIFIED]** FPC calls the kernel directly: `do_SysCall(425, …)` (unit
+  `Syscall`) returned a ring; a Pascal `io_uring_params` record has the C
+  size (120 bytes). No C library is needed.
+- `liburing` is not installed by default, and its `io_uring_prep_*` helpers
+  are C inline functions in its header – Pascal cannot call them anyway.
+- `io_uring` is enabled (`kernel.io_uring_disabled` = 0). The installed
+  header is the one of kernel 6.8 (`linux-libc-dev`, Ubuntu 24.04 LTS); the
+  running kernel reports 18 feature bits, the 6.8 header names 14.
+- gcc 13 is installed: layout tests can be checked against the real header.
+
+**Phase 18 decisions (decided 2026-10-23):**
+
+- **Raw system calls, no `liburing`** (closes open question 1 in §14): the
+  unit wraps the three system calls with FPC's `do_SysCall`. The few helpers
+  that `liburing` has in C (preparing an SQE, reading the rings with the right
+  memory barriers) are written in Pascal in Phase 19, where `TLinuxIORing`
+  needs them.
+- **Pinned header: Linux 6.8** – the one installed with Ubuntu 24.04 LTS, so
+  every record and constant can be checked against it on this machine. What
+  newer kernels added (4 more feature bits, a few opcodes and register
+  codes) can follow with a newer pin; the generated layout tests (below)
+  make that cheap. The core subset (§2.3) needs nothing newer than 5.11.
+- **`Delphi.IOUring.Backend.Posix.API`, standalone** like the Windows unit:
+  original C names; `{$PACKRECORDS C}`; C unions as variant parts of records;
+  all constants, enums, flags and records of the header; the mmap offsets
+  (`IORING_OFF_SQ_RING`, …); the wrappers `io_uring_setup`, `io_uring_enter`
+  and `io_uring_register` return the kernel's result (`-errno` on failure)
+  and raise nothing. FPC only (Linux goes through FPC, decision 11), x86-64
+  and AArch64; the system call numbers are the same on both.
+- **Layout tests generated from the C header:** a small C program, built
+  with gcc on Linux, writes the size of every record, the offset of every
+  field and the value of every constant into a Pascal include file, which
+  is kept in the repository. The FPCUnit test compares the unit against it.
+  A new pin = run the generator again.
+- **Live tests:** set up a ring with its parameters, map its memory, send a
+  no-op through it, register files and buffers, ask the kernel which
+  opcodes it has (`IORING_REGISTER_PROBE`), and the error cases (for
+  example 0 entries: `-EINVAL`).
+- **A Linux test program:** `Delphi.IOUring.UnitTests.Linux.lpr` (FPCUnit;
+  the Windows test project uses Windows calls throughout). `Build-FPC.ps1`
+  gets `-Platform Linux64`, which compiles and runs it inside WSL, so the
+  same script builds everything.
+- **AArch64:** the unit is written for it (the same system call numbers;
+  the records have no pointer-size differences), but it can only be tested
+  on an ARM machine – marked [VERIFY] until then.
+
+**Phase 18 implementation notes** (2026-10-23):
+
+- Built as decided: `Delphi.IOUring.Backend.Posix.API` (Free Pascal, Linux,
+  x86-64 and AArch64; only the RTL units `BaseUnix` and `Syscall`). The test
+  program is `Source/UnitTests/Linux/Delphi.IOUring.UnitTests.Linux.lpr`:
+  `Build-FPC.ps1 -Project Tests -Platform Linux64 -Run`.
+- How C maps to Pascal: a union is the variant part of a record; the fields
+  after a union are inside its last variant, so every member keeps its C
+  name (`sqe.off`, `sqe.rw_flags`, …). `io_sqring_offsets.array` is
+  `&array` (a reserved word). Flexible arrays that would change `SizeOf`
+  (`io_uring_cqe.big_cqe`, `io_uring_probe.ops`) are not fields; they start
+  right after the record.
+- **[VERIFIED] FPC aligns a variant part to the largest field in it – also
+  the fields that come after the union** (they are inside its last variant).
+  C aligns a union only to its own members. So FPC moved the flags union of
+  `io_uring_sqe` from offset 28 to 32 (`user_data`, 8 bytes, follows it),
+  and the union of `io_uring_restriction` from 2 to 4. These two records are
+  `packed`: C has no gaps in them, so packed gives the C offsets. The
+  generated layout tests found this on their first run. The live tests
+  failed too (wrong `user_data`, a timeout that did not wait), but a read
+  that uses only `off`, `addr` and `len` worked: a wrong layout can look
+  fine in a simple test.
+- **[VERIFIED]** FPC's `do_SysCall` returns -1 and sets `errno` on failure.
+  The wrappers give back `-errno`, the kernel's own form (as liburing does).
+- The layout checks: `Generate-PosixApiLayout.sh` (bash and gcc, on Linux)
+  reads the header and stops if `PosixApiLayout.c` misses a constant, record
+  or field of it (6.8: 200 constants, 20 records, 147 fields). Then the C
+  program writes 373 checks (sizes, offsets, values) into
+  `Tests.Linux.Backend.Posix.API.Layout.inc`; the output is the same on
+  every run. A name the Pascal unit does not have does not compile. A new
+  header pin: run the script and add what it reports.
+- **[VERIFIED] what the kernel does** (6.18 in WSL2; the live tests):
+  - `io_uring_setup` rounds the entries up to a power of two, and the CQ is
+    twice as big; `IORING_SETUP_CQSIZE` is rounded up too (100 → 128).
+    0 entries, an unknown flag or a non-zero `resv` give `-EINVAL`; more
+    than 32 768 entries give `-EINVAL`, and with `IORING_SETUP_CLAMP`
+    32 768 (CQ 65 536).
+  - Features `$3FFFF`: the 14 that the 6.8 header names and 4 newer ones.
+    The probe reports `last_op` 62: 63 opcodes, all supported (the 6.8
+    header has 55).
+  - A request with a bad file descriptor is submitted; its error (`-EBADF`)
+    comes in its CQE. The same for an empty slot of the registered files
+    (`-EBADF`) and for `IORING_OP_READ_FIXED` outside the registered buffer
+    (`-EFAULT`).
+  - A read at the end of the file completes with 0 bytes; a read across the
+    end with the bytes up to the end.
+  - `io_uring_enter` on a file that is not a ring: `-EOPNOTSUPP`; on a bad
+    descriptor: `-EBADF`. `io_uring_register` with an unknown opcode:
+    `-EINVAL`.
+  - Waiting with `IORING_ENTER_EXT_ARG` and a timeout, and
+    `IORING_OP_TIMEOUT`, end with `-ETIME`.
+- **[VERIFY] AArch64:** build and run the Linux tests on an ARM machine, and
+  run the generator there (its output must be the same, apart from the
+  comment line). Also look at the code FPC makes for the fields of the two
+  packed records: it may load them byte by byte if it thinks they could be
+  unaligned.
 
 ---
 
@@ -2213,10 +2321,11 @@ tested.
 
 ## 14. Open questions
 
-1. **[DECIDE later]** Linux backend: raw syscalls or liburing (§2.2)?
-2. **[DECIDE later]** Neutral ref records vs OS-layout records (§5.1).
+1. **[DECIDE later]** Neutral ref records vs OS-layout records (§5.1).
 
-(Overlap handling in the engine: decided in Phase 16 – §11 and decision 15.)
+(Overlap handling in the engine: decided in Phase 16 – §11 and decision 15.
+Linux backend: raw syscalls, no liburing – decided in Phase 18, §6.4 and
+decision 17.)
 
 ---
 
@@ -2240,3 +2349,4 @@ tested.
 | 14 | 2026-10-22 | In FPC the IoRing functions are **looked up with `GetProcAddress` on first use** (no `delayed` in FPC 3.2.2); a missing function returns `E_NOTIMPL`. |
 | 15 | 2026-10-23 | **Overlap rules in the engine: an option** (`orKeepOrder`, §11). For one file handle, requests that touch the same bytes take effect in start order; conflicting later requests are held back, and the requests of a handle are routed to one I/O thread. The core ring keeps no rules (A). |
 | 16 | 2026-10-23 | **The write stream writes through an engine** (its own by default, or a shared one): Windows does buffered writes inside the submit call, so the submit must happen on another thread (§2.1, §8.2). A failed background write raises at the next call, and at `Free` if it was never raised. |
+| 17 | 2026-10-23 | **Linux: raw system calls, no liburing**; the API unit translates the **kernel 6.8** `linux/io_uring.h` (Ubuntu 24.04 LTS), checked by layout tests generated from the C header; Linux tests are built and run in WSL through `Build-FPC.ps1 -Platform Linux64` (§6.4). |

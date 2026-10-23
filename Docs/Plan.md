@@ -28,7 +28,7 @@ Source/
     Delphi.IOUring.Backend.Custom.pas        neutral types, errors, shared helpers
     Delphi.IOUring.Backend.Windows.API.pas   100 % IoRing API translation, standalone (new)
     Delphi.IOUring.Backend.Windows.pas       TWindowsIORing (record)
-    Delphi.IOUring.Backend.Posix.API.pas     100 % io_uring API translation (Milestone 4)
+    Delphi.IOUring.Backend.Posix.API.pas     100 % io_uring API translation (Linux 6.8), standalone (new)
     Delphi.IOUring.Backend.Posix.pas         TLinuxIORing (Milestone 4)
     Delphi.IOUring.SequentialReader.pas      read-ahead engine (record)        (new)
     Delphi.IOUring.SequentialWriter.pas      write-behind through an engine (record) (new)
@@ -38,12 +38,18 @@ Source/
     Delphi.IOUring.RequestQueue.pas          lock-free queue: producers -> I/O thread (new)
     Delphi.IOUring.Engine.pas                TIORingEngine: the I/O thread, Wait, callbacks (new)
     Delphi.IOUring.BlockReader.pas           TIORingBlockReader: known blocks, read-ahead, merging (new)
-  Build-FPC.ps1                              builds/runs the FPC tests or benchmark (no fpc.exe/lazbuild needed; -Optimize)
+  Build-FPC.ps1                              builds/runs the FPC tests or benchmark (no fpc.exe/lazbuild needed; -Optimize; -Platform Linux64 in WSL)
   UnitTests/
     Delphi.IOUring.UnitTests.dpr/.dproj      DUnitX console runner (Delphi)
     FPC/                                     Free Pascal tests (FPCUnit), separate from the DUnitX ones
       Delphi.IOUring.UnitTests.FPC.lpr/.lpi  runner (own small console runner on FPCUnit)
       Tests.FPC.*.pas                        the same checks as the Delphi test units
+    Linux/                                   Linux tests (FPCUnit; built and run in WSL by Build-FPC.ps1 -Platform Linux64)
+      Delphi.IOUring.UnitTests.Linux.lpr     runner
+      Tests.Linux.Backend.Posix.API.Layout.pas  sizes, offsets and constants against the C header
+      Tests.Linux.Backend.Posix.API.Layout.inc  those checks, generated from the C header (do not edit)
+      Tests.Linux.Backend.Posix.API.pas      live calls to the kernel
+      PosixApiLayout.c, Generate-PosixApiLayout.sh  the generator of the .inc (gcc, on Linux)
     Tests.Backend.Windows.API.Layout.pas     record layouts + helpers
     Tests.Backend.Windows.API.pas            live API calls
     Tests.Ring.pas                           the core ring (TIORing)
@@ -272,6 +278,15 @@ Source/
 ## Milestone 4 – Linux through Free Pascal
 
 - **Phase 18** – `Delphi.IOUring.Backend.Posix.API`: complete `linux/io_uring.h` translation (Design §6.4) + syscall wrappers, layout tests on x86-64 and AArch64.
+  - [x] Decided first (Design §6.4, decision 17): raw system calls, no liburing; the header of Linux 6.8 (Ubuntu 24.04 LTS); layout tests generated from the C header; the Linux tests run in WSL.
+  - [x] `Delphi.IOUring.Backend.Posix.API`: every constant, enum, flag and record of the header with its C name, the mmap offsets, `__kernel_timespec`, the system call numbers, and `io_uring_setup`, `io_uring_enter`, `io_uring_enter2`, `io_uring_register` (they return `-errno` and raise nothing). Standalone: RTL only.
+  - [x] Layout tests generated: `Generate-PosixApiLayout.sh` first checks that `PosixApiLayout.c` names everything in the header (200 constants, 20 records, 147 fields), then builds it with gcc; it writes 373 checks into `Tests.Linux.Backend.Posix.API.Layout.inc`. A name the Pascal unit does not have does not compile.
+  - [x] Live tests (22): setup and its errors, the ring memory, no-ops, reads and writes through the ring, end of file, errors in the completion, registered files and buffers, the probe, `io_uring_enter` errors, timeouts.
+  - [x] New test program `Delphi.IOUring.UnitTests.Linux.lpr`; `Build-FPC.ps1 -Platform Linux64` builds and runs it inside WSL.
+  - [x] Found on the way: FPC aligns a variant part (a C union) to the largest field in it – also the fields after the union. In the SQE the flags union moved from offset 28 to 32. Fixed with `packed` for the two records concerned (Design §6.4); the generated layout tests caught it on their first run.
+  - [ ] AArch64: written for it, not tested yet – needs an ARM machine ([VERIFY], Design §6.4).
+
+  **Done 2026-10-23** – Linux: 25 tests pass in WSL2 (kernel 6.18, x86-64), with and without `-O3`. Windows: no code changes; the FPC tests (235) still pass on Win32 and Win64 with the changed `Build-FPC.ps1`.
 - **Phase 19** – `TLinuxIORing` record in `Delphi.IOUring.Backend.Posix`; `Atomics` gets AArch64-correct acquire/release; same `Tests.Ring` / reader / stream / engine suites run on Linux (WSL2 is enough for x86-64 development).
 - **Phase 20** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only.
 
@@ -279,7 +294,9 @@ Source/
 
 ## Immediate next step
 
-Milestone 3 is complete (Phases 10–17). Next: **Milestone 4 – Linux through
-Free Pascal**, starting with Phase 18: the complete `linux/io_uring.h`
-translation (`Delphi.IOUring.Backend.Posix.API`, Design §6.4) with its
-layout tests. Development can start on WSL2 (x86-64).
+Phase 18 is done: the Linux API unit with its layout and live tests. Next:
+**Phase 19 – `TLinuxIORing`** in `Delphi.IOUring.Backend.Posix`, built on the
+API unit: the ring memory with the right memory barriers, prepare / submit /
+complete like `TWindowsIORing`, and the shared test suites (ring, reader,
+stream, engine) running on Linux. To decide first: how those tests run on
+Linux – the FPC tests and their helpers call Windows in many places.

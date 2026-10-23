@@ -29,7 +29,8 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Block reader `TIORingBlockReader` (`Delphi.IOUring.BlockReader`: blocks known in advance, read ahead, neighbours merged, handed out in order) | done, tested, benchmarked |
 | Overlap rule of the engine (`orKeepOrder`: per file handle, requests that touch the same bytes take effect in start order) | done, tested, measured |
 | Write stream `TSequentialWriteOnlyFileStream` and writer `TIORingSequentialWriter` (writing in the background) | done, tested, benchmarked |
-| Linux `io_uring` through Free Pascal | planned |
+| Complete Linux io_uring API translation (`Delphi.IOUring.Backend.Posix.API`, Linux 6.8 header, Free Pascal) | done, tested on x86-64 (WSL2); AArch64 not tested yet |
+| Linux ring and the rest on Linux | planned |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
 
@@ -217,6 +218,9 @@ end;
 
 `Delphi.IOUring.Backend.Windows.API` is a complete, standalone translation of
 the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
+`Delphi.IOUring.Backend.Posix.API` is the same for Linux: the whole
+`linux/io_uring.h` of Linux 6.8 and the three system calls, for Free Pascal
+(no C library, no liburing).
 
 ## Building and testing
 
@@ -227,6 +231,9 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
   that way (with Delphi: the Release configuration). Without it the build is
   for debugging: no inlining, like Delphi's Debug configuration.
   Lazarus project: `Source\UnitTests\FPC\Delphi.IOUring.UnitTests.FPC.lpi`.
+- Tests, Linux: `Source\Build-FPC.ps1 -Project Tests -Platform Linux64 -Run`
+  builds and runs them in WSL, with the FPC installed there (Ubuntu:
+  `sudo apt install fpc`). So far they test the Linux API translation.
 - Benchmarks: `Source\Benchmarks\Delphi.IOUring.Benchmarks.dproj`, and for Free
   Pascal `Source\Build-FPC.ps1 -Project Benchmarks` – see
   [Docs/Benchmarks.md](Docs/Benchmarks.md). The engine's data structures
