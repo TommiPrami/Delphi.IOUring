@@ -3,7 +3,8 @@
 Measured 2026-10-22 (Plan, Phase 5) with `Source/Benchmarks/Delphi.IOUring.Benchmarks`,
 Release builds, Delphi 13. Raw data (every single run): [BenchmarkResults/](BenchmarkResults/).
 The engine's data structures (Phase 11 and later) have a benchmark of their
-own: [Engine structures](#engine-structures-phase-11).
+own: [Engine structures](#engine-structures-phase-11), and so has the engine
+with the block reader: [Blocks known in advance](#blocks-known-in-advance-phase-14).
 
 ## Short version
 
@@ -39,12 +40,20 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
   I/O thread beats an SRW-lock queue everywhere: 4–23 % with few producers
   and real work, 3–290× under contention, where the lock starves the
   consumer.
+- **Blocks known in advance (Phase 14):** 20 000 random 4 KiB blocks of a
+  4 GiB file that is not in the cache: the block reader (the engine with 128
+  reads in flight, one thread) is **7–10× faster than `TFileStream` +
+  `Seek`** and 1.2–2.1× faster than 8 threads with `ReadFile`. For sorted
+  blocks with small gaps, reading the gaps too (`MaxGap`) makes it
+  **17–22× faster**. With the data already in the cache, plain `ReadFile`
+  stays faster (the reader gets 85–92 % of its speed on the fast cores of
+  this CPU, 43–50 % on the slow ones).
 
 ## Machine
 
 | | |
 | --- | --- |
-| CPU | Intel Core i7-14700 (20 cores, 28 logical processors) |
+| CPU | Intel Core i7-14700 (20 cores, 28 logical processors: 8 fast P-cores with 2 threads each, 12 slower E-cores) |
 | Memory | 64 GB |
 | Disk | Samsung SSD 990 PRO 2 TB, NVMe (drive C:, NTFS) |
 | Windows | Windows 11, build 26300, IoRing version 4 (kernel, not emulated) |
@@ -380,6 +389,100 @@ Why the difference is so big:
   contended. One value through the lock-free queue costs about 11 ns
   (94 million per second with one producer and one consumer).
 
+## Blocks known in advance (Phase 14)
+
+Many small reads at offsets that are known before reading starts – as a
+program does that reads records found through an index. This is the first
+benchmark of the engine (`TIORingEngine`), through the block reader
+(`TIORingBlockReader`). Program: `Delphi.IOUring.Benchmarks.Blocks` (Delphi)
+and `Delphi.IOUring.Benchmarks.Blocks.FPC` (Free Pascal). Measured
+2026-10-23, same machine. Raw data:
+[2026-10-23-blocks.csv](BenchmarkResults/2026-10-23-blocks.csv).
+
+- **File:** 4 GiB of pseudo-random data. **Blocks:** 20 000 blocks of
+  4 KiB (78 MiB in all), in two lists:
+  - *random* – at random 4 KiB-aligned offsets, in random order;
+  - *sorted, gaps* – in increasing order, 0–28 KiB apart (on average one
+    block per 18 KiB of file).
+- **Cache:** *cold* – the file is dropped from the cache before every run;
+  *warm* – the blocks were read once before.
+- Every contender hands every block, in list order, to the same checksum
+  consumer (all checksums matched). 3 runs, median; contenders take turns.
+
+| Contender | What it is |
+| --- | --- |
+| TFileStream | `Seek` + `ReadBuffer` per block |
+| ReadFile | positioned `ReadFile` per block (no separate seek), synchronous handle |
+| ReadFile, 8 threads | the same on 8 threads, each with its own handle and every 8th block (no ordered consumer) |
+| Block reader, read-ahead N | `TIORingBlockReader` with N buffers of 256 KiB (N reads in flight), one shared engine, overlapped handle |
+| … MaxGap 32 KiB | read-ahead 32; blocks up to 32 KiB apart become one read (sorted list only – random blocks have no near neighbours) |
+| … synchronous handle | read-ahead 32 on a handle without `FILE_FLAG_OVERLAPPED` |
+
+Thousand blocks per second, Delphi, Win64 (the other builds below):
+
+| Contender | random, cold | random, warm | sorted, cold | sorted, warm |
+| --- | ---: | ---: | ---: | ---: |
+| TFileStream | 14.1 | 265.6 | 17.2 | 426.0 |
+| ReadFile | 14.0 | 282.5 | 16.8 | 466.9 |
+| ReadFile, 8 threads | 112.5 | 448.1 | 115.6 | 618.9 |
+| Block reader, read-ahead 1 | 11.4 | 89.3 | 13.1 | 119.8 |
+| Block reader, read-ahead 8 | 72.0 | 210.2 | 83.6 | 332.1 |
+| Block reader, read-ahead 32 | 84.1 | 248.7 | 99.9 | 397.5 |
+| Block reader, read-ahead 128 | **140.6** | 250.1 | 164.8 | 406.3 |
+| … MaxGap 32 KiB | – | – | **363.6** | 381.7 |
+| … synchronous handle | 14.2 | 252.3 | 16.3 | 304.6 |
+
+Cold cache, all four builds:
+
+| Build | random: read-ahead 128 ÷ TFileStream | random: read-ahead 128 ÷ 8 threads | sorted: read-ahead 128 ÷ TFileStream | sorted: MaxGap ÷ TFileStream |
+| --- | ---: | ---: | ---: | ---: |
+| Delphi Win64 | 10.0 | 1.25 | 9.6 | 21.1 |
+| FPC Win64 | 9.7 | 1.22 | 7.2 | 16.6 |
+| Delphi Win32 | 7.4 | 2.08 | 7.8 | 18.5 |
+| FPC Win32 | 8.3 | 1.91 | 9.6 | 21.6 |
+
+Warm cache, block reader with read-ahead 32 ÷ `ReadFile`:
+
+| Build | random | sorted |
+| --- | ---: | ---: |
+| Delphi Win64 | 0.88 | 0.85 |
+| FPC Win64 | 0.87 | 0.43 |
+| Delphi Win32 | 0.50 | 0.43 |
+| FPC Win32 | 0.45 | 0.92 |
+
+What the numbers say:
+
+- **Data from the disk: reading ahead is the gain.** One read at a time
+  (read-ahead 1) is a little slower than `ReadFile` – each read goes to the
+  I/O thread and back. With 8 reads in flight it is already 5× faster, with
+  128 **7–10× faster than `TFileStream`**, and faster than 8 threads with
+  `ReadFile` in every build (1.2–2.1×) – from one thread, with less CPU
+  time (156 against 250 ms in the Delphi Win64 random case).
+- **`MaxGap` for blocks that lie close together:** reading the gaps too
+  turns 20 000 reads into about 1 500 with 256 KiB buffers, and reads about
+  4.5× more bytes than the blocks hold (both computed from the list). It is
+  17–22× faster than `TFileStream`, with almost no CPU time (31 ms): on an
+  SSD the extra bytes cost little.
+- **A synchronous handle throws the gain away:** Windows then runs the reads
+  one at a time, and the reader is as fast as `ReadFile` (cold: 14.2 against
+  14.0). With cached data it does not matter (252 against 249).
+- **Cached data: the block reader does not beat `ReadFile`.** It reached
+  85–92 % of `ReadFile` in some runs and 43–50 % in others. The two states
+  come from the hybrid CPU: pinned to the P-cores, a probe gave the reader
+  222–232 thousand blocks/s; pinned to the E-cores, 90 (and `ReadFile` 303
+  against 176). The reader and the I/O thread hand work to each other, and
+  every wait means a sleep and a wake-up, which costs much more on the slower
+  cores. Windows chooses the cores, so a real program can see either.
+  Even on the fast cores the reader stays below `ReadFile`: on an overlapped
+  handle every read takes the asynchronous way, even when the data is in the
+  cache, and that path costs more per read (Design §2.1, §10.10).
+- **Where one engine stops:** with a buffered handle (the normal case) a bare
+  ring without the engine got no further either (about 125–140 thousand reads
+  per second), so Windows' cache path is the limit, not the engine. With an
+  unbuffered handle one engine stayed at about 70 thousand reads per second
+  whatever the read-ahead, while two engines reached 114–126: there, the one
+  I/O thread is the limit (Design §10.10).
+
 ## Known limits of these measurements
 
 - **One machine, one very fast disk.** The NVMe drive has low latency, so
@@ -406,6 +509,12 @@ Why the difference is so big:
   unbuffered reads pay for cache coherency in that time. Worth knowing in real
   programs too: **unbuffered reading of a file that was just read buffered can
   be slower for a short while.**
+- **Fast and slow cores.** Windows decides whether a thread runs on a P-core
+  or an E-core, and the results of threads that hand work to each other (the
+  engine) can change by 2× between runs because of it (seen with cached data
+  in Phase 14). For probes, pin the process to one kind of core (in
+  PowerShell: `[Diagnostics.Process]::GetCurrentProcess().ProcessorAffinity`;
+  child processes inherit it – here 0xFFFF = P-cores, 0xFFF0000 = E-cores).
 - `FILE_FLAG_SEQUENTIAL_SCAN` made no measurable difference, cold or warm. (A
   single early test run suggested it halves warm-cache speed; the repeated
   runs did not confirm that.)
@@ -436,4 +545,13 @@ Engine structures (free list about 30 s, queue about 5 min per build; options
 ```
 Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Structures.exe --runs 3 --csv structures.csv
 Source\Build-FPC.ps1 -Project Structures -Platform Win64 -Run
+```
+
+Blocks known in advance (about 1 minute per build; options `--dir`,
+`--size-gib` (default 4), `--blocks` (default 20 000), `--runs`, `--csv`,
+`--keep`):
+
+```
+Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Blocks.exe --runs 3 --csv blocks.csv
+Source\Build-FPC.ps1 -Project Blocks -Platform Win64 -Run
 ```

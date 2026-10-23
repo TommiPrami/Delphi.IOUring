@@ -32,6 +32,11 @@
 // first one only when the I/O thread has said it sleeps, so while the engine
 // is busy, starting a request costs no system call.
 //
+// Open files with FILE_FLAG_OVERLAPPED (TIORingPlatform.OpenFileForRead does):
+// a handle opened without it works, but Windows then carries out its I/O one
+// request at a time - no parallel reads (measured: Docs/Benchmarks.md,
+// "Blocks known in advance").
+//
 // Every request completes: done, failed or cancelled. Destroy cancels what is
 // left and waits for it. Buffers and file handles must stay valid until their
 // request has completed. (Known limit: if the ring itself fails - a system

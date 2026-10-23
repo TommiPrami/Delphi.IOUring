@@ -36,6 +36,7 @@ Source/
     Delphi.IOUring.RequestPool.pas           request slots, handles, lock-free free list (new)
     Delphi.IOUring.RequestQueue.pas          lock-free queue: producers -> I/O thread (new)
     Delphi.IOUring.Engine.pas                TIORingEngine: the I/O thread, Wait, callbacks (new)
+    Delphi.IOUring.BlockReader.pas           TIORingBlockReader: known blocks, read-ahead, merging (new)
   Build-FPC.ps1                              builds/runs the FPC tests or benchmark (no fpc.exe/lazbuild needed; -Optimize)
   UnitTests/
     Delphi.IOUring.UnitTests.dpr/.dproj      DUnitX console runner (Delphi)
@@ -51,6 +52,7 @@ Source/
     Tests.RequestPool.pas                    free list and request pool, incl. an engine simulation
     Tests.RequestQueue.pas                   request queue, incl. wrap-around and producer/consumer stress
     Tests.Engine.pas                         the engine: results, waiting, callbacks, batches, Destroy, stress
+    Tests.BlockReader.pas                    the block reader: order, merging, end of file, errors, shared engine
     TestFileHelpers.pas                      generates deterministic test files
     TestPlatformHelpers.pas                  files, pipes, page memory for tests
     TestThreadHelpers.pas                    starting threads together, busy waiting (Delphi tests)
@@ -63,6 +65,9 @@ Source/
     Delphi.IOUring.Benchmarks.Structures.dpr/.dproj   runs Bench.Structures (Delphi)
     FPC/Delphi.IOUring.Benchmarks.FPC.lpr    Free Pascal benchmark: the main contenders
     FPC/Delphi.IOUring.Benchmarks.Structures.FPC.lpr  runs Bench.Structures (FPC)
+    Bench.Blocks.pas                         blocks known in advance: block reader vs TFileStream/ReadFile (Delphi + FPC)
+    Delphi.IOUring.Benchmarks.Blocks.dpr/.dproj       runs Bench.Blocks (Delphi)
+    FPC/Delphi.IOUring.Benchmarks.Blocks.FPC.lpr      runs Bench.Blocks (FPC)
   3rdParty/DUnitX
 ```
 
@@ -220,7 +225,16 @@ Source/
 
   **Done 2026-10-22** – Delphi 190 tests and FPC 176 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets. Not measured yet: the engine's speed (Phase 14's benchmark).
 - **Phase 14 – Read stream with block provider**: look-ahead distance, merging adjacent requests (contiguous buffer or scatter), in-order delivery. Benchmark: many small "known in advance" random reads vs `TFileStream` + seek.
-- **Phase 15 – Several I/O threads** (only if Phase 13 benchmarks show one thread is the limit): per-file routing, wake-up policy that avoids thundering herd.
+  - [x] API decided first (Design §10.4): both a provider (a method that gives the next block) and a plain list. `Delphi.IOUring.BlockReader` – `TIORingBlockReader`, a managed record: `TryGetBlock`/`ReleaseBlock`, zero-copy, blocks in the provider's order (Design §10.10).
+  - [x] Look-ahead: `ReadAhead` buffers (default 32 × 256 KiB), one read in flight per buffer, all new reads of a round in one engine batch. Neighbouring blocks become one read; `MaxGap` lets small gaps be read too. Scatter reads left out: they need unbuffered handles and page-aligned blocks (Design §2.1).
+  - [x] Tests `Tests.BlockReader` / `Tests.FPC.BlockReader` (15 each): order and data, the provider asked only when needed, merging, `MaxGap`, backward and overlapping blocks, end of file, empty list, not waiting, bad arguments, wrong call order, failed reads, `Close` with reads in flight, stats, stress (20 000 random blocks; 4 readers sharing one engine).
+  - [x] Benchmark: new program `Delphi.IOUring.Benchmarks.Blocks` (Delphi and FPC, `Build-FPC.ps1 -Project Blocks`) – 20 000 blocks of 4 KiB from a 4 GiB file, random and sorted, cold and warm, against `TFileStream` + `Seek` and positioned `ReadFile` (1 and 8 threads). Not in the cache: **7–10× faster than `TFileStream`** with read-ahead 128 and faster than 8 `ReadFile` threads; 17–22× for sorted blocks with `MaxGap`. In the cache, `ReadFile` stays faster ([Benchmarks.md](Benchmarks.md#blocks-known-in-advance-phase-14)).
+  - [x] Probes of the engine (Design §10.10): it adds about 10 % to a bare ring; one I/O thread is the limit only with unbuffered reads (about 70 thousand reads/s, two engines 114–126); results with cached data depend on whether Windows runs the threads on P- or E-cores; spinning longer before a wait sleeps helps cached reads but costs CPU time with reads from the disk.
+  - [x] Found: on a handle without `FILE_FLAG_OVERLAPPED`, Windows runs the reads one at a time, also through IoRing; and on an overlapped handle every read takes the slower asynchronous way, even for cached data (Design §2.1).
+  - [x] Tried and dropped: starting new reads in groups instead of one per freed buffer – no measurable gain (Design §10.10).
+
+  **Done 2026-10-23** – Delphi 205 tests and FPC 191 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
+- **Phase 15 – Several I/O threads** (only if Phase 13 benchmarks show one thread is the limit): per-file routing, wake-up policy that avoids thundering herd. Phase 14 found one such case: unbuffered small reads (Design §10.10).
 - **Phase 16 – Overlap handling (decision first, Design §11)**: decide A only vs B opt-in. If B: in-flight range table per file on the I/O thread; write-after-read/write ordering, read-after-write ordering or serve-from-buffer, attach duplicate reads. Tests for each case in the Design §11 table.
 - **Phase 17 – `TSequentialWriteOnlyFileStream`** (write-behind; can use the engine or its own ring).
 
@@ -236,9 +250,15 @@ Source/
 
 ## Immediate next step
 
-Phase 14 – the read stream with a block provider on top of the engine: the
-caller says which (offset, length) blocks it will need, the stream keeps a
-number of them in flight, merges neighbours, and hands them out in order.
-With it the first benchmark of the engine: many small reads known in advance
-against `TFileStream` + seek. Before starting: decide the stream's API (how
-the caller gives the blocks: callback or list).
+Phase 14 is done. Two questions from its measurements, to decide before the
+next phase (Design §10.10):
+
+1. **Spin count before a wait sleeps** (now 100 `PAUSE`s): keep it, raise it
+   (4 000 made cached reads on the E-cores 49 % faster but costs 67 % more
+   CPU time with reads from the disk), or make it a setting of the engine.
+2. **Phase 15 or not.** One I/O thread is the limit for unbuffered small
+   reads: about 14 µs of I/O-thread time per read, where a bare ring needs
+   8–10 µs. Proposal: first measure where that time goes – a cheaper I/O
+   thread may be enough – and do Phase 15 only if it is not. Otherwise next
+   is Phase 16 (overlap rules, decision first, Design §11) or Phase 17 (the
+   write stream).

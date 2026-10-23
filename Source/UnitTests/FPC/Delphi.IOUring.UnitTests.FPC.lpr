@@ -30,7 +30,8 @@ uses
   Tests.FPC.Atomics,
   Tests.FPC.RequestPool,
   Tests.FPC.RequestQueue,
-  Tests.FPC.Engine;
+  Tests.FPC.Engine,
+  Tests.FPC.BlockReader;
 
 type
   // TComponent: interface without reference counting, as TTestResult expects

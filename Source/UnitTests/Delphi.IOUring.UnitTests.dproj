@@ -82,6 +82,7 @@
         <DCCReference Include="..\Units\Delphi.IOUring.RequestPool.pas"/>
         <DCCReference Include="..\Units\Delphi.IOUring.RequestQueue.pas"/>
         <DCCReference Include="..\Units\Delphi.IOUring.Engine.pas"/>
+        <DCCReference Include="..\Units\Delphi.IOUring.BlockReader.pas"/>
         <DCCReference Include="TestFileHelpers.pas"/>
         <DCCReference Include="TestPlatformHelpers.pas"/>
         <DCCReference Include="Tests.TestFileHelpers.pas"/>
@@ -95,6 +96,7 @@
         <DCCReference Include="Tests.RequestPool.pas"/>
         <DCCReference Include="Tests.RequestQueue.pas"/>
         <DCCReference Include="Tests.Engine.pas"/>
+        <DCCReference Include="Tests.BlockReader.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

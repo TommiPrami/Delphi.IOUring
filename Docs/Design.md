@@ -6,8 +6,9 @@ complete Windows API unit, core ring (implementation notes in §5.2),
 sequential reader (notes in §7), read-only stream (notes in §8.1),
 benchmarks ([Benchmarks.md](Benchmarks.md)). Milestone 3 started: the
 atomics unit (Phase 10, notes in §10.6), the request pool (Phase 11, notes
-in §10.7), the request queue (Phase 12, notes in §10.8) and the engine with one
-I/O thread (Phase 13, notes in §10.9). Things marked **[DECIDE]**
+in §10.7), the request queue (Phase 12, notes in §10.8), the engine with one
+I/O thread (Phase 13, notes in §10.9) and the block reader (Phase 14, notes in
+§10.10). Things marked **[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
 **[VERIFIED]** with the answer once a test proves them. Decisions already made
@@ -195,7 +196,18 @@ Important semantics:
   page-sized, page-aligned segments. On a buffered handle `Build*` succeeds
   but the completion is `E_INVALIDARG`.
 - **[VERIFIED]** File handles opened **without** `FILE_FLAG_OVERLAPPED` work
-  too. (Whether the I/O on them is still fully asynchronous is not tested.)
+  too – **but Windows carries out their I/O one request at a time**, also
+  through IoRing: 32 or 128 random 4 KiB reads in flight on a synchronous
+  handle were no faster than one `ReadFile` after another (Phase 14,
+  [Benchmarks.md](Benchmarks.md#blocks-known-in-advance-phase-14)). For
+  parallel I/O, open files with `FILE_FLAG_OVERLAPPED`
+  (`TIORingPlatform.OpenFileForRead` does).
+- **[VERIFIED]** On an overlapped handle, **every** buffered read takes the
+  asynchronous way (`ERROR_IO_PENDING`), even when the data is already in the
+  file cache. For cached data that costs about 20–25 % more per read than a
+  synchronous `ReadFile`, and IoRing reads pay it too (Phase 14, §10.10). So
+  for small reads of cached data, synchronous `ReadFile` stays the fastest;
+  IoRing wins when the data comes from the disk.
 - **[VERIFIED]** A thread that waits inside `SubmitIoRing` blocks all other
   submits on that ring. So when more than one thread may submit, wait with the
   completion event, never with `SubmitIoRing(…, waitOperations > 0, …)`.
@@ -236,7 +248,8 @@ barrier. That is the shape of the core API. Everything outside the subset
  │ Layer 2 – Helpers / engine (records where possible)                    │
  │   Delphi.IOUring.SequentialReader  TIORingSequentialReader (record)   │
  │   Delphi.IOUring.Engine            the I/O thread, Wait, callbacks     │
- │                                    later: streams, overlap handling    │
+ │                                    later: more threads, overlaps       │
+ │   Delphi.IOUring.BlockReader       known blocks through the engine     │
  │   Delphi.IOUring.Atomics           CAS / fences / wait-on-address      │
  │   Delphi.IOUring.RequestPool       request slots, lock-free free list  │
  │   Delphi.IOUring.RequestQueue      lock-free queue to the I/O thread   │
@@ -269,6 +282,7 @@ Unit responsibilities:
 | `Delphi.IOUring.RequestPool` *(new)* | `TIORingRequestPool` (request slots, states, handles, waiting) and `TIORingFreeList` (lock-free stack) (§10.3, §10.7) | `Delphi.IOUring`, Atomics |
 | `Delphi.IOUring.RequestQueue` *(new)* | `TIORingRequestQueue`: bounded lock-free queue from the producers to an I/O thread (§10.5, §10.8) | `Delphi.IOUring`, Atomics |
 | `Delphi.IOUring.Engine` *(new)* | `TIORingEngine`: one I/O thread with its own ring; `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`, callbacks, batches (§10.4, §10.9); later more threads and the overlap rules (§11) | `Delphi.IOUring`, Atomics, RequestPool, RequestQueue |
+| `Delphi.IOUring.BlockReader` *(new)* | `TIORingBlockReader`: blocks known in advance (a provider or a list), read through the engine with read-ahead and merging, delivered in order (§10.4, §10.10) | `Delphi.IOUring`, Engine |
 
 The "all OS-specific code lives in the `Backend.<OS>` units" rule still holds:
 the `.API` units are the raw translation, the `Backend.<OS>` unit next to it
@@ -1116,6 +1130,41 @@ written; implementation notes and findings in §10.9:
 - Completion notification options: wait, callback on the I/O thread (must be
   short), or posting to a per-consumer completion queue.
 
+**Phase 14 decisions (2026-10-23, before coding; for review)** – the read
+stream with a block provider:
+
+- `TIORingBlockReader` (unit `Delphi.IOUring.BlockReader`): a managed
+  record like `TIORingSequentialReader`, used by one thread, reading through
+  a shared `TIORingEngine` (not owned) from a file handle (not owned).
+- **Callback or list: both.** The core is a provider,
+  `TIORingBlockProvider = function(out ABlock: TIORingBlock): Boolean of
+  object` (`TIORingBlock` = offset + length; False = no more blocks), called
+  on the reader's thread, at most one block ahead of what has been sent to
+  the engine. It suits blocks that are found while reading (an index, a
+  tree). A plain list is the second `Open` (the blocks are copied).
+- `Open(AEngine, AFile, AProvider or ABlocks, AReadAhead = 32,
+  ABufferSize = 256 KiB, AMaxGap = 0)`: `AReadAhead` buffers of
+  `ABufferSize` bytes, one read in flight per buffer. A block may be at
+  most `ABufferSize` long (`EIORingError` otherwise). The engine must allow
+  at least `AReadAhead` requests.
+- **Merging:** the next block joins the current read if it starts at or
+  after the read's end, at most `AMaxGap` bytes after it, and the read then
+  still fits into one buffer. Blocks that overlap or go backwards start a new
+  read. Scatter reads (one read into several buffers) are left out: they need
+  unbuffered handles and sector-aligned blocks.
+- `TryGetBlock(out ABlock, out AData, out ALength, AWait = True): Boolean` –
+  the next block **in the provider's order**, zero-copy (valid until
+  `ReleaseBlock`). `ALength` is shorter than the block only at the end of
+  the file (0 for a block that starts at or after it). False: no more blocks
+  (`Finished`), or with `AWait = False` the data is not there yet. A failed
+  read raises `EIORingError`.
+- New reads are started as buffers become free, all of one round in one
+  engine batch (one wake-up). `Close` waits for the reads in flight.
+- Stats: blocks, reads (merged blocks count once), bytes, stalls, stall time.
+- Benchmark (Plan): blocks known in advance, random 4 KiB (and sorted, mixed
+  sizes), cold and warm cache, against `TFileStream` + `Seek` and positioned
+  `ReadFile`.
+
 ### 10.5 Lock-free hand-over between threads
 
 Locks are used only on cold paths (start-up, registration changes,
@@ -1442,8 +1491,129 @@ runs.
   queue before the I/O thread would sleep. A test that expected at least one
   sleep failed now and then (5 of 40 runs) for exactly this reason; it now
   checks sleeping on an idle engine.
-- Performance is not measured yet: the benchmark comes with the read stream
-  (Phase 14).
+- Performance was measured in Phase 14, through the block reader (§10.10).
+
+### 10.10 Block reader – implementation notes (Phase 14)
+
+`Delphi.IOUring.BlockReader` has `TIORingBlockReader`, built as decided in
+§10.4 ("Phase 14 decisions"): a managed record used by one thread, reading
+through a shared engine from a file handle; neither is owned by the reader.
+
+**Buffers and slots.** One allocation (`AllocPages`) holds `ReadAhead`
+buffers of `BufferSize` bytes. Each buffer has a slot that goes Free →
+InFlight (its read is started) → Ready (the read is finished, its blocks are
+being handed out) → Free. The slots are used as a ring: the head is the
+oldest slot that still has blocks to hand out, and the next read goes to the
+slot `Outstanding` places after it. So blocks come out in the provider's
+order even when the reads finish in another order.
+
+**One read, several blocks.** The reader keeps one block "in hand": taken
+from the provider, not in a read yet. When a slot is free, a read starts with
+that block, and the following blocks join it while they can (at or after the
+read's end, at most `MaxGap` bytes after it, and the read still fits into the
+buffer). The slot keeps the list of its blocks, so `TryGetBlock` can hand
+them out one by one, each as a pointer into the buffer. The provider is asked
+for a block only when there is room for it: at most one block more than the
+reads in flight hold (the test `Provider_IsAskedLazily` checks this).
+
+**Starting reads.** `StartReads` fills every free slot, and all the reads of
+one round go inside one `BeginBatch`/`EndBatch` (one wake-up of the I/O
+thread). It runs in `Open`, in `TryGetBlock`, and when `ReleaseBlock` frees a
+buffer – so once the reader runs, that is one new read per freed buffer.
+
+**Results.** `TryGetBlock` waits only for the head slot: `TryGetResult`
+first; if the data is not there yet, it waits (`Wait`; counted as a stall,
+with its time) or, with `AWait = False`, returns False. End of file counts as
+success with fewer bytes; each block's length is cut where the read stopped
+(0 for a block that lies wholly after the end). A failed read stays in its
+slot: every block of that read raises `EIORingError` with the native code and
+the read's offset – also when `TryGetBlock` is called again.
+
+**Close** waits for every read in flight (the kernel still writes into the
+buffers) before the memory is freed; a request that the engine no longer
+knows (`EIORingError`) is skipped. The record calls `Close` when it goes out
+of scope; copying a reader raises, as with the sequential reader.
+
+**Tried and dropped: refilling in groups.** In the first full benchmark run
+the reader was 2–4× slower than `ReadFile` on cached data, and one read per
+freed buffer means one wake-up of the I/O thread per block. A version that
+started new reads only when a quarter of the buffers were free (8 of 32: one
+wake-up for 8 reads) made no measurable difference in a probe with 9 runs per
+case (random 4 KiB blocks: 231 against 237 thousand blocks/s; sorted: 332
+against 333), and the share of blocks that had to wait stayed the same. The
+code stays simple.
+
+**Where the time goes with cached data** (probe, Delphi Win64, 20 000 random
+4 KiB blocks of a 4 GiB file, all in the cache, median of 9 runs; two
+separate runs):
+
+| Way of reading | Thousand blocks/s |
+| --- | ---: |
+| `ReadFile`, synchronous handle | 307–325 |
+| `ReadFile`, overlapped handle, waiting for each read | 229–259 |
+| Bare `TIORing` (no engine), 32 reads per submit | 257–272 |
+| Block reader, read-ahead 32 | 231–245 |
+
+- On the overlapped handle **every** read went the asynchronous way
+  (`ERROR_IO_PENDING` for 100 % of them), although the data was in the cache
+  (§2.1). That path costs about 20–25 % more per read than synchronous
+  `ReadFile`, and IoRing reads take it too.
+- The engine adds about 10 % to a bare ring.
+- So with cached data the block reader cannot beat synchronous `ReadFile`.
+  It wins when the data comes from the disk.
+- **Fast and slow cores.** Cached-data numbers jumped between runs: the same
+  test gave the block reader 220–250 or 75–90 thousand blocks/s. The cause is
+  the hybrid CPU (8 P-cores and 12 E-cores): pinned to the P-cores, the probe
+  gave 222–232 (4 % of the blocks had to wait); pinned to the E-cores, 90
+  (half of the blocks had to wait), while `ReadFile` went from 303 to 176.
+  Two threads that hand work to each other (reader ↔ I/O thread) suffer
+  most from the slower cores, because every wait means a sleep and a
+  wake-up.
+- **Spinning longer before sleeping** (`IORING_POOL_DEFAULT_SPIN_COUNT`, now
+  100 `PAUSE`s): 4 000 made cached reads on the E-cores 49 % faster (83 →
+  124) and on the P-cores 6–8 % faster, but with data from the disk it gave
+  no speed and cost 67 % more CPU time (188 → 313 ms for 20 000 blocks). Not
+  changed: open question for review (a setting of the engine?).
+
+**Is one I/O thread the limit?** (the question for Phase 15; probe, Delphi
+Win64, 4 GiB file, cold, random 4 KiB blocks, median of 5)
+
+- **Buffered handle (the normal case): no.** A bare ring in one thread,
+  without the engine, reached 125–140 thousand reads/s even with 256 reads in
+  flight; the block reader with read-ahead 128 got 103–119 in the probe (141
+  in the full benchmark), and two readers on two engines (two I/O threads)
+  129–133. The limit is Windows' cache path.
+- **Unbuffered handle** (`FILE_FLAG_NO_BUFFERING`; works with the block
+  reader when every block's offset and length are multiples of the sector
+  size): **yes.** One engine stayed at about 70 thousand reads/s whatever the
+  read-ahead (32, 128 or 256), also with two readers on it (65–69); two
+  readers on two engines reached 114–126, a bare ring with 128 reads in
+  flight 95–123. Grouped refill
+  did not help here either (63 → 66) although it cut the sleeps of the I/O
+  thread almost to zero (81 reads per submit) – so the cost is in the I/O
+  thread's own work per request, not in waking it.
+- Handing blocks out in order costs something by itself: a bare ring that
+  frees its buffers only in order dropped from 103 to 85 thousand reads/s
+  (128 in flight, unbuffered).
+
+**Benchmark summary** (Benchmarks.md, "Blocks known in advance"): with data
+from the disk, the block reader with read-ahead 128 is 7–10× faster than
+`TFileStream` + `Seek` on random 4 KiB blocks and 1.2–2.1× faster than 8
+threads with `ReadFile`; on sorted blocks with small gaps `MaxGap` makes it
+17–22× faster than `TFileStream`. With cached data it reaches 85–92 % of
+`ReadFile` on the P-cores and 43–50 % when it runs on the E-cores. On a
+synchronous handle it is no faster than `ReadFile` (§2.1).
+
+**Tests:** `Tests.BlockReader` (DUnitX) and `Tests.FPC.BlockReader`
+(FPCUnit), 15 each – blocks in order with their data; the provider asked
+only when there is room; touching blocks merged (100 blocks → 2 reads);
+`MaxGap` 0/99/100 bytes (20/20/1 reads); backward and overlapping blocks read
+again; end of file (shortened and empty blocks); an empty list; not waiting
+(a pipe that gets its data later); bad arguments and wrong call order raise;
+a failed read raises every time; `Close` waits for reads in flight; stats
+(5 blocks, 3 reads, 400 bytes); stress: 20 000 random blocks (read-ahead 64)
+and 4 readers sharing one engine, all data checked. All pass with Delphi
+Debug and Release and FPC with and without `-O3`, Win32 and Win64.
 
 ---
 

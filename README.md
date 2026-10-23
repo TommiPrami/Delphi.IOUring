@@ -24,8 +24,9 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Atomics for the engine (`Delphi.IOUring.Atomics`: CAS, acquire/release, wait/wake) | done, tested (Delphi and FPC) |
 | Request pool for the engine (`Delphi.IOUring.RequestPool`: slots, handles, lock-free free list) | done, tested, benchmarked against a lock |
 | Request queue for the engine (`Delphi.IOUring.RequestQueue`: lock-free, producers → I/O thread) | done, tested, benchmarked against a lock |
-| I/O engine `TIORingEngine` (`Delphi.IOUring.Engine`: many threads, one I/O thread, many requests in flight) | done, tested; speed not measured yet |
-| Read stream with a block provider, more I/O threads, overlap rules, write stream | planned |
+| I/O engine `TIORingEngine` (`Delphi.IOUring.Engine`: many threads, one I/O thread, many requests in flight) | done, tested, benchmarked through the block reader |
+| Block reader `TIORingBlockReader` (`Delphi.IOUring.BlockReader`: blocks known in advance, read ahead, neighbours merged, handed out in order) | done, tested, benchmarked |
+| Overlap rules, write stream (more I/O threads only if a benchmark asks for them) | planned |
 | Linux `io_uring` through Free Pascal | planned |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
@@ -113,6 +114,38 @@ Requests can also report back through a callback on the I/O thread, and
 `BeginBatch`/`EndBatch` sends many requests to the kernel with one call. The
 buffer and the file handle must stay valid until the request has completed.
 
+### Blocks known in advance
+
+```pascal
+uses
+  Delphi.IOUring, Delphi.IOUring.Engine, Delphi.IOUring.BlockReader;
+
+var
+  LReader: TIORingBlockReader;        // a record: closed at the end of the scope
+  LBlock: TIORingBlock;
+  LData: PByte;
+  LLength: Cardinal;
+begin
+  // LFile opened with FILE_FLAG_OVERLAPPED (TIORingPlatform.OpenFileForRead
+  // does): on a handle without it, Windows reads one block at a time
+  LReader.Open(LEngine, LFile, [TIORingBlock.Create(81920, 4096), TIORingBlock.Create(4096, 512)]);
+  while LReader.TryGetBlock(LBlock, LData, LLength) do   // in the order given
+  begin
+    Process(LBlock, LData, LLength);  // zero-copy
+    LReader.ReleaseBlock;
+  end;
+end;
+```
+
+Instead of a list, `Open` also takes a provider: a method that gives the next
+block when the reader needs it. Up to `ReadAhead` reads (default 32) are in
+flight; neighbouring blocks are read with one read (`MaxGap` lets small gaps
+between them be read too).
+
+With data from the disk, 20 000 random 4 KiB blocks are read **7–10× faster
+than with `TFileStream` + `Seek`** ([Benchmarks](Docs/Benchmarks.md#blocks-known-in-advance-phase-14)).
+For data that is already in the file cache, plain `ReadFile` stays faster.
+
 ### The ring itself
 
 ```pascal
@@ -148,7 +181,9 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
   Pascal `Source\Build-FPC.ps1 -Project Benchmarks` – see
   [Docs/Benchmarks.md](Docs/Benchmarks.md). The engine's data structures
   (lock-free against a lock): `Delphi.IOUring.Benchmarks.Structures.dproj`, or
-  `Build-FPC.ps1 -Project Structures`.
+  `Build-FPC.ps1 -Project Structures`. Blocks known in advance (the block
+  reader and the engine): `Delphi.IOUring.Benchmarks.Blocks.dproj`, or
+  `Build-FPC.ps1 -Project Blocks`.
 
 ## License
 
