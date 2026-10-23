@@ -94,5 +94,8 @@
         <DebugInfoType Value="dsDwarf3"/>
       </Debugging>
     </Linking>
+    <Other>
+      <CustomOptions Value="-dIORING_NO_INLINE"/>
+    </Other>
   </CompilerOptions>
 </CONFIG>

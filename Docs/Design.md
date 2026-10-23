@@ -1502,7 +1502,8 @@ opt-in, C not planned.
    and Win64 (101 at the end of Milestone 2, 121 after Phase 10); speed is
    the same as with Delphi.
    The FPC tests are separate FPCUnit units (`Source/UnitTests/FPC`), built
-   with `Source/Build-FPC.ps1` (`-Optimize` adds `-O3`).
+   with `Source/Build-FPC.ps1` (`-Optimize`: `-O3` and inlining; without it
+   a debug build without inlining).
 3. **Linux through Free Pascal** (x86-64, AArch64) – new `Posix` backend; the
    upper layers should then compile unchanged.
 
@@ -1561,8 +1562,15 @@ tested.
 - Parameter style matching the existing skeletons: `A`-prefixed, `const`
   where possible; locals `L`-prefixed, fields `F`-prefixed.
 - **`inline` only works when all of these hold** (Delphi):
-  1. Inlining is on – the default `{$INLINE ON}`; the projects must not turn
-     it off.
+  1. Inlining is on. Release builds: yes, the default. **Debug builds: off on
+     purpose** (2026-10-23), so the debugger can step into every routine.
+     Delphi: the Debug configurations set "inlining off" (`--inline:off`).
+     FPC: the define `IORING_NO_INLINE` switches `{$INLINE OFF}` on in
+     `Delphi.IOUring.inc` (`-Si-` does not work: `{$MODE DELPHI}` turns
+     inlining on again); `Build-FPC.ps1` sets it unless `-Optimize` is given,
+     and the Lazarus test project sets it too. What depends on inlining is
+     therefore tested in the Release / `-Optimize` builds – both are part of
+     every full test run.
   2. The body comes **before** the first call in the same unit. Delphi
      compiles in one pass: a call it meets before the body becomes a normal
      call, **without any hint**. So implement inline routines (and the

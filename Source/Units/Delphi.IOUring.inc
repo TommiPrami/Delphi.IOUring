@@ -11,6 +11,13 @@
 {$IFDEF FPC}
   {$MODE DELPHI}
   {$MODESWITCH ADVANCEDRECORDS}
+  // Debug builds: no inlining, so that the debugger can step into every
+  // routine. Build-FPC.ps1 defines IORING_NO_INLINE unless -Optimize is
+  // given. (FPC's -Si- does not help: {$MODE DELPHI} above turns inlining on
+  // again.) Delphi: the Debug configurations set "inlining off".
+  {$IFDEF IORING_NO_INLINE}
+    {$INLINE OFF}
+  {$ENDIF}
 {$ENDIF}
 
 {$SCOPEDENUMS OFF}

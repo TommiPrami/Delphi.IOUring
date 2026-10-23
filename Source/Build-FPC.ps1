@@ -21,8 +21,10 @@
     The FPC folder of the Lazarus installation. Default C:\lazarus\fpc\3.2.2.
 
 .PARAMETER Optimize
-    Tests only: compile with -O3 too. The atomics tests mean most with
-    optimization on. (Benchmarks are always optimized.)
+    Tests only: compile with -O3 and with inlining. Without it the tests are a
+    debug build: no inlining (IORING_NO_INLINE), so the debugger can step into
+    every routine. The atomics tests mean most with optimization on.
+    (Benchmarks are always optimized.)
 
 .PARAMETER Run
     Run the program after a successful build. The exit code is the program's.
@@ -84,6 +86,8 @@ if ($Project -eq 'Tests') {
     $codeOptions = @('-g', '-gl')                            # debug info with line numbers
     if ($Optimize) {
         $codeOptions += '-O3'
+    } else {
+        $codeOptions += '-dIORING_NO_INLINE'                 # debug build: no inlining (Delphi.IOUring.inc)
     }
 } else {
     $projectDir = Join-Path $sourceDir 'Benchmarks\FPC'

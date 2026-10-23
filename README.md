@@ -141,7 +141,8 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
 - Tests, Free Pascal: `Source\Build-FPC.ps1 -Project Tests -Platform Win32 -Run`
   (FPCUnit; calls the compiler directly, no `fpc.exe` or `lazbuild` needed).
   Add `-Optimize` to build them with `-O3`; the multi-thread tests mean most
-  that way (with Delphi: the Release configuration).
+  that way (with Delphi: the Release configuration). Without it the build is
+  for debugging: no inlining, like Delphi's Debug configuration.
   Lazarus project: `Source\UnitTests\FPC\Delphi.IOUring.UnitTests.FPC.lpi`.
 - Benchmarks: `Source\Benchmarks\Delphi.IOUring.Benchmarks.dproj`, and for Free
   Pascal `Source\Build-FPC.ps1 -Project Benchmarks` – see
