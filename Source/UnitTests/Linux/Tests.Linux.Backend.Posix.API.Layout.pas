@@ -16,10 +16,10 @@
 interface
 
 uses
-  fpcunit;
+  Tests.Support;
 
 type
-  TPosixApiLayoutTests = class(TTestCase)
+  TPosixApiLayoutTests = class(TIORingTestCase)
   private
     FMismatches: string;
     FChecks: Integer;
@@ -37,7 +37,6 @@ implementation
 
 uses
   SysUtils,
-  testregistry,
   Delphi.IOUring.Backend.Posix.API;
 
 type
@@ -91,6 +90,6 @@ begin
 end;
 
 initialization
-  RegisterTest(TPosixApiLayoutTests);
+  RegisterTests(TPosixApiLayoutTests);
 
 end.

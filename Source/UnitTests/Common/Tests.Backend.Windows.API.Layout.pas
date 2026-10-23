@@ -1,8 +1,9 @@
-﻿unit Tests.FPC.Backend.Windows.API.Layout;
+﻿unit Tests.Backend.Windows.API.Layout;
 
 {
-  Free Pascal version of Tests.Backend.Windows.API.Layout: record sizes and
-  field offsets must equal the C (MSVC) layout, with FPC's own record rules.
+  Record sizes and field offsets of Delphi.IOUring.Backend.Windows.API must be
+  identical to the C structures (MSVC layout), on Win32 and on Win64.
+  Expected values come from the C declarations in ioringapi.h / ntioring_x.h.
 }
 
 {$I Delphi.IOUring.inc}
@@ -10,7 +11,7 @@
 interface
 
 uses
-  Tests.FPC.Support;
+  Tests.Support;
 
 type
   TWindowsIoRingApiLayoutTests = class(TIORingTestCase)
@@ -27,14 +28,20 @@ type
     procedure IORING_BUFFER_INFO_Layout;
     procedure IORING_CQE_Layout;
     procedure FILE_SEGMENT_ELEMENT_Layout;
-    procedure Helpers_SetKindAndValue;
+    procedure IoRingHandleRefFromHandle_SetsRawHandle;
+    procedure IoRingHandleRefFromIndex_SetsRegisteredIndex;
+    procedure IoRingBufferRefFromPointer_SetsRawAddress;
+    procedure IoRingBufferRefFromIndexAndOffset_SetsRegisteredBuffer;
   end;
 
 implementation
 
 uses
+{$IFDEF FPC}
   Windows,
-  testregistry,
+{$ELSE}
+  Winapi.Windows,
+{$ENDIF}
   Delphi.IOUring.Backend.Windows.API;
 
 {$IFDEF CPUX64}
@@ -140,32 +147,47 @@ begin
   AssertEquals(Int64(8), Int64(SizeOf(FILE_SEGMENT_ELEMENT)));
 end;
 
-procedure TWindowsIoRingApiLayoutTests.Helpers_SetKindAndValue;
+procedure TWindowsIoRingApiLayoutTests.IoRingHandleRefFromHandle_SetsRawHandle;
 var
-  LHandleRef: IORING_HANDLE_REF;
-  LBufferRef: IORING_BUFFER_REF;
+  LRef: IORING_HANDLE_REF;
+begin
+  LRef := IoRingHandleRefFromHandle(THandle($1234));
+  AssertEquals('Kind', Int64(IORING_REF_RAW), Int64(LRef.Kind));
+  AssertEquals('Handle', Int64($1234), Int64(LRef.Handle));
+end;
+
+procedure TWindowsIoRingApiLayoutTests.IoRingHandleRefFromIndex_SetsRegisteredIndex;
+var
+  LRef: IORING_HANDLE_REF;
+begin
+  LRef := IoRingHandleRefFromIndex(7);
+  AssertEquals('Kind', Int64(IORING_REF_REGISTERED), Int64(LRef.Kind));
+  AssertEquals('Index', Int64(7), Int64(LRef.Index));
+  // The unused upper part of the union must be zero (Win64)
+  AssertEquals('Upper part of the union is zero', Int64(7), Int64(LRef.Handle));
+end;
+
+procedure TWindowsIoRingApiLayoutTests.IoRingBufferRefFromPointer_SetsRawAddress;
+var
+  LRef: IORING_BUFFER_REF;
   LBuffer: array[0..15] of Byte;
 begin
-  LHandleRef := IoRingHandleRefFromHandle(THandle($1234));
-  AssertEquals('Raw handle kind', Int64(IORING_REF_RAW), Int64(LHandleRef.Kind));
-  AssertEquals('Raw handle', Int64($1234), Int64(LHandleRef.Handle));
+  LRef := IoRingBufferRefFromPointer(@LBuffer);
+  AssertEquals('Kind', Int64(IORING_REF_RAW), Int64(LRef.Kind));
+  AssertTrue('Address', LRef.Address = @LBuffer);
+end;
 
-  LHandleRef := IoRingHandleRefFromIndex(7);
-  AssertEquals('Index kind', Int64(IORING_REF_REGISTERED), Int64(LHandleRef.Kind));
-  AssertEquals('Index', Int64(7), Int64(LHandleRef.Index));
-  AssertEquals('Upper part of the union is zero', Int64(7), Int64(LHandleRef.Handle));
-
-  LBufferRef := IoRingBufferRefFromPointer(@LBuffer);
-  AssertEquals('Pointer kind', Int64(IORING_REF_RAW), Int64(LBufferRef.Kind));
-  AssertTrue('Pointer', LBufferRef.Address = @LBuffer);
-
-  LBufferRef := IoRingBufferRefFromIndexAndOffset(3, 4096);
-  AssertEquals('Registered kind', Int64(IORING_REF_REGISTERED), Int64(LBufferRef.Kind));
-  AssertEquals('Buffer index', Int64(3), Int64(LBufferRef.IndexAndOffset.BufferIndex));
-  AssertEquals('Offset', Int64(4096), Int64(LBufferRef.IndexAndOffset.Offset));
+procedure TWindowsIoRingApiLayoutTests.IoRingBufferRefFromIndexAndOffset_SetsRegisteredBuffer;
+var
+  LRef: IORING_BUFFER_REF;
+begin
+  LRef := IoRingBufferRefFromIndexAndOffset(3, 4096);
+  AssertEquals('Kind', Int64(IORING_REF_REGISTERED), Int64(LRef.Kind));
+  AssertEquals('Buffer index', Int64(3), Int64(LRef.IndexAndOffset.BufferIndex));
+  AssertEquals('Offset', Int64(4096), Int64(LRef.IndexAndOffset.Offset));
 end;
 
 initialization
-  RegisterTest(TWindowsIoRingApiLayoutTests);
+  RegisterTests(TWindowsIoRingApiLayoutTests);
 
 end.

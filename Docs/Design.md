@@ -846,7 +846,7 @@ plus the three syscall wrappers. x86-64 and AArch64 only.
 - **Raw system calls, no `liburing`** (closes open question 1 in §14): the
   unit wraps the three system calls with FPC's `do_SysCall`. The few helpers
   that `liburing` has in C (preparing an SQE, reading the rings with the right
-  memory barriers) are written in Pascal in Phase 19, where `TLinuxIORing`
+  memory barriers) are written in Pascal in Phase 20, where `TLinuxIORing`
   needs them.
 - **Pinned header: Linux 6.8** – the one installed with Ubuntu 24.04 LTS, so
   every record and constant can be checked against it on this machine. What
@@ -2224,9 +2224,10 @@ gets B as an option, C is not planned.
    whole library compiles with FPC 3.2.2 and all FPC tests pass on Win32
    and Win64 (101 at the end of Milestone 2, 121 after Phase 10); speed is
    the same as with Delphi.
-   The FPC tests are separate FPCUnit units (`Source/UnitTests/FPC`), built
-   with `Source/Build-FPC.ps1` (`-Optimize`: `-O3` and inlining; without it
-   a debug build without inlining).
+   Since Phase 19, Delphi and FPC run the same test units
+   (`Source/UnitTests/Common`, §12.4); `Source/Build-FPC.ps1` builds the FPC
+   runner (`-Optimize`: `-O3` and inlining; without it a debug build without
+   inlining).
 3. **Linux through Free Pascal** (x86-64, AArch64) – new `Posix` backend; the
    upper layers should then compile unchanged.
 
@@ -2307,6 +2308,125 @@ tested.
   no inline routine is called before its body. Free Pascal inlines by
   default too (seen in its assembler output, §10.6).
 
+### 12.4 One set of tests for Delphi, Free Pascal and Linux (Phase 19)
+
+Today the same checks are written twice: DUnitX units for Delphi
+(`Source/UnitTests/Tests.*.pas`, 249 tests) and FPCUnit units for Free
+Pascal (`Source/UnitTests/FPC/Tests.FPC.*.pas`, 235 tests). Linux has a
+third program (`Source/UnitTests/Linux`). The FPC units are near copies of
+the Delphi ones, with the same tests and comments. They differ in three
+ways:
+
+- The test framework: DUnitX attributes and `Assert.AreEqual(Expected,
+  Actual, Message)`, against FPCUnit `published` methods and
+  `AssertEquals(Message, Expected, Actual)`.
+- Thread bodies and `Assert.WillRaise`: anonymous methods in Delphi, methods
+  of the test class in FPC (FPC 3.2.2 has no anonymous methods, §12.2).
+- A few tests exist on one side only. Delphi only: 4 tests of the ref
+  helpers (Windows API layout), `Assign_Raises` and
+  `BufferInfo_HasLayoutOfIoRingBufferInfo` (ring), `ReadOverloads_Work`
+  (stream). Some tests are split differently.
+
+Found while looking (2026-10-23):
+
+- DUnitX runs the `published` methods of a fixture as tests, without
+  attributes, and calls `SetUp`/`TearDown` declared in a base class (its own
+  DUnit compatibility class works that way). So one test class can serve
+  both frameworks, if a small base class hides the difference.
+- The FPC test units use only four calls of their framework: `AssertTrue`
+  (326 times), `AssertEquals` (280), `AssertFalse` (62) and `Fail` (11). The
+  rest are check helpers of their own.
+- Outside the Windows API tests, the tests call Windows only a little:
+  `Sleep` (in `SysUtils` on both compilers), a few file flags and error
+  codes, pipes and one byte-range lock. Most of it is in
+  `TestPlatformHelpers` already.
+
+**Phase 19 decisions (decided 2026-10-23):**
+
+- **One unit per test topic, in `Source/UnitTests/Common`**, used by all
+  runners: `Tests.Ring`, `Tests.Engine`, … (the names without `.FPC`), plus
+  the helpers (`TestFileHelpers`, `TestPlatformHelpers`) and a new
+  `Tests.Support`. Each one starts from the FPC unit (it already has no
+  anonymous methods) and gets the tests that only Delphi has, so no test is
+  lost. The Windows API tests go there too: Delphi and FPC both run them;
+  they are for Windows only.
+- **`Tests.Support`: a base class `TIORingTestCase`.** With FPC it is an
+  FPCUnit `TTestCase`; with Delphi a plain class for DUnitX whose
+  `[Setup]`/`[TearDown]` methods call the virtual `SetUp`/`TearDown`. Both
+  have the same check methods, with the **FPCUnit names**
+  (`AssertEquals(Message, Expected, Actual)`, `AssertTrue`, `AssertFalse`,
+  `Fail`), so the FPC tests move over almost unchanged; with Delphi they
+  call DUnitX's `Assert`. Also in `Tests.Support`: the thread
+  helpers (`RunThreads` with a method of the test, `TWorkerThread`), `Log`,
+  `CheckPattern`, `CheckEqualsU64`, and `RegisterTests(Class)` (FPCUnit's
+  `RegisterTest`, DUnitX's `RegisterTestFixture`). Every check counts as an
+  assert for DUnitX (the Delphi runner fails tests without asserts).
+- **`{$IFDEF}` only where the platform differs**, and as much as possible of
+  it inside `TestPlatformHelpers` (files, pipes, page memory, the "end of
+  file" result). A base class per platform is not needed: the differences
+  are a few calls, not different tests. The Linux side of the helpers comes
+  with `TLinuxIORing` (Phase 20).
+- **Thin runners.** The Delphi program stays where it is
+  (`Delphi.IOUring.UnitTests.dpr`: DUnitX, TestInsight). **One Free Pascal
+  program for Windows and Linux:**
+  `FPC/Delphi.IOUring.UnitTests.FPC.lpr`, with `{$IFDEF MSWINDOWS}` and
+  `{$IFDEF LINUX}` in its `uses`; `Build-FPC.ps1 -Platform Linux64` builds
+  it in WSL. `Source/UnitTests/Linux` keeps only what is for Linux only (the
+  API tests and the layout generator).
+- **The same tests everywhere.** After the phase, Delphi and FPC run the same
+  tests on Windows (one test count). Linux runs its API tests now, and the
+  shared suites from Phase 20 on (they need `TLinuxIORing`, and the atomics
+  need the Linux futex for waiting).
+- **On main, not a branch.** It moves a lot of test code (about 26 units
+  become about 15) but changes no library code. One test topic at a time. After each step all Windows runs pass (Delphi Win32 and
+  Win64, Debug and Release; FPC Win32 and Win64, with and without `-O3`),
+  so you can commit between steps.
+
+**Phase 19 implementation notes** (2026-10-23):
+
+- Built as decided. `Source/UnitTests/Common` has the 13 test units, the
+  helpers and `Tests.Support`; the Delphi runner and the one Free Pascal
+  runner (`FPC/Delphi.IOUring.UnitTests.FPC.lpr`) use them. The old twins
+  (`Tests.*.pas` for Delphi, `FPC/Tests.FPC.*.pas`) and the Delphi-only
+  `TestThreadHelpers` are gone. Every unit was made from the FPC twin by a
+  script (unit name, `uses` with `{$IFDEF FPC}`, registration), then the
+  differences were fixed by hand.
+- **One object per test with DUnitX too.** FPCUnit makes a new test object
+  for every test; DUnitX runs all tests of a class on one object, so fields
+  would carry over from one test to the next. The Delphi side of the base
+  class therefore resets the object before each test (`CleanupInstance`,
+  then `InitInstance`: fields zero, as after `Create`).
+- **Every check counts as an assert** for DUnitX: the Delphi runner fails a
+  test without one (`FailsOnNoAsserts`). Check helpers that only called
+  `Fail` on a mismatch (`CheckResult` of the Windows API tests,
+  `CheckPattern`) now count a passing check too. Three tests failed on this
+  at first.
+- Kept from the Delphi side: the tests the FPC side did not have (the
+  layout of `TIORingBufferInfo`, the four ref-helper tests), the split of
+  tests that FPC had joined (large file buffered / unbuffered, `Write` /
+  `SetSize` raise), and 32 log lines with findings ("VERIFY: …") that the
+  FPC twins had dropped.
+- Delphi only: `ReadOverloads_Work` (`TStream.Read(TBytes, …)`, `Read64`,
+  `ReadData`) and two `Write` checks – FPC 3.2.2's `TStream` does not have
+  these overloads (`{$IFNDEF FPC}`).
+- Fewer test entries in Delphi, the same checks: Delphi had 9 `[TestCase]`
+  variants of 2 file-helper tests; the shared tests loop over the same
+  cases.
+- Differences between the RTLs, now in the shared code: `GetTickCount64` is
+  `TThread.GetTickCount64` (Delphi's `SysUtils` has none); `constref` is
+  `const [ref]` in Delphi (§12.2); `TStreamReader` is in FPC's `streamex`
+  with other constructors; Delphi's `string` has 2-byte characters, so a
+  test that compared file bytes with a `string` now compares `TBytes`.
+- `Tests.Support` compiles on Linux too (no Windows calls outside
+  `{$IFDEF MSWINDOWS}`; the RTL's interlocked calls instead of
+  `Delphi.IOUring.Atomics`, which is Windows-only until Phase 20). The FPC
+  runner needs `cthreads` on Linux, which links the C library:
+  `Build-FPC.ps1 -Platform Linux64` passes gcc's library folder (`-Fl`).
+- Result: Delphi 242 tests (Win32 and Win64, Debug and Release), FPC 241 on
+  Windows (Win32 and Win64, with and without `-O3`), FPC 32 on Linux (the
+  25 Linux API tests and the 7 file-helper tests). Delphi has one test more:
+  `ReadOverloads_Work`.
+
 ---
 
 ## 13. Ideas parked for later
@@ -2345,8 +2465,9 @@ decision 17.)
 | 10 | 2026-10-22 | **Lock-free / wait-free** algorithms (CAS etc.) for the engine's hot paths, each justified by a benchmark (§10.5). |
 | 11 | 2026-10-22 | Compiler/platform order: **Delphi 13 Windows → latest FPC/Lazarus Windows → Linux via FPC**. Language baseline = what both Delphi 13 and the latest FPC support (§12). |
 | 12 | 2026-10-22 | Lighter replacements for RTL containers: **idea only**, not planned until profiling shows a need (§4.2). |
-| 13 | 2026-10-22 | Free Pascal tests are **separate FPCUnit test units** (`Source/UnitTests/FPC`), not a shared source with the DUnitX tests. |
+| 13 | 2026-10-22 | Free Pascal tests are **separate FPCUnit test units** (`Source/UnitTests/FPC`), not a shared source with the DUnitX tests. *Replaced by decision 18 (Phase 19): one set of tests.* |
 | 14 | 2026-10-22 | In FPC the IoRing functions are **looked up with `GetProcAddress` on first use** (no `delayed` in FPC 3.2.2); a missing function returns `E_NOTIMPL`. |
 | 15 | 2026-10-23 | **Overlap rules in the engine: an option** (`orKeepOrder`, §11). For one file handle, requests that touch the same bytes take effect in start order; conflicting later requests are held back, and the requests of a handle are routed to one I/O thread. The core ring keeps no rules (A). |
 | 16 | 2026-10-23 | **The write stream writes through an engine** (its own by default, or a shared one): Windows does buffered writes inside the submit call, so the submit must happen on another thread (§2.1, §8.2). A failed background write raises at the next call, and at `Free` if it was never raised. |
 | 17 | 2026-10-23 | **Linux: raw system calls, no liburing**; the API unit translates the **kernel 6.8** `linux/io_uring.h` (Ubuntu 24.04 LTS), checked by layout tests generated from the C header; Linux tests are built and run in WSL through `Build-FPC.ps1 -Platform Linux64` (§6.4). |
+| 18 | 2026-10-23 | **One set of tests** for Delphi, Free Pascal and Linux in `Source/UnitTests/Common`: a base class over DUnitX and FPCUnit with the FPCUnit check names; one Free Pascal test program for Windows and Linux; done on main (§12.4). |

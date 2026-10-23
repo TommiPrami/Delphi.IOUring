@@ -1,13 +1,16 @@
-﻿unit Tests.FPC.TestFileHelpers;
+﻿unit Tests.TestFileHelpers;
 
-{ Free Pascal version of Tests.TestFileHelpers: the test-file helpers themselves. }
+{
+  Tests for the test-file helpers themselves. If these fail, every later test
+  that checks file contents would give wrong answers.
+}
 
 {$I Delphi.IOUring.inc}
 
 interface
 
 uses
-  Tests.FPC.Support;
+  Tests.Support;
 
 type
   TTestFileHelpersTests = class(TIORingTestCase)
@@ -24,9 +27,13 @@ type
 implementation
 
 uses
+{$IFDEF FPC}
   SysUtils,
   Classes,
-  testregistry,
+{$ELSE}
+  System.SysUtils,
+  System.Classes,
+{$ENDIF}
   TestFileHelpers;
 
 procedure TTestFileHelpersTests.PatternWord_IsDeterministic;
@@ -129,6 +136,6 @@ begin
 end;
 
 initialization
-  RegisterTest(TTestFileHelpersTests);
+  RegisterTests(TTestFileHelpersTests);
 
 end.

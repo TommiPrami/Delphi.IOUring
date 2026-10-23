@@ -92,7 +92,7 @@ Source/Benchmarks/*.csv
 # Delphi.IOUring: Free Pascal / Lazarus build output and session files
 Source/UnitTests/FPC/Win32/
 Source/UnitTests/FPC/Win64/
-Source/UnitTests/Linux/Linux64/
+Source/UnitTests/FPC/Linux64/
 Source/UnitTests/FPC/bin/
 Source/UnitTests/FPC/lib/
 Source/Benchmarks/FPC/Win32/

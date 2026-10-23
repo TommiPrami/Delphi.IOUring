@@ -17,8 +17,8 @@
 interface
 
 uses
-  fpcunit,
-  Delphi.IOUring.Backend.Posix.API;
+  Delphi.IOUring.Backend.Posix.API,
+  Tests.Support;
 
 type
   // A ring of a test, with its memory mapped
@@ -53,14 +53,11 @@ type
     function TryPopCqe(out ACqe: io_uring_cqe): Boolean;
   end;
 
-  TPosixApiTests = class(TTestCase)
+  TPosixApiTests = class(TIORingTestCase)
   private
     FRing: TTestRing;
     FFiles: array of string;
     FFds: array of Integer;
-    procedure Log(const AText: string);
-    procedure CheckValue(const AMessage: string; const AExpected, AActual: Int64);
-    procedure CheckPattern(const AFileOffset: UInt64; const ABuffer; const ACount: NativeInt);
     procedure OpenRing(const AEntries: Cardinal);
     function PopCqe: io_uring_cqe;
     // A pattern file of ASize bytes, opened read-only; deleted and closed in TearDown
@@ -99,7 +96,6 @@ implementation
 uses
   SysUtils,
   BaseUnix,
-  testregistry,
   TestFileHelpers;
 
 const
@@ -268,24 +264,6 @@ begin
   inherited;
 end;
 
-procedure TPosixApiTests.Log(const AText: string);
-begin
-  Writeln('    ', AText);
-end;
-
-procedure TPosixApiTests.CheckValue(const AMessage: string; const AExpected, AActual: Int64);
-begin
-  AssertEquals(AMessage, AExpected, AActual);
-end;
-
-procedure TPosixApiTests.CheckPattern(const AFileOffset: UInt64; const ABuffer; const ACount: NativeInt);
-var
-  LBadOffset: UInt64;
-begin
-  if not TTestFileHelpers.CheckPattern(AFileOffset, ABuffer, ACount, LBadOffset) then
-    Fail(Format('Wrong data at file offset %d', [LBadOffset]));
-end;
-
 procedure TPosixApiTests.OpenRing(const AEntries: Cardinal);
 var
   LResult: Integer;
@@ -326,8 +304,8 @@ begin
   LFd := io_uring_setup(8, @LParams);
   AssertTrue('io_uring_setup: ' + IntToStr(LFd), LFd >= 0);
   try
-    CheckValue('sq_entries', 8, LParams.sq_entries);
-    CheckValue('cq_entries (twice sq_entries)', 16, LParams.cq_entries);
+    AssertEquals('sq_entries', 8, LParams.sq_entries);
+    AssertEquals('cq_entries (twice sq_entries)', 16, LParams.cq_entries);
     AssertTrue('IORING_FEAT_SINGLE_MMAP', LParams.features and IORING_FEAT_SINGLE_MMAP <> 0);
     AssertTrue('IORING_FEAT_NODROP', LParams.features and IORING_FEAT_NODROP <> 0);
     AssertTrue('sq_off.array', LParams.sq_off.&array > 0);
@@ -342,8 +320,8 @@ end;
 procedure TPosixApiTests.Setup_RoundsEntriesUpToPowerOfTwo;
 begin
   OpenRing(5);
-  CheckValue('sq_entries', 8, FRing.Params.sq_entries);
-  CheckValue('cq_entries', 16, FRing.Params.cq_entries);
+  AssertEquals('sq_entries', 8, FRing.Params.sq_entries);
+  AssertEquals('cq_entries', 16, FRing.Params.cq_entries);
 end;
 
 procedure TPosixApiTests.Setup_CQSize;
@@ -356,8 +334,8 @@ begin
   LParams.cq_entries := 100;
   LResult := FRing.Open(8, LParams);
   AssertTrue('io_uring_setup: ' + IntToStr(LResult), LResult >= 0);
-  CheckValue('sq_entries', 8, FRing.Params.sq_entries);
-  CheckValue('cq_entries (100 rounded up)', 128, FRing.Params.cq_entries);
+  AssertEquals('sq_entries', 8, FRing.Params.sq_entries);
+  AssertEquals('cq_entries (100 rounded up)', 128, FRing.Params.cq_entries);
 end;
 
 procedure TPosixApiTests.Setup_ZeroEntries_EINVAL;
@@ -365,7 +343,7 @@ var
   LParams: io_uring_params;
 begin
   LParams := Default(io_uring_params);
-  CheckValue('io_uring_setup', -ESysEINVAL, io_uring_setup(0, @LParams));
+  AssertEquals('io_uring_setup', -ESysEINVAL, io_uring_setup(0, @LParams));
 end;
 
 procedure TPosixApiTests.Setup_UnknownFlag_EINVAL;
@@ -374,7 +352,7 @@ var
 begin
   LParams := Default(io_uring_params);
   LParams.flags := 1 shl 30;
-  CheckValue('io_uring_setup', -ESysEINVAL, io_uring_setup(8, @LParams));
+  AssertEquals('io_uring_setup', -ESysEINVAL, io_uring_setup(8, @LParams));
 end;
 
 procedure TPosixApiTests.Setup_ReservedNotZero_EINVAL;
@@ -383,7 +361,7 @@ var
 begin
   LParams := Default(io_uring_params);
   LParams.resv[2] := 1;
-  CheckValue('io_uring_setup', -ESysEINVAL, io_uring_setup(8, @LParams));
+  AssertEquals('io_uring_setup', -ESysEINVAL, io_uring_setup(8, @LParams));
 end;
 
 procedure TPosixApiTests.Setup_TooManyEntries_EINVALOrClamped;
@@ -393,27 +371,27 @@ var
 begin
   // The kernel's limit is 32768 SQ entries (IORING_MAX_ENTRIES)
   LParams := Default(io_uring_params);
-  CheckValue('io_uring_setup', -ESysEINVAL, io_uring_setup(65536, @LParams));
+  AssertEquals('io_uring_setup', -ESysEINVAL, io_uring_setup(65536, @LParams));
 
   LParams := Default(io_uring_params);
   LParams.flags := IORING_SETUP_CLAMP;
   LResult := FRing.Open(65536, LParams);
   AssertTrue('io_uring_setup with IORING_SETUP_CLAMP: ' + IntToStr(LResult), LResult >= 0);
-  CheckValue('sq_entries', 32768, FRing.Params.sq_entries);
-  CheckValue('cq_entries', 65536, FRing.Params.cq_entries);
+  AssertEquals('sq_entries', 32768, FRing.Params.sq_entries);
+  AssertEquals('cq_entries', 65536, FRing.Params.cq_entries);
 end;
 
 procedure TPosixApiTests.MapRings_RingMemoryHoldsSizes;
 begin
   OpenRing(16);
-  CheckValue('SQ ring_mask', 15, FRing.SqWord(FRing.Params.sq_off.ring_mask)^);
-  CheckValue('SQ ring_entries', 16, FRing.SqWord(FRing.Params.sq_off.ring_entries)^);
-  CheckValue('SQ head', 0, FRing.SqWord(FRing.Params.sq_off.head)^);
-  CheckValue('SQ tail', 0, FRing.SqWord(FRing.Params.sq_off.tail)^);
-  CheckValue('CQ ring_mask', 31, FRing.CqWord(FRing.Params.cq_off.ring_mask)^);
-  CheckValue('CQ ring_entries', 32, FRing.CqWord(FRing.Params.cq_off.ring_entries)^);
-  CheckValue('CQ head', 0, FRing.CqWord(FRing.Params.cq_off.head)^);
-  CheckValue('CQ tail', 0, FRing.CqWord(FRing.Params.cq_off.tail)^);
+  AssertEquals('SQ ring_mask', 15, FRing.SqWord(FRing.Params.sq_off.ring_mask)^);
+  AssertEquals('SQ ring_entries', 16, FRing.SqWord(FRing.Params.sq_off.ring_entries)^);
+  AssertEquals('SQ head', 0, FRing.SqWord(FRing.Params.sq_off.head)^);
+  AssertEquals('SQ tail', 0, FRing.SqWord(FRing.Params.sq_off.tail)^);
+  AssertEquals('CQ ring_mask', 31, FRing.CqWord(FRing.Params.cq_off.ring_mask)^);
+  AssertEquals('CQ ring_entries', 32, FRing.CqWord(FRing.Params.cq_off.ring_entries)^);
+  AssertEquals('CQ head', 0, FRing.CqWord(FRing.Params.cq_off.head)^);
+  AssertEquals('CQ tail', 0, FRing.CqWord(FRing.Params.cq_off.tail)^);
 end;
 
 procedure TPosixApiTests.Nop_ReturnsUserData;
@@ -425,12 +403,12 @@ begin
   LSqe := FRing.NextSqe;
   LSqe^.opcode := IORING_OP_NOP;
   LSqe^.user_data := UInt64($FEDCBA9876543210);
-  CheckValue('submitted', 1, FRing.Submit(1));
+  AssertEquals('submitted', 1, FRing.Submit(1));
 
   LCqe := PopCqe;
   AssertTrue('user_data', LCqe.user_data = UInt64($FEDCBA9876543210));
-  CheckValue('res', 0, LCqe.res);
-  CheckValue('flags', 0, LCqe.flags);
+  AssertEquals('res', 0, LCqe.res);
+  AssertEquals('flags', 0, LCqe.flags);
   AssertFalse('One completion only', FRing.TryPopCqe(LCqe));
 end;
 
@@ -449,16 +427,16 @@ begin
     LSqe^.user_data := I;
   end;
   AssertTrue('The SQ is full', FRing.NextSqe = nil);
-  CheckValue('submitted', 8, FRing.Submit(8));
+  AssertEquals('submitted', 8, FRing.Submit(8));
 
   LSeen := 0;
   for I := 1 to 8 do
   begin
     LCqe := PopCqe;
-    CheckValue('res', 0, LCqe.res);
+    AssertEquals('res', 0, LCqe.res);
     LSeen := LSeen or (Cardinal(1) shl LCqe.user_data);
   end;
-  CheckValue('user_data 1..8', $1FE, LSeen);
+  AssertEquals('user_data 1..8', $1FE, LSeen);
 end;
 
 procedure TPosixApiTests.Read_ReadsRightData;
@@ -479,11 +457,11 @@ begin
   LSqe^.len := SizeOf(LBuffer);
   LSqe^.off := 12345;
   LSqe^.user_data := 1;
-  CheckValue('submitted', 1, FRing.Submit(1));
+  AssertEquals('submitted', 1, FRing.Submit(1));
 
   LCqe := PopCqe;
-  CheckValue('res (bytes read)', SizeOf(LBuffer), LCqe.res);
-  CheckPattern(12345, LBuffer, SizeOf(LBuffer));
+  AssertEquals('res (bytes read)', SizeOf(LBuffer), LCqe.res);
+  CheckPattern(12345, @LBuffer, SizeOf(LBuffer));
 end;
 
 procedure TPosixApiTests.Read_AtEndOfFile_ReturnsZero;
@@ -501,8 +479,8 @@ begin
   LSqe^.addr := AddressOf(@LBuffer);
   LSqe^.len := SizeOf(LBuffer);
   LSqe^.off := 65536;
-  CheckValue('submitted', 1, FRing.Submit(1));
-  CheckValue('res (bytes read)', 0, PopCqe.res);
+  AssertEquals('submitted', 1, FRing.Submit(1));
+  AssertEquals('res (bytes read)', 0, PopCqe.res);
 
   // Crossing the end: the bytes up to the end
   LSqe := FRing.NextSqe;
@@ -511,8 +489,8 @@ begin
   LSqe^.addr := AddressOf(@LBuffer);
   LSqe^.len := SizeOf(LBuffer);
   LSqe^.off := 65536 - 100;
-  CheckValue('submitted', 1, FRing.Submit(1));
-  CheckValue('res (bytes read)', 100, PopCqe.res);
+  AssertEquals('submitted', 1, FRing.Submit(1));
+  AssertEquals('res (bytes read)', 100, PopCqe.res);
 end;
 
 procedure TPosixApiTests.Read_BadFd_ErrorInCompletion;
@@ -527,8 +505,8 @@ begin
   LSqe^.addr := AddressOf(@LBuffer);
   LSqe^.len := SizeOf(LBuffer);
   // The request is submitted; its error comes in the completion
-  CheckValue('submitted', 1, FRing.Submit(1));
-  CheckValue('res', -ESysEBADF, PopCqe.res);
+  AssertEquals('submitted', 1, FRing.Submit(1));
+  AssertEquals('res', -ESysEBADF, PopCqe.res);
 end;
 
 procedure TPosixApiTests.Write_WritesRightData;
@@ -553,19 +531,19 @@ begin
   LSqe^.addr := AddressOf(@LData);
   LSqe^.len := SizeOf(LData);
   LSqe^.off := 4096;
-  CheckValue('submitted', 1, FRing.Submit(1));
-  CheckValue('res (bytes written)', SizeOf(LData), PopCqe.res);
+  AssertEquals('submitted', 1, FRing.Submit(1));
+  AssertEquals('res (bytes written)', SizeOf(LData), PopCqe.res);
 
   LCheck := FileOpen(LFileName, fmOpenRead or fmShareDenyNone);
   AssertTrue('FileOpen', LCheck <> THandle(-1));
   try
-    CheckValue('file size', 4096 + SizeOf(LData), FileSeek(LCheck, Int64(0), fsFromEnd));
+    AssertEquals('file size', 4096 + SizeOf(LData), FileSeek(LCheck, Int64(0), fsFromEnd));
     FileSeek(LCheck, 4096, fsFromBeginning);
-    CheckValue('FileRead', SizeOf(LBack), FileRead(LCheck, LBack, SizeOf(LBack)));
+    AssertEquals('FileRead', SizeOf(LBack), FileRead(LCheck, LBack, SizeOf(LBack)));
   finally
     FileClose(LCheck);
   end;
-  CheckPattern(4096, LBack, SizeOf(LBack));
+  CheckPattern(4096, @LBack, SizeOf(LBack));
 end;
 
 procedure TPosixApiTests.RegisterFiles_ReadThroughFixedFile;
@@ -577,7 +555,7 @@ begin
   OpenRing(8);
   LFds[0] := -1;  // an empty slot
   LFds[1] := OpenPatternFile(65536);
-  CheckValue('IORING_REGISTER_FILES', 0, io_uring_register(FRing.Fd, IORING_REGISTER_FILES, @LFds, 2));
+  AssertEquals('IORING_REGISTER_FILES', 0, io_uring_register(FRing.Fd, IORING_REGISTER_FILES, @LFds, 2));
 
   LSqe := FRing.NextSqe;
   LSqe^.opcode := IORING_OP_READ;
@@ -586,9 +564,9 @@ begin
   LSqe^.addr := AddressOf(@LBuffer);
   LSqe^.len := SizeOf(LBuffer);
   LSqe^.off := 8192;
-  CheckValue('submitted', 1, FRing.Submit(1));
-  CheckValue('res (bytes read)', SizeOf(LBuffer), PopCqe.res);
-  CheckPattern(8192, LBuffer, SizeOf(LBuffer));
+  AssertEquals('submitted', 1, FRing.Submit(1));
+  AssertEquals('res (bytes read)', SizeOf(LBuffer), PopCqe.res);
+  CheckPattern(8192, @LBuffer, SizeOf(LBuffer));
 
   // The empty slot
   LSqe := FRing.NextSqe;
@@ -597,10 +575,10 @@ begin
   LSqe^.fd := 0;
   LSqe^.addr := AddressOf(@LBuffer);
   LSqe^.len := SizeOf(LBuffer);
-  CheckValue('submitted', 1, FRing.Submit(1));
-  CheckValue('res (empty slot)', -ESysEBADF, PopCqe.res);
+  AssertEquals('submitted', 1, FRing.Submit(1));
+  AssertEquals('res (empty slot)', -ESysEBADF, PopCqe.res);
 
-  CheckValue('IORING_UNREGISTER_FILES', 0, io_uring_register(FRing.Fd, IORING_UNREGISTER_FILES, nil, 0));
+  AssertEquals('IORING_UNREGISTER_FILES', 0, io_uring_register(FRing.Fd, IORING_UNREGISTER_FILES, nil, 0));
 end;
 
 procedure TPosixApiTests.RegisterBuffers_ReadFixed;
@@ -615,7 +593,7 @@ begin
   SetLength(LBuffer, 16384);
   LVec.iov_base := @LBuffer[0];
   LVec.iov_len := Length(LBuffer);
-  CheckValue('IORING_REGISTER_BUFFERS', 0, io_uring_register(FRing.Fd, IORING_REGISTER_BUFFERS, @LVec, 1));
+  AssertEquals('IORING_REGISTER_BUFFERS', 0, io_uring_register(FRing.Fd, IORING_REGISTER_BUFFERS, @LVec, 1));
 
   // Into the middle of registered buffer 0
   LSqe := FRing.NextSqe;
@@ -625,9 +603,9 @@ begin
   LSqe^.len := 8192;
   LSqe^.off := 20480;
   LSqe^.buf_index := 0;
-  CheckValue('submitted', 1, FRing.Submit(1));
-  CheckValue('res (bytes read)', 8192, PopCqe.res);
-  CheckPattern(20480, LBuffer[4096], 8192);
+  AssertEquals('submitted', 1, FRing.Submit(1));
+  AssertEquals('res (bytes read)', 8192, PopCqe.res);
+  CheckPattern(20480, @LBuffer[4096], 8192);
 
   // Outside the registered buffer
   LSqe := FRing.NextSqe;
@@ -636,10 +614,10 @@ begin
   LSqe^.addr := AddressOf(@LBuffer[12288]);
   LSqe^.len := 8192;
   LSqe^.buf_index := 0;
-  CheckValue('submitted', 1, FRing.Submit(1));
-  CheckValue('res (past the buffer)', -ESysEFAULT, PopCqe.res);
+  AssertEquals('submitted', 1, FRing.Submit(1));
+  AssertEquals('res (past the buffer)', -ESysEFAULT, PopCqe.res);
 
-  CheckValue('IORING_UNREGISTER_BUFFERS', 0, io_uring_register(FRing.Fd, IORING_UNREGISTER_BUFFERS, nil, 0));
+  AssertEquals('IORING_UNREGISTER_BUFFERS', 0, io_uring_register(FRing.Fd, IORING_UNREGISTER_BUFFERS, nil, 0));
 end;
 
 procedure TPosixApiTests.RegisterProbe_ReportsOpcodes;
@@ -658,13 +636,13 @@ begin
   // The kernel wants the memory zeroed (SetLength does that)
   SetLength(LBuffer, SizeOf(io_uring_probe) + OPS * SizeOf(io_uring_probe_op));
   LProbe := @LBuffer[0];
-  CheckValue('IORING_REGISTER_PROBE', 0, io_uring_register(FRing.Fd, IORING_REGISTER_PROBE, LProbe, OPS));
+  AssertEquals('IORING_REGISTER_PROBE', 0, io_uring_register(FRing.Fd, IORING_REGISTER_PROBE, LProbe, OPS));
 
-  CheckValue('ops_len', LProbe^.last_op + 1, LProbe^.ops_len);
+  AssertEquals('ops_len', LProbe^.last_op + 1, LProbe^.ops_len);
   LSupported := 0;
   for I := 0 to LProbe^.ops_len - 1 do
   begin
-    CheckValue('ops[I].op', I, ProbeOp(LProbe, I)^.op);
+    AssertEquals('ops[I].op', I, ProbeOp(LProbe, I)^.op);
     if ProbeOp(LProbe, I)^.flags and IO_URING_OP_SUPPORTED <> 0 then
       Inc(LSupported);
   end;
@@ -678,17 +656,17 @@ end;
 procedure TPosixApiTests.Register_UnknownOpcode_EINVAL;
 begin
   OpenRing(8);
-  CheckValue('io_uring_register', -ESysEINVAL, io_uring_register(FRing.Fd, 9999, nil, 0));
+  AssertEquals('io_uring_register', -ESysEINVAL, io_uring_register(FRing.Fd, 9999, nil, 0));
 end;
 
 procedure TPosixApiTests.Enter_BadFd_EBADF;
 begin
-  CheckValue('io_uring_enter', -ESysEBADF, io_uring_enter(BAD_FD, 0, 0, 0, nil));
+  AssertEquals('io_uring_enter', -ESysEBADF, io_uring_enter(BAD_FD, 0, 0, 0, nil));
 end;
 
 procedure TPosixApiTests.Enter_NotARing_EOPNOTSUPP;
 begin
-  CheckValue('io_uring_enter', -ESysEOPNOTSUPP, io_uring_enter(OpenPatternFile(4096), 0, 0, 0, nil));
+  AssertEquals('io_uring_enter', -ESysEOPNOTSUPP, io_uring_enter(OpenPatternFile(4096), 0, 0, 0, nil));
 end;
 
 procedure TPosixApiTests.Enter_ExtArgTimeout_ETIME;
@@ -704,7 +682,7 @@ begin
 
   // Nothing submitted: waits for one completion, until the timeout
   LStart := GetTickCount64;
-  CheckValue('io_uring_enter2', -ESysETIME, io_uring_enter2(FRing.Fd, 0, 1,
+  AssertEquals('io_uring_enter2', -ESysETIME, io_uring_enter2(FRing.Fd, 0, 1,
     IORING_ENTER_GETEVENTS or IORING_ENTER_EXT_ARG, @LArg, SizeOf(LArg)));
   AssertTrue('Waited', GetTickCount64 - LStart >= 15);
 end;
@@ -726,14 +704,14 @@ begin
   LSqe^.user_data := 42;
 
   LStart := GetTickCount64;
-  CheckValue('submitted', 1, FRing.Submit(1));
+  AssertEquals('submitted', 1, FRing.Submit(1));
   AssertTrue('Waited', GetTickCount64 - LStart >= 15);
   LCqe := PopCqe;
-  CheckValue('user_data', 42, LCqe.user_data);
-  CheckValue('res', -ESysETIME, LCqe.res);
+  AssertEquals('user_data', 42, LCqe.user_data);
+  AssertEquals('res', -ESysETIME, LCqe.res);
 end;
 
 initialization
-  RegisterTest(TPosixApiTests);
+  RegisterTests(TPosixApiTests);
 
 end.

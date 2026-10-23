@@ -8,8 +8,8 @@
   offset can be computed without keeping a copy of the file, and data read
   from a wrong offset is detected (each word is different).
 
-  No test framework dependency, so the same helpers can later be used from
-  FPCUnit tests (Plan, Phase 7).
+  No test framework and no operating system dependency: used by all tests
+  (Delphi, Free Pascal on Windows and Linux).
 }
 
 {$I Delphi.IOUring.inc}

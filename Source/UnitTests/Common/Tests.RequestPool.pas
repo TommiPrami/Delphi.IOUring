@@ -1,13 +1,15 @@
-﻿unit Tests.FPC.RequestPool;
+﻿unit Tests.RequestPool;
 
 {
-  Free Pascal version of Tests.RequestPool: the lock-free free list and the
-  request pool - slots, states, stale handles, waiting, and the multi-thread
-  stress tests (no slot or index held twice, none lost; a simulated engine
-  with producers and one "I/O thread" without lost wake-ups).
+  Tests for Delphi.IOUring.RequestPool: the lock-free free list and the
+  request pool (slots, states, handles, waiting).
 
-  The thread bodies are methods of the test cases (Work*), run by
-  TWorkerThread (Tests.FPC.Support).
+  Stale handles: after Release every method must see the old handle as
+  stale. Multi-thread stress: no slot or index may ever be held by two
+  threads at once, none may get lost, and a simulated engine (producers + one
+  "I/O thread") must hand every request over and back without a lost
+  wake-up. The thread bodies are methods of the tests (Work*), run by
+  RunThreads.
 }
 
 {$I Delphi.IOUring.inc}
@@ -15,10 +17,13 @@
 interface
 
 uses
+{$IFDEF FPC}
   Classes,
-  fpcunit,
+{$ELSE}
+  System.Classes,
+{$ENDIF}
   Delphi.IOUring.RequestPool,
-  Tests.FPC.Support;
+  Tests.Support;
 
 const
   STRESS_CAPACITY = 8;
@@ -89,8 +94,11 @@ type
 implementation
 
 uses
+{$IFDEF FPC}
   SysUtils,
-  testregistry,
+{$ELSE}
+  System.SysUtils,
+{$ENDIF}
   Delphi.IOUring,
   Delphi.IOUring.Atomics;
 
@@ -590,9 +598,9 @@ begin
   FPool.Open(4);
   AssertTrue(FPool.TryAcquire(LHandle));
   AssertTrue(FPool.TryChangeState(LHandle, rsDefined, rsSubmitted));
-  LStart := GetTickCount64;
+  LStart := TThread.GetTickCount64;
   AssertTrue(FPool.WaitFor(LHandle, 0) = wrTimeout);
-  AssertTrue(Format('Took %d ms', [GetTickCount64 - LStart]), GetTickCount64 - LStart < 100);
+  AssertTrue(Format('Took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 100);
 end;
 
 procedure TRequestPoolTests.WaitFor_Timeout_ReturnsAfterTimeout;
@@ -604,9 +612,9 @@ begin
   FPool.Open(4);
   AssertTrue(FPool.TryAcquire(LHandle));
   AssertTrue(FPool.TryChangeState(LHandle, rsDefined, rsSubmitted));
-  LStart := GetTickCount64;
+  LStart := TThread.GetTickCount64;
   AssertTrue(FPool.WaitFor(LHandle, 50) = wrTimeout);
-  LElapsed := GetTickCount64 - LStart;
+  LElapsed := TThread.GetTickCount64 - LStart;
   // GetTickCount64 moves in steps of about 16 ms: 50 ms show as 46 or more
   AssertTrue(Format('Waited only %d ms', [LElapsed]), LElapsed >= 45);
   // Still usable: completes and releases normally
@@ -625,14 +633,14 @@ begin
   StartWaiter(LThread);
   try
     Sleep(50); // let it fall asleep
-    LStart := GetTickCount64;
+    LStart := TThread.GetTickCount64;
     AssertTrue(FPool.TryChangeState(FHandle, rsSubmitted, rsCompleted));
     LThread.WaitFor;
   finally
     LThread.Free;
   end;
   AssertTrue('Result', FWaitResult = wrCompleted);
-  AssertTrue(Format('Wake-up took %d ms', [GetTickCount64 - LStart]), GetTickCount64 - LStart < 5000);
+  AssertTrue(Format('Wake-up took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 5000);
 end;
 
 procedure TRequestPoolTests.WaitFor_WokenByRelease_ReturnsStale;
@@ -645,14 +653,14 @@ begin
   StartWaiter(LThread);
   try
     Sleep(50); // let it fall asleep
-    LStart := GetTickCount64;
+    LStart := TThread.GetTickCount64;
     AssertTrue(FPool.Release(FHandle));
     LThread.WaitFor;
   finally
     LThread.Free;
   end;
   AssertTrue('Result', FWaitResult = wrStale);
-  AssertTrue(Format('Wake-up took %d ms', [GetTickCount64 - LStart]), GetTickCount64 - LStart < 5000);
+  AssertTrue(Format('Wake-up took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 5000);
 end;
 
 procedure TRequestPoolTests.WorkAcquireAndRelease(AIndex: Integer);
@@ -783,7 +791,7 @@ begin
 end;
 
 initialization
-  RegisterTest(TFreeListTests);
-  RegisterTest(TRequestPoolTests);
+  RegisterTests(TFreeListTests);
+  RegisterTests(TRequestPoolTests);
 
 end.

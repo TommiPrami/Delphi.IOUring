@@ -1,14 +1,17 @@
-﻿unit Tests.FPC.EngineOverlap;
+﻿unit Tests.EngineOverlap;
 
 {
-  Free Pascal version of Tests.EngineOverlap: the overlap rule of
-  TIORingEngine (orKeepOrder) - for one file handle, requests that touch the
-  same bytes take effect in the order they were started. Exact cases with
-  pipes, and model tests: random reads and writes compared with an in-memory
-  copy of the file updated in start order.
+  Tests for the overlap rule of TIORingEngine (orKeepOrder, Docs/Design.md
+  §11): for one file handle, requests that touch the same bytes take effect
+  in the order they were started.
 
-  The thread bodies are methods of the test case (Work*), run by
-  TWorkerThread (Tests.FPC.Support).
+  Pipes make the cases exact: a read from a pipe stays pending until the test
+  writes to the other end, so a later write of the same handle and bytes must
+  stay held back meanwhile. (Pipes ignore offsets; the rule does not.)
+
+  The model tests start random reads and writes of random sizes without
+  waiting for them, and keep an in-memory copy of the file updated in start
+  order: every read must return what the copy held when the read was started.
 }
 
 {$I Delphi.IOUring.inc}
@@ -16,13 +19,17 @@
 interface
 
 uses
+{$IFDEF FPC}
   Classes,
   SysUtils,
-  fpcunit,
+{$ELSE}
+  System.Classes,
+  System.SysUtils,
+{$ENDIF}
   Delphi.IOUring,
   Delphi.IOUring.Engine,
   TestPlatformHelpers,
-  Tests.FPC.Support;
+  Tests.Support;
 
 type
   TEngineOverlapTests = class(TIORingTestCase)
@@ -72,8 +79,11 @@ type
 implementation
 
 uses
+{$IFDEF FPC}
   Windows,
-  testregistry,
+{$ELSE}
+  Winapi.Windows,
+{$ENDIF}
   Delphi.IOUring.Atomics;
 
 const
@@ -171,8 +181,8 @@ function TEngineOverlapTests.WaitForHeldBack(const AExpected: UInt64): Boolean;
 var
   LDeadline: UInt64;
 begin
-  LDeadline := GetTickCount64 + WAIT_MILLISECONDS;
-  while (FEngine.Stats.HeldBack <> AExpected) and (GetTickCount64 < LDeadline) do
+  LDeadline := TThread.GetTickCount64 + WAIT_MILLISECONDS;
+  while (FEngine.Stats.HeldBack <> AExpected) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
   Result := FEngine.Stats.HeldBack = AExpected;
 end;
@@ -181,8 +191,8 @@ function TEngineOverlapTests.WaitForRequests(const AExpected: UInt64): Boolean;
 var
   LDeadline: UInt64;
 begin
-  LDeadline := GetTickCount64 + WAIT_MILLISECONDS;
-  while (FEngine.Stats.Requests <> AExpected) and (GetTickCount64 < LDeadline) do
+  LDeadline := TThread.GetTickCount64 + WAIT_MILLISECONDS;
+  while (FEngine.Stats.Requests <> AExpected) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
   Result := FEngine.Stats.Requests = AExpected;
 end;
@@ -191,8 +201,8 @@ function TEngineOverlapTests.WaitForCompleted(const AExpected: Integer): Boolean
 var
   LDeadline: UInt64;
 begin
-  LDeadline := GetTickCount64 + WAIT_MILLISECONDS;
-  while (CompletedCount <> AExpected) and (GetTickCount64 < LDeadline) do
+  LDeadline := TThread.GetTickCount64 + WAIT_MILLISECONDS;
+  while (CompletedCount <> AExpected) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
   Result := CompletedCount = AExpected;
 end;
@@ -596,6 +606,6 @@ begin
 end;
 
 initialization
-  RegisterTest(TEngineOverlapTests);
+  RegisterTests(TEngineOverlapTests);
 
 end.

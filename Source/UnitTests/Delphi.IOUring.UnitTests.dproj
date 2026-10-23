@@ -37,7 +37,7 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <SanitizedProjectName>Delphi_IOUring_UnitTests</SanitizedProjectName>
-        <DCC_UnitSearchPath>..\Units;..\3rdParty\DUnitX\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>..\Units;Common;..\3rdParty\DUnitX\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_IncludePath>..\Units;$(DCC_IncludePath)</DCC_IncludePath>
         <DCC_DcuOutput>.\$(Platform)\$(Config)\dcu</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
@@ -84,22 +84,22 @@
         <DCCReference Include="..\Units\Delphi.IOUring.RequestQueue.pas"/>
         <DCCReference Include="..\Units\Delphi.IOUring.Engine.pas"/>
         <DCCReference Include="..\Units\Delphi.IOUring.BlockReader.pas"/>
-        <DCCReference Include="TestFileHelpers.pas"/>
-        <DCCReference Include="TestPlatformHelpers.pas"/>
-        <DCCReference Include="Tests.TestFileHelpers.pas"/>
-        <DCCReference Include="Tests.Backend.Windows.API.Layout.pas"/>
-        <DCCReference Include="Tests.Backend.Windows.API.pas"/>
-        <DCCReference Include="Tests.Ring.pas"/>
-        <DCCReference Include="Tests.SequentialReader.pas"/>
-        <DCCReference Include="Tests.Streams.pas"/>
-        <DCCReference Include="TestThreadHelpers.pas"/>
-        <DCCReference Include="Tests.Atomics.pas"/>
-        <DCCReference Include="Tests.RequestPool.pas"/>
-        <DCCReference Include="Tests.RequestQueue.pas"/>
-        <DCCReference Include="Tests.Engine.pas"/>
-        <DCCReference Include="Tests.BlockReader.pas"/>
-        <DCCReference Include="Tests.EngineOverlap.pas"/>
-        <DCCReference Include="Tests.SequentialWriter.pas"/>
+        <DCCReference Include="Common\TestFileHelpers.pas"/>
+        <DCCReference Include="Common\TestPlatformHelpers.pas"/>
+        <DCCReference Include="Common\Tests.Support.pas"/>
+        <DCCReference Include="Common\Tests.TestFileHelpers.pas"/>
+        <DCCReference Include="Common\Tests.Backend.Windows.API.Layout.pas"/>
+        <DCCReference Include="Common\Tests.Backend.Windows.API.pas"/>
+        <DCCReference Include="Common\Tests.Ring.pas"/>
+        <DCCReference Include="Common\Tests.SequentialReader.pas"/>
+        <DCCReference Include="Common\Tests.Streams.pas"/>
+        <DCCReference Include="Common\Tests.Atomics.pas"/>
+        <DCCReference Include="Common\Tests.RequestPool.pas"/>
+        <DCCReference Include="Common\Tests.RequestQueue.pas"/>
+        <DCCReference Include="Common\Tests.Engine.pas"/>
+        <DCCReference Include="Common\Tests.BlockReader.pas"/>
+        <DCCReference Include="Common\Tests.EngineOverlap.pas"/>
+        <DCCReference Include="Common\Tests.SequentialWriter.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

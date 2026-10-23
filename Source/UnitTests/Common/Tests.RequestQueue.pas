@@ -1,13 +1,15 @@
-﻿unit Tests.FPC.RequestQueue;
+﻿unit Tests.RequestQueue;
 
 {
-  Free Pascal version of Tests.RequestQueue: order, full and empty, the
-  capacity, many laps, the wrap-around of the position counters, and the
-  multi-thread stress tests (every value exactly once; with one consumer also
-  in each producer's order).
+  Tests for TIORingRequestQueue (Delphi.IOUring.RequestQueue): order, full
+  and empty, the capacity, many laps around the array, and the wrap-around of
+  the position counters (started just before the end of the NativeUInt
+  range).
 
-  The thread body is a method of the test case (WorkQueue), run by
-  TWorkerThread (Tests.FPC.Support).
+  Multi-thread stress: producers and consumers at the same time. Every value
+  must come out exactly once; with one consumer (the engine's case) also in
+  the order each producer put them in. The thread body is a method of the
+  test (WorkQueue), run by RunThreads.
 }
 
 {$I Delphi.IOUring.inc}
@@ -15,10 +17,13 @@
 interface
 
 uses
+{$IFDEF FPC}
   Classes,
-  fpcunit,
+{$ELSE}
+  System.Classes,
+{$ENDIF}
   Delphi.IOUring.RequestQueue,
-  Tests.FPC.Support;
+  Tests.Support;
 
 type
   TRequestQueueTests = class(TIORingTestCase)
@@ -28,7 +33,7 @@ type
     FConsumed: Integer;
     FSeen: array of Integer;            // [Producer * Items + Sequence]: 1 when consumed
     FNextExpected: array of Integer;    // per producer, with one consumer
-    FDeadline: UInt64;                  // GetTickCount64: give up (a lost value would hang the test)
+    FDeadline: UInt64;                  // TThread.GetTickCount64: give up (a lost value would hang the test)
     FTimedOut: Integer;
     // The parameters of WorkQueue
     FProducers: Integer;
@@ -66,8 +71,11 @@ type
 implementation
 
 uses
+{$IFDEF FPC}
   SysUtils,
-  testregistry,
+{$ELSE}
+  System.SysUtils,
+{$ENDIF}
   Delphi.IOUring,
   Delphi.IOUring.Atomics;
 
@@ -279,7 +287,7 @@ begin
         end;
         TAtomic.Increment(FConsumed);
       end
-      else if GetTickCount64 > FDeadline then
+      else if TThread.GetTickCount64 > FDeadline then
       begin
         TAtomic.Exchange(FTimedOut, 1);    // values were lost
         Exit;
@@ -318,7 +326,7 @@ begin
   FillChar(FSeen[0], Length(FSeen) * SizeOf(Integer), 0);
   SetLength(FNextExpected, AProducers + 1);
   FillChar(FNextExpected[0], Length(FNextExpected) * SizeOf(Integer), 0);
-  FDeadline := GetTickCount64 + 20000;
+  FDeadline := TThread.GetTickCount64 + 20000;
 
   RunThreads(AConsumers + AProducers, WorkQueue);
 
@@ -363,6 +371,6 @@ begin
 end;
 
 initialization
-  RegisterTest(TRequestQueueTests);
+  RegisterTests(TRequestQueueTests);
 
 end.

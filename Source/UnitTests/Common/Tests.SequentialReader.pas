@@ -8,99 +8,73 @@
   byte.
 }
 
+{$I Delphi.IOUring.inc}
+
 interface
 
 uses
-  System.Generics.Collections,
-  DUnitX.TestFramework,
   Delphi.IOUring.SequentialReader,
-  TestPlatformHelpers;
+  TestPlatformHelpers,
+  Tests.Support;
 
 type
-  [TestFixture]
-  TSequentialReaderTests = class
+  TSequentialReaderTests = class(TIORingTestCase)
   private
-    FFiles: TDictionary<Int64, string>;
     FResources: TTestResources;
-    function PatternFile(const ASize: Int64): string;
     function CheckReadAll(const ASize: Int64; const AOptions: TIORingSequentialReaderOptions;
       const ABufferSize, ABufferCount: Cardinal; const AChunkSize: Integer): TIORingReaderStats;
     procedure CheckSizeAndChunkMatrix(const AOptions: TIORingSequentialReaderOptions;
       const ABufferCounts: array of Cardinal);
     procedure CheckZeroCopyReadAll(const ASize: Int64; const ABufferSize, ABufferCount: Cardinal);
-  public
-    [SetupFixture]
-    procedure SetupFixture;
-    [TearDownFixture]
-    procedure TearDownFixture;
-    [Setup]
-    procedure Setup;
-    [TearDown]
-    procedure TearDown;
-
-    // Content
-    [Test]
+    function OpenRaisesIORingError(const AFileName: string; const ABufferSize, ABufferCount: Cardinal): Boolean;
+  protected
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
     procedure Read_SizeAndChunkMatrix_Buffered;
-    [Test]
     procedure Read_SizeAndChunkMatrix_Unbuffered;
-    [Test]
     procedure Read_SizeAndChunkMatrix_FixedReadAheadNoRegistration;
-    [Test]
     procedure Read_LargeFile_Buffered;
-    [Test]
     procedure Read_LargeFile_Unbuffered;
-    [Test]
     procedure ZeroCopy_DeliversSameContent;
-    [Test]
     procedure ReadAndZeroCopy_Mixed;
-    [Test]
     procedure EmptyFile_IsEndOfFileAtOnce;
-
-    // Files that change while being read
-    [Test]
     procedure AppendedWhileReading_StopsAtSizeAtOpen;
-    [Test]
     procedure ShortenedWhileReading_EndsAtNewEnd;
-
-    // Life cycle
-    [Test]
     procedure Close_InTheMiddle_IsClean;
-    [Test]
     procedure EndOfScope_ClosesFile;
-    [Test]
     procedure OpenHandle_NotOwned_KeepsHandleOpen;
-    [Test]
     procedure Open_BadArguments_Raise;
-    [Test]
     procedure Open_MissingFile_Raises;
-    [Test]
     procedure Open_Twice_Raises;
-    [Test]
     procedure Copy_Raises;
-
-    // API rules and statistics
-    [Test]
     procedure Read_WithChunkAcquired_Raises;
-    [Test]
     procedure ReleaseChunk_WithoutChunk_Raises;
-    [Test]
     procedure TryAcquireChunk_WithoutWait_GetsDataEventually;
-    [Test]
     procedure Stats_AreConsistent;
   end;
 
 implementation
 
 uses
+{$IFDEF FPC}
+  Windows,
+  SysUtils,
+  Classes,
+{$ELSE}
   Winapi.Windows,
   System.SysUtils,
   System.Classes,
+{$ENDIF}
   Delphi.IOUring,
   TestFileHelpers;
 
 const
   SMALL_BUFFER = 64 * 1024;
   LARGE_FILE_SIZE = 100 * 1024 * 1024;
+
+function IORingGetFileSizeEx(hFile: THandle; out lpFileSize: Int64): BOOL; stdcall;
+  external 'kernel32.dll' name 'GetFileSizeEx';
 
 procedure ReadALittleAndLeaveScope(const AFileName: string);
 var
@@ -112,29 +86,16 @@ begin
   // No Close: the end of scope must close the reader (and its file)
 end;
 
-function OpenRaisesIORingError(const AFileName: string; const ABufferSize, ABufferCount: Cardinal): Boolean;
-var
-  LReader: TIORingSequentialReader;
-begin
-  Result := False;
-  try
-    LReader.Open(AFileName, [], ABufferSize, ABufferCount);
-  except
-    on EIORingError do
-      Result := True;
-  end;
-  Assert.IsFalse(LReader.IsOpen, 'A failed Open must leave the reader closed');
-end;
-
 { Helpers }
 
-function TSequentialReaderTests.PatternFile(const ASize: Int64): string;
+procedure TSequentialReaderTests.SetUp;
 begin
-  if not FFiles.TryGetValue(ASize, Result) then
-  begin
-    Result := TTestFileHelpers.CreatePatternFile(ASize, 'Reader');
-    FFiles.Add(ASize, Result);
-  end;
+  FResources := TTestResources.Create;
+end;
+
+procedure TSequentialReaderTests.TearDown;
+begin
+  FreeAndNil(FResources);
 end;
 
 function TSequentialReaderTests.CheckReadAll(const ASize: Int64; const AOptions: TIORingSequentialReaderOptions;
@@ -144,27 +105,25 @@ var
   LBuffer: TBytes;
   LRead: NativeInt;
   LTotal: Int64;
-  LBadOffset: UInt64;
   LContext: string;
 begin
   LContext := Format('size %d, buffers %d x %d, chunk %d', [ASize, ABufferCount, ABufferSize, AChunkSize]);
-
-  LReader.Open(PatternFile(ASize), AOptions, ABufferSize, ABufferCount);
-  Assert.AreEqual(ASize, LReader.Size, LContext);
+  LReader.Open(SharedPatternFile(ASize), AOptions, ABufferSize, ABufferCount);
+  AssertEquals(LContext + ': size', ASize, LReader.Size);
 
   SetLength(LBuffer, AChunkSize);
   LTotal := 0;
   repeat
     LRead := LReader.Read(LBuffer[0], AChunkSize);
-    if (LRead > 0) and not TTestFileHelpers.CheckPattern(UInt64(LTotal), LBuffer[0], LRead, LBadOffset) then
-      Assert.Fail(Format('%s: wrong data at offset %d', [LContext, LBadOffset]));
+    if LRead > 0 then
+      CheckPattern(UInt64(LTotal), @LBuffer[0], LRead, LContext);
     Inc(LTotal, LRead);
   until LRead < AChunkSize;
 
-  Assert.AreEqual(ASize, LTotal, LContext + ': total');
-  Assert.AreEqual(ASize, LReader.Position, LContext + ': position');
-  Assert.IsTrue(LReader.Eof, LContext + ': Eof');
-  Assert.AreEqual(NativeInt(0), LReader.Read(LBuffer[0], AChunkSize), LContext + ': read after EOF');
+  AssertEquals(LContext + ': total', ASize, LTotal);
+  AssertEquals(LContext + ': position', ASize, LReader.Position);
+  AssertTrue(LContext + ': Eof', LReader.Eof);
+  AssertEquals(LContext + ': read after EOF', Int64(0), Int64(LReader.Read(LBuffer[0], AChunkSize)));
   Result := LReader.Stats;
 end;
 
@@ -173,14 +132,16 @@ procedure TSequentialReaderTests.CheckSizeAndChunkMatrix(const AOptions: TIORing
 const
   B = SMALL_BUFFER;
 var
+  LCountIndex: Integer;
   LCount: Cardinal;
   LSizes: array[0..6] of Int64;
   LChunks: array[0..6] of Integer;
-  LSize: Int64;
-  LChunk: Integer;
+  LSizeIndex: Integer;
+  LChunkIndex: Integer;
 begin
-  for LCount in ABufferCounts do
+  for LCountIndex := 0 to High(ABufferCounts) do
   begin
+    LCount := ABufferCounts[LCountIndex];
     LSizes[0] := 0;
     LSizes[1] := 1;
     LSizes[2] := B - 1;
@@ -189,7 +150,7 @@ begin
     LSizes[5] := Int64(B) * LCount;
     LSizes[6] := Int64(B) * LCount + 1;
 
-    for LSize in LSizes do
+    for LSizeIndex := 0 to High(LSizes) do
     begin
       LChunks[0] := 1;
       LChunks[1] := 7;
@@ -197,10 +158,9 @@ begin
       LChunks[3] := 4096;
       LChunks[4] := B;
       LChunks[5] := B + 1;
-      LChunks[6] := Integer(LSize) + 10;   // larger than the file
-
-      for LChunk in LChunks do
-        CheckReadAll(LSize, AOptions, B, LCount, LChunk);
+      LChunks[6] := Integer(LSizes[LSizeIndex]) + 10;
+      for LChunkIndex := 0 to High(LChunks) do
+        CheckReadAll(LSizes[LSizeIndex], AOptions, B, LCount, LChunks[LChunkIndex]);
     end;
   end;
 end;
@@ -211,52 +171,38 @@ var
   LData: PByte;
   LLength: NativeInt;
   LTotal: Int64;
-  LBadOffset: UInt64;
   LContext: string;
 begin
   LContext := Format('zero-copy, size %d, buffers %d x %d', [ASize, ABufferCount, ABufferSize]);
-  LReader.Open(PatternFile(ASize), [], ABufferSize, ABufferCount);
+  LReader.Open(SharedPatternFile(ASize), [], ABufferSize, ABufferCount);
 
   LTotal := 0;
   while LReader.TryAcquireChunk(LData, LLength) do
   begin
-    Assert.IsTrue(LLength > 0, LContext + ': empty chunk');
-    Assert.IsTrue(LLength <= NativeInt(ABufferSize), LContext + ': chunk larger than a buffer');
-    if not TTestFileHelpers.CheckPattern(UInt64(LTotal), LData^, LLength, LBadOffset) then
-      Assert.Fail(Format('%s: wrong data at offset %d', [LContext, LBadOffset]));
+    AssertTrue(LContext + ': empty chunk', LLength > 0);
+    AssertTrue(LContext + ': chunk larger than a buffer', LLength <= NativeInt(ABufferSize));
+    CheckPattern(UInt64(LTotal), LData, LLength, LContext);
     Inc(LTotal, LLength);
     LReader.ReleaseChunk;
   end;
 
-  Assert.AreEqual(ASize, LTotal, LContext + ': total');
-  Assert.IsTrue(LReader.Eof, LContext + ': Eof');
+  AssertEquals(LContext + ': total', ASize, LTotal);
+  AssertTrue(LContext + ': Eof', LReader.Eof);
 end;
 
-{ Set-up }
-
-procedure TSequentialReaderTests.SetupFixture;
-begin
-  FFiles := TDictionary<Int64, string>.Create;
-end;
-
-procedure TSequentialReaderTests.TearDownFixture;
+function TSequentialReaderTests.OpenRaisesIORingError(const AFileName: string;
+  const ABufferSize, ABufferCount: Cardinal): Boolean;
 var
-  LFileName: string;
+  LReader: TIORingSequentialReader;
 begin
-  for LFileName in FFiles.Values do
-    TTestFileHelpers.DeleteTestFile(LFileName);
-  FFiles.Free;
-end;
-
-procedure TSequentialReaderTests.Setup;
-begin
-  FResources := TTestResources.Create;
-end;
-
-procedure TSequentialReaderTests.TearDown;
-begin
-  FResources.Free;
-  FResources := nil;
+  Result := False;
+  try
+    LReader.Open(AFileName, [], ABufferSize, ABufferCount);
+  except
+    on EIORingError do
+      Result := True;
+  end;
+  AssertFalse('A failed Open must leave the reader closed', LReader.IsOpen);
 end;
 
 { Content }
@@ -281,11 +227,11 @@ var
   LStart: UInt64;
   LStats: TIORingReaderStats;
 begin
-  LStart := GetTickCount64;
+  LStart := TThread.GetTickCount64;
   LStats := CheckReadAll(LARGE_FILE_SIZE, [], IORING_READER_DEFAULT_BUFFER_SIZE,
     IORING_READER_DEFAULT_BUFFER_COUNT, 64 * 1024);
   Log(Format('100 MB buffered (incl. pattern checks): %d ms; stalls %d (%d us), max read-ahead %d',
-    [GetTickCount64 - LStart, LStats.Stalls, LStats.StallMicroseconds, LStats.MaxReadAhead]));
+    [TThread.GetTickCount64 - LStart, LStats.Stalls, LStats.StallMicroseconds, LStats.MaxReadAhead]));
 end;
 
 procedure TSequentialReaderTests.Read_LargeFile_Unbuffered;
@@ -293,11 +239,11 @@ var
   LStart: UInt64;
   LStats: TIORingReaderStats;
 begin
-  LStart := GetTickCount64;
+  LStart := TThread.GetTickCount64;
   LStats := CheckReadAll(LARGE_FILE_SIZE, [sroUnbuffered], IORING_READER_DEFAULT_BUFFER_SIZE,
     IORING_READER_DEFAULT_BUFFER_COUNT, 64 * 1024);
   Log(Format('100 MB unbuffered (incl. pattern checks): %d ms; stalls %d (%d us), max read-ahead %d',
-    [GetTickCount64 - LStart, LStats.Stalls, LStats.StallMicroseconds, LStats.MaxReadAhead]));
+    [TThread.GetTickCount64 - LStart, LStats.Stalls, LStats.StallMicroseconds, LStats.MaxReadAhead]));
 end;
 
 procedure TSequentialReaderTests.ZeroCopy_DeliversSameContent;
@@ -305,22 +251,19 @@ const
   B = SMALL_BUFFER;
   COUNTS: array[0..2] of Cardinal = (1, 2, 8);
 var
+  LCountIndex: Integer;
   LCount: Cardinal;
-  LSizes: array[0..6] of Int64;
-  LSize: Int64;
 begin
-  for LCount in COUNTS do
+  for LCountIndex := Low(COUNTS) to High(COUNTS) do
   begin
-    LSizes[0] := 0;
-    LSizes[1] := 1;
-    LSizes[2] := B - 1;
-    LSizes[3] := B;
-    LSizes[4] := B + 1;
-    LSizes[5] := Int64(B) * LCount;
-    LSizes[6] := Int64(B) * LCount + 1;
-
-    for LSize in LSizes do
-      CheckZeroCopyReadAll(LSize, B, LCount);
+    LCount := COUNTS[LCountIndex];
+    CheckZeroCopyReadAll(0, B, LCount);
+    CheckZeroCopyReadAll(1, B, LCount);
+    CheckZeroCopyReadAll(B - 1, B, LCount);
+    CheckZeroCopyReadAll(B, B, LCount);
+    CheckZeroCopyReadAll(B + 1, B, LCount);
+    CheckZeroCopyReadAll(Int64(B) * LCount, B, LCount);
+    CheckZeroCopyReadAll(Int64(B) * LCount + 1, B, LCount);
   end;
 end;
 
@@ -335,11 +278,9 @@ var
   LLength: NativeInt;
   LRead: NativeInt;
   LTotal: Int64;
-  LBadOffset: UInt64;
   LUseChunk: Boolean;
 begin
-  // Alternate: Read 1000 bytes, then take the rest of that buffer as a chunk
-  LReader.Open(PatternFile(FILE_SIZE), [], B, 2);
+  LReader.Open(SharedPatternFile(FILE_SIZE), [], B, 2);
   LTotal := 0;
   LUseChunk := False;
   repeat
@@ -347,8 +288,7 @@ begin
     begin
       if not LReader.TryAcquireChunk(LData, LLength) then
         Break;
-      Assert.IsTrue(TTestFileHelpers.CheckPattern(UInt64(LTotal), LData^, LLength, LBadOffset),
-        Format('Chunk: wrong data at %d', [LBadOffset]));
+      CheckPattern(UInt64(LTotal), LData, LLength, 'Chunk');
       Inc(LTotal, LLength);
       LReader.ReleaseChunk;
     end
@@ -357,15 +297,14 @@ begin
       LRead := LReader.Read(LBuffer, SizeOf(LBuffer));
       if LRead = 0 then
         Break;
-      Assert.IsTrue(TTestFileHelpers.CheckPattern(UInt64(LTotal), LBuffer, LRead, LBadOffset),
-        Format('Read: wrong data at %d', [LBadOffset]));
+      CheckPattern(UInt64(LTotal), @LBuffer, LRead, 'Read');
       Inc(LTotal, LRead);
     end;
     LUseChunk := not LUseChunk;
   until False;
 
-  Assert.AreEqual(Int64(FILE_SIZE), LTotal);
-  Assert.AreEqual(Int64(FILE_SIZE), LReader.Position);
+  AssertEquals('Total', Int64(FILE_SIZE), LTotal);
+  AssertEquals('Position', Int64(FILE_SIZE), LReader.Position);
 end;
 
 procedure TSequentialReaderTests.EmptyFile_IsEndOfFileAtOnce;
@@ -375,13 +314,12 @@ var
   LData: PByte;
   LLength: NativeInt;
 begin
-  LReader.Open(PatternFile(0));
-
-  Assert.IsTrue(LReader.Eof);
-  Assert.IsTrue(LReader.DataReady);
-  Assert.AreEqual(NativeInt(0), LReader.Read(LBuffer, SizeOf(LBuffer)));
-  Assert.IsFalse(LReader.TryAcquireChunk(LData, LLength));
-  Assert.AreEqual(Int64(0), LReader.Size);
+  LReader.Open(SharedPatternFile(0));
+  AssertTrue('Eof', LReader.Eof);
+  AssertTrue('DataReady', LReader.DataReady);
+  AssertEquals('Read', Int64(0), Int64(LReader.Read(LBuffer, SizeOf(LBuffer))));
+  AssertFalse('TryAcquireChunk', LReader.TryAcquireChunk(LData, LLength));
+  AssertEquals('Size', Int64(0), LReader.Size);
 end;
 
 { Files that change while being read }
@@ -398,12 +336,9 @@ var
   LBuffer: TBytes;
   LTotal: Int64;
   LRead: NativeInt;
-  LBadOffset: UInt64;
 begin
   LFileName := TTestFileHelpers.CreatePatternFile(FILE_SIZE, 'Append');
   FResources.AddFile(LFileName);
-
-  // One buffer in flight, so the last buffer is read after the append
   LReader.Open(LFileName, [sroFixedReadAhead], B, 1);
 
   SetLength(LExtra, 1024 * 1024);
@@ -420,13 +355,13 @@ begin
   LTotal := 0;
   repeat
     LRead := LReader.Read(LBuffer[0], Length(LBuffer));
-    if (LRead > 0) and not TTestFileHelpers.CheckPattern(UInt64(LTotal), LBuffer[0], LRead, LBadOffset) then
-      Assert.Fail(Format('Wrong data at %d', [LBadOffset]));
+    if LRead > 0 then
+      CheckPattern(UInt64(LTotal), @LBuffer[0], LRead);
     Inc(LTotal, LRead);
   until LRead = 0;
 
-  Assert.AreEqual(Int64(FILE_SIZE), LTotal, 'Bytes read');
-  Assert.IsTrue(LReader.Eof);
+  AssertEquals('Bytes read', Int64(FILE_SIZE), LTotal);
+  AssertTrue('Eof', LReader.Eof);
 end;
 
 procedure TSequentialReaderTests.ShortenedWhileReading_EndsAtNewEnd;
@@ -441,13 +376,10 @@ var
   LBuffer: TBytes;
   LTotal: Int64;
   LRead: NativeInt;
-  LBadOffset: UInt64;
 begin
   LFileName := TTestFileHelpers.CreatePatternFile(FILE_SIZE, 'Shorten');
   FResources.AddFile(LFileName);
-
   LReader.Open(LFileName, [sroFixedReadAhead], B, 1);
-  Assert.AreEqual(Int64(FILE_SIZE), LReader.Size);
 
   LWriter := TFileStream.Create(LFileName, fmOpenReadWrite or fmShareDenyNone);
   try
@@ -460,14 +392,14 @@ begin
   LTotal := 0;
   repeat
     LRead := LReader.Read(LBuffer[0], Length(LBuffer));
-    if (LRead > 0) and not TTestFileHelpers.CheckPattern(UInt64(LTotal), LBuffer[0], LRead, LBadOffset) then
-      Assert.Fail(Format('Wrong data at %d', [LBadOffset]));
+    if LRead > 0 then
+      CheckPattern(UInt64(LTotal), @LBuffer[0], LRead);
     Inc(LTotal, LRead);
   until LRead = 0;
 
-  Assert.AreEqual(Int64(NEW_SIZE), LTotal, 'Bytes read');
-  Assert.IsTrue(LReader.Eof);
-  Assert.AreEqual(Int64(FILE_SIZE), LReader.Size, 'Size stays the size at open');
+  AssertEquals('Bytes read', Int64(NEW_SIZE), LTotal);
+  AssertTrue('Eof', LReader.Eof);
+  AssertEquals('Size stays the size at open', Int64(FILE_SIZE), LReader.Size);
 end;
 
 { Life cycle }
@@ -480,16 +412,14 @@ var
   LBuffer: TBytes;
 begin
   SetLength(LBuffer, 100 * 1024);
-  LReader.Open(PatternFile(FILE_SIZE), [sroFixedReadAhead], SMALL_BUFFER, 16);
-  Assert.AreEqual(NativeInt(Length(LBuffer)), LReader.Read(LBuffer[0], Length(LBuffer)));
+  LReader.Open(SharedPatternFile(FILE_SIZE), [sroFixedReadAhead], SMALL_BUFFER, 16);
+  AssertEquals('First read', Int64(Length(LBuffer)), Int64(LReader.Read(LBuffer[0], Length(LBuffer))));
+  LReader.Close;
+  AssertFalse('Closed', LReader.IsOpen);
 
-  LReader.Close;   // reads still in flight
-  Assert.IsFalse(LReader.IsOpen);
-
-  // The same variable can be opened again
   CheckReadAll(FILE_SIZE, [], SMALL_BUFFER, 4, 100 * 1024);
-  LReader.Open(PatternFile(FILE_SIZE));
-  Assert.IsTrue(LReader.IsOpen);
+  LReader.Open(SharedPatternFile(FILE_SIZE));
+  AssertTrue('Opened again', LReader.IsOpen);
 end;
 
 procedure TSequentialReaderTests.EndOfScope_ClosesFile;
@@ -501,8 +431,7 @@ begin
 
   ReadALittleAndLeaveScope(LFileName);
 
-  // The reader opens without FILE_SHARE_DELETE, so this fails while it is open
-  Assert.IsTrue(System.SysUtils.DeleteFile(LFileName), 'The file is still open: ' + SysErrorMessage(GetLastError));
+  AssertTrue('The file is still open: ' + SysErrorMessage(GetLastError), DeleteFile(LFileName));
 end;
 
 procedure TSequentialReaderTests.OpenHandle_NotOwned_KeepsHandleOpen;
@@ -512,31 +441,29 @@ var
   LBuffer: array[0..999] of Byte;
   LSize: Int64;
 begin
-  LHandle := FResources.OpenFile(PatternFile(3 * SMALL_BUFFER));
-
+  LHandle := FResources.OpenFile(SharedPatternFile(3 * SMALL_BUFFER));
   LReader.Open(LHandle, False, [], SMALL_BUFFER, 2);
-  Assert.AreEqual(NativeInt(SizeOf(LBuffer)), LReader.Read(LBuffer, SizeOf(LBuffer)));
+  AssertEquals('Read', Int64(SizeOf(LBuffer)), Int64(LReader.Read(LBuffer, SizeOf(LBuffer))));
   LReader.Close;
 
-  Assert.IsTrue(GetFileSizeEx(LHandle, LSize), 'The handle was closed by the reader');
-  Assert.AreEqual(Int64(3 * SMALL_BUFFER), LSize);
+  AssertTrue('The handle was closed by the reader', IORingGetFileSizeEx(LHandle, LSize));
+  AssertEquals('Size', Int64(3 * SMALL_BUFFER), LSize);
 end;
 
 procedure TSequentialReaderTests.Open_BadArguments_Raise;
 var
   LFileName: string;
 begin
-  LFileName := PatternFile(SMALL_BUFFER);
-
-  Assert.IsTrue(OpenRaisesIORingError(LFileName, 0, 4), 'Buffer size 0');
-  Assert.IsTrue(OpenRaisesIORingError(LFileName, 1000, 4), 'Buffer size not a multiple of 4096');
-  Assert.IsTrue(OpenRaisesIORingError(LFileName, SMALL_BUFFER, 0), 'No buffers');
-  Assert.IsTrue(OpenRaisesIORingError(LFileName, SMALL_BUFFER, IORING_READER_MAX_BUFFER_COUNT + 1), 'Too many buffers');
+  LFileName := SharedPatternFile(SMALL_BUFFER);
+  AssertTrue('Buffer size 0', OpenRaisesIORingError(LFileName, 0, 4));
+  AssertTrue('Buffer size not a multiple of 4096', OpenRaisesIORingError(LFileName, 1000, 4));
+  AssertTrue('No buffers', OpenRaisesIORingError(LFileName, SMALL_BUFFER, 0));
+  AssertTrue('Too many buffers', OpenRaisesIORingError(LFileName, SMALL_BUFFER, IORING_READER_MAX_BUFFER_COUNT + 1));
 end;
 
 procedure TSequentialReaderTests.Open_MissingFile_Raises;
 begin
-  Assert.IsTrue(OpenRaisesIORingError(TTestFileHelpers.NewTestFileName('Missing'), SMALL_BUFFER, 4));
+  AssertTrue(OpenRaisesIORingError(TTestFileHelpers.NewTestFileName('Missing'), SMALL_BUFFER, 4));
 end;
 
 procedure TSequentialReaderTests.Open_Twice_Raises;
@@ -544,18 +471,16 @@ var
   LReader: TIORingSequentialReader;
   LRaised: Boolean;
 begin
-  LReader.Open(PatternFile(SMALL_BUFFER));
-
+  LReader.Open(SharedPatternFile(SMALL_BUFFER));
   LRaised := False;
   try
-    LReader.Open(PatternFile(SMALL_BUFFER));
+    LReader.Open(SharedPatternFile(SMALL_BUFFER));
   except
     on EIORingError do
       LRaised := True;
   end;
-
-  Assert.IsTrue(LRaised);
-  Assert.IsTrue(LReader.IsOpen, 'The first Open must stay usable');
+  AssertTrue('Second Open raises', LRaised);
+  AssertTrue('The first Open stays usable', LReader.IsOpen);
 end;
 
 procedure TSequentialReaderTests.Copy_Raises;
@@ -564,8 +489,7 @@ var
   LReader2: TIORingSequentialReader;
   LRaised: Boolean;
 begin
-  LReader1.Open(PatternFile(SMALL_BUFFER));
-
+  LReader1.Open(SharedPatternFile(SMALL_BUFFER));
   LRaised := False;
   try
     LReader2 := LReader1;
@@ -573,9 +497,8 @@ begin
     on EInvalidOpException do
       LRaised := True;
   end;
-
-  Assert.IsTrue(LRaised);
-  Assert.IsFalse(LReader2.IsOpen);
+  AssertTrue('Copy raises', LRaised);
+  AssertFalse('Target not open', LReader2.IsOpen);
 end;
 
 { API rules and statistics }
@@ -588,9 +511,8 @@ var
   LBuffer: array[0..15] of Byte;
   LRaised: Boolean;
 begin
-  LReader.Open(PatternFile(SMALL_BUFFER));
-  Assert.IsTrue(LReader.TryAcquireChunk(LData, LLength));
-
+  LReader.Open(SharedPatternFile(SMALL_BUFFER));
+  AssertTrue('Acquire', LReader.TryAcquireChunk(LData, LLength));
   LRaised := False;
   try
     LReader.Read(LBuffer, SizeOf(LBuffer));
@@ -598,7 +520,7 @@ begin
     on EInvalidOpException do
       LRaised := True;
   end;
-  Assert.IsTrue(LRaised);
+  AssertTrue('Read raises', LRaised);
 end;
 
 procedure TSequentialReaderTests.ReleaseChunk_WithoutChunk_Raises;
@@ -606,8 +528,7 @@ var
   LReader: TIORingSequentialReader;
   LRaised: Boolean;
 begin
-  LReader.Open(PatternFile(SMALL_BUFFER));
-
+  LReader.Open(SharedPatternFile(SMALL_BUFFER));
   LRaised := False;
   try
     LReader.ReleaseChunk;
@@ -615,7 +536,7 @@ begin
     on EInvalidOpException do
       LRaised := True;
   end;
-  Assert.IsTrue(LRaised);
+  AssertTrue('ReleaseChunk raises', LRaised);
 end;
 
 procedure TSequentialReaderTests.TryAcquireChunk_WithoutWait_GetsDataEventually;
@@ -626,22 +547,21 @@ var
   LStart: UInt64;
   LGot: Boolean;
 begin
-  LReader.Open(PatternFile(4 * SMALL_BUFFER), [], SMALL_BUFFER, 4);
-
-  LStart := GetTickCount64;
+  LReader.Open(SharedPatternFile(4 * SMALL_BUFFER), [], SMALL_BUFFER, 4);
+  LStart := TThread.GetTickCount64;
   repeat
     LGot := LReader.TryAcquireChunk(LData, LLength, False);
     if not LGot then
     begin
-      Assert.IsFalse(LReader.Eof, 'No data must not mean end of file here');
+      AssertFalse('No data must not mean end of file here', LReader.Eof);
       Sleep(1);
     end;
-  until LGot or (GetTickCount64 - LStart > 5000);
+  until LGot or (TThread.GetTickCount64 - LStart > 5000);
 
-  Assert.IsTrue(LGot, 'No data within 5 s');
-  Assert.AreEqual(NativeInt(SMALL_BUFFER), LLength);
+  AssertTrue('Data within 5 s', LGot);
+  AssertEquals('Chunk', Int64(SMALL_BUFFER), Int64(LLength));
   LReader.ReleaseChunk;
-  Assert.AreEqual(Int64(SMALL_BUFFER), LReader.Position);
+  AssertEquals('Position', Int64(SMALL_BUFFER), LReader.Position);
 end;
 
 procedure TSequentialReaderTests.Stats_AreConsistent;
@@ -654,27 +574,26 @@ var
   LStats: TIORingReaderStats;
 begin
   SetLength(LBuffer, B);
-
-  LReader.Open(PatternFile(FILE_SIZE), [], B, 4);
+  LReader.Open(SharedPatternFile(FILE_SIZE), [], B, 4);
   while LReader.Read(LBuffer[0], B) > 0 do
     ;
   LStats := LReader.Stats;
   Log(Format('Adaptive: reads %d, bytes %d, stalls %d (%d us), max read-ahead %d',
     [LStats.ReadsIssued, LStats.BytesFromDisk, LStats.Stalls, LStats.StallMicroseconds, LStats.MaxReadAhead]));
-  Assert.AreEqual(UInt64(11), LStats.ReadsIssued);
-  Assert.AreEqual(UInt64(FILE_SIZE), LStats.BytesFromDisk);
-  Assert.IsTrue((LStats.MaxReadAhead >= 2) and (LStats.MaxReadAhead <= 4), 'Adaptive read-ahead between 2 and 4');
+  CheckEqualsU64('Reads', 11, LStats.ReadsIssued);
+  CheckEqualsU64('Bytes', FILE_SIZE, LStats.BytesFromDisk);
+  AssertTrue('Adaptive read-ahead between 2 and 4', (LStats.MaxReadAhead >= 2) and (LStats.MaxReadAhead <= 4));
   LReader.Close;
 
-  LReader.Open(PatternFile(FILE_SIZE), [sroFixedReadAhead], B, 4);
+  LReader.Open(SharedPatternFile(FILE_SIZE), [sroFixedReadAhead], B, 4);
   while LReader.Read(LBuffer[0], B) > 0 do
     ;
   LStats := LReader.Stats;
-  Assert.AreEqual(Cardinal(4), LStats.MaxReadAhead, 'Fixed read-ahead');
-  Assert.AreEqual(UInt64(FILE_SIZE), LStats.BytesFromDisk);
+  AssertEquals('Fixed read-ahead', Int64(4), Int64(LStats.MaxReadAhead));
+  CheckEqualsU64('Bytes', FILE_SIZE, LStats.BytesFromDisk);
 end;
 
 initialization
-  TDUnitX.RegisterTestFixture(TSequentialReaderTests);
+  RegisterTests(TSequentialReaderTests);
 
 end.

@@ -14,9 +14,8 @@
       Writes      Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.Writes.FPC.lpr (optimized)
 
     Linux64 builds and runs inside WSL, with the FPC of the default WSL
-    distribution (Ubuntu: sudo apt install fpc). So far only the tests:
-
-      Tests       Source\UnitTests\Linux\Delphi.IOUring.UnitTests.Linux.lpr (debug info)
+    distribution (Ubuntu: sudo apt install fpc). So far only the tests: the
+    same program, with the Linux-only tests of Source\UnitTests\Linux.
 
 .PARAMETER Project
     Tests, Benchmarks, Structures, Blocks or Writes. Default Tests.
@@ -92,6 +91,14 @@ if ($isLinux64) {
     }
     $wslSourceDir = $wslSourceDir.Trim()
     $rtlSearchPath = "$LinuxFpcUnits/*"
+    # The tests use cthreads, which links the C library: the linker needs the
+    # folder of gcc's crtbegin.o (fpc.cfg names it, but -n leaves fpc.cfg out)
+    $crtFile = & wsl.exe -e gcc '-print-file-name=crtbegin.o' 2>$null
+    $linuxLibraryPath = $null
+    if (($LASTEXITCODE -eq 0) -and $crtFile -and $crtFile.Trim().StartsWith('/')) {
+        $crtFile = $crtFile.Trim()
+        $linuxLibraryPath = $crtFile.Substring(0, $crtFile.LastIndexOf('/'))
+    }
 } else {
     if ($Platform -eq 'Win32') {
         $compilerName = 'ppc386.exe'
@@ -125,14 +132,12 @@ function ConvertTo-CompilerPath([string] $Path) {
 }
 
 if ($Project -eq 'Tests') {
+    $projectDir = Join-Path $sourceDir 'UnitTests\FPC'
+    $programFile = 'Delphi.IOUring.UnitTests.FPC.lpr'
+    $extraUnits = @(Join-Path $sourceDir 'UnitTests\Common') # Tests.Support, the shared tests and helpers
     if ($isLinux64) {
-        $projectDir = Join-Path $sourceDir 'UnitTests\Linux'
-        $programFile = 'Delphi.IOUring.UnitTests.Linux.lpr'
-    } else {
-        $projectDir = Join-Path $sourceDir 'UnitTests\FPC'
-        $programFile = 'Delphi.IOUring.UnitTests.FPC.lpr'
+        $extraUnits += Join-Path $sourceDir 'UnitTests\Linux' # the Linux-only tests
     }
-    $extraUnits = @(Join-Path $sourceDir 'UnitTests')       # TestFileHelpers, TestPlatformHelpers
     $codeOptions = @('-g', '-gl')                            # debug info with line numbers
     if ($Optimize) {
         $codeOptions += '-O3'
@@ -164,6 +169,9 @@ $arguments = @('-n', '-B', '-vewn') + $codeOptions + @(
 )
 foreach ($unitDir in $extraUnits) {
     $arguments += "-Fu$(ConvertTo-CompilerPath $unitDir)"
+}
+if ($isLinux64 -and $linuxLibraryPath) {
+    $arguments += "-Fl$linuxLibraryPath"
 }
 $arguments += (ConvertTo-CompilerPath (Join-Path $projectDir $programFile))
 

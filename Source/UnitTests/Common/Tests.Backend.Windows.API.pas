@@ -1,10 +1,14 @@
-﻿unit Tests.FPC.Backend.Windows.API;
+﻿unit Tests.Backend.Windows.API;
 
 {
-  Free Pascal version of Tests.Backend.Windows.API: calls the real Windows
-  IoRing API, compiled with FPC. Besides the translation itself this proves,
-  for FPC: records passed by value work, and the functions are found at run
-  time (GetProcAddress wrappers instead of Delphi's "delayed").
+  Calls the real Windows IoRing API through Delphi.IOUring.Backend.Windows.API.
+
+  Besides checking the translation, several tests answer the [VERIFY]
+  questions of Docs/Design.md. Their findings are written to the test log
+  (lines starting with "VERIFY:"), so run the tests with console output to
+  see them.
+
+  Requires Windows with IoRing version 4 (Windows 11 24H2 or newer).
 }
 
 {$I Delphi.IOUring.inc}
@@ -12,10 +16,14 @@
 interface
 
 uses
+{$IFDEF FPC}
   Windows,
+{$ELSE}
+  Winapi.Windows,
+{$ENDIF}
   Delphi.IOUring.Backend.Windows.API,
   TestPlatformHelpers,
-  Tests.FPC.Support;
+  Tests.Support;
 
 type
   TCompletionArray = array of IORING_CQE;
@@ -60,9 +68,13 @@ type
 implementation
 
 uses
+{$IFDEF FPC}
   SysUtils,
   Classes,
-  testregistry,
+{$ELSE}
+  System.SysUtils,
+  System.Classes,
+{$ENDIF}
   TestFileHelpers;
 
 const
@@ -119,7 +131,9 @@ end;
 
 procedure TWindowsIoRingApiTests.CheckResult(const AMessage: string; const AExpected, AActual: HRESULT);
 begin
-  if AExpected <> AActual then
+  if AExpected = AActual then
+    AssertTrue(True)
+  else
     Fail(Format('%s: expected %s but was %s', [AMessage, HrToStr(AExpected), HrToStr(AActual)]));
 end;
 
@@ -164,6 +178,9 @@ var
   LCapabilities: IORING_CAPABILITIES;
 begin
   CheckResult('QueryIoRingCapabilities', S_OK, QueryIoRingCapabilities(LCapabilities));
+  Log(Format('Capabilities: MaxVersion=%d MaxSQ=%d MaxCQ=%d FeatureFlags=0x%x',
+    [LCapabilities.MaxVersion, LCapabilities.MaxSubmissionQueueSize,
+     LCapabilities.MaxCompletionQueueSize, LCapabilities.FeatureFlags]));
   AssertTrue('IoRing version 4 required', LCapabilities.MaxVersion >= IORING_VERSION_4);
   AssertEquals('Not emulated', Int64(0), Int64(LCapabilities.FeatureFlags and IORING_FEATURE_UM_EMULATION));
 end;
@@ -175,6 +192,8 @@ var
 begin
   FRing := NewRing(10, 0);
   CheckResult('GetIoRingInfo', S_OK, GetIoRingInfo(FRing, LInfo));
+  Log(Format('Requested SQ=10 CQ=0 -> version=%d SQ=%d CQ=%d',
+    [LInfo.IoRingVersion, LInfo.SubmissionQueueSize, LInfo.CompletionQueueSize]));
   AssertEquals('Version', Int64(IORING_VERSION_4), Int64(LInfo.IoRingVersion));
   AssertEquals('SQ', Int64(16), Int64(LInfo.SubmissionQueueSize));
   AssertEquals('CQ', Int64(32), Int64(LInfo.CompletionQueueSize));
@@ -182,6 +201,8 @@ begin
   LRing := NewRing(10, 100);
   try
     CheckResult('GetIoRingInfo', S_OK, GetIoRingInfo(LRing, LInfo));
+    Log(Format('Requested SQ=10 CQ=100 -> SQ=%d CQ=%d',
+      [LInfo.SubmissionQueueSize, LInfo.CompletionQueueSize]));
     AssertEquals('SQ', Int64(16), Int64(LInfo.SubmissionQueueSize));
     AssertEquals('CQ', Int64(128), Int64(LInfo.CompletionQueueSize));
   finally
@@ -197,6 +218,7 @@ begin
   LFlags := Default(IORING_CREATE_FLAGS);
   LResult := CreateIoRing(12345, LFlags, 16, 0, FRing);
   FRing := 0;
+  Log('VERIFY: CreateIoRing with unknown version returns ' + HrToStr(LResult));
   CheckResult('Unknown version', IORING_E_VERSION_NOT_SUPPORTED, LResult);
 end;
 
@@ -209,6 +231,7 @@ begin
   CheckResult('QueryIoRingCapabilities', S_OK, QueryIoRingCapabilities(LCapabilities));
   LFlags := Default(IORING_CREATE_FLAGS);
   LResult := CreateIoRing(IORING_VERSION_4, LFlags, LCapabilities.MaxSubmissionQueueSize * 2, 0, FRing);
+  Log('VERIFY: CreateIoRing with SQ = 2 x max returns ' + HrToStr(LResult));
   if Succeeded(LResult) then
     CloseIoRing(FRing);
   FRing := 0;
@@ -218,10 +241,15 @@ end;
 procedure TWindowsIoRingApiTests.IsIoRingOpSupported_AllOperations;
 var
   LOp: IORING_OP_CODE;
+  LSupported: Boolean;
 begin
   FRing := NewRing;
   for LOp := IORING_OP_NOP to IORING_OP_WRITE_GATHER do
-    AssertTrue(Format('Operation %d', [LOp]), IsIoRingOpSupported(FRing, LOp));
+  begin
+    LSupported := IsIoRingOpSupported(FRing, LOp);
+    Log(Format('VERIFY: IsIoRingOpSupported(%d) = %s', [LOp, BoolToStr(LSupported, True)]));
+    AssertTrue(Format('Operation %d', [LOp]), LSupported);
+  end;
 end;
 
 procedure TWindowsIoRingApiTests.SetIoRingCompletionEvent_SignalsOnFirstCompletion;
@@ -294,7 +322,15 @@ var
   LCqe: IORING_CQE;
 begin
   FRing := NewRing;
+  LCqe.UserData := 4711;
+  LCqe.ResultCode := 4712;
+  LCqe.Information := 4713;
   CheckResult('Empty queue', S_FALSE, PopIoRingCompletion(FRing, LCqe));
+
+  // Learn says the cqe is not modified on S_FALSE; Windows 11 build 26300
+  // zeroes it. Either way: do not use the cqe when the result is S_FALSE.
+  Log(Format('VERIFY: cqe after S_FALSE: UserData=%d ResultCode=%d Information=%d',
+    [LCqe.UserData, LCqe.ResultCode, LCqe.Information]));
 end;
 
 procedure TWindowsIoRingApiTests.ReadFile_RegisteredFileAndBuffers_ReadsRightData;
@@ -485,6 +521,8 @@ begin
 
   LCompletions := PopAll(FRing);
   AssertEquals('Completions', 1, Length(LCompletions));
+  Log(Format('VERIFY: scatter read on buffered handle: %s, %d bytes',
+    [HrToStr(LCompletions[0].ResultCode), LCompletions[0].Information]));
   CheckResult('Scatter on buffered handle', RESULT_E_INVALIDARG, LCompletions[0].ResultCode);
 end;
 
@@ -502,13 +540,18 @@ begin
     IoRingBufferRefFromPointer(@LBuffer), SizeOf(LBuffer), 0, 1, IOSQE_FLAGS_NONE));
   CheckResult('Submit', S_OK, SubmitIoRing(FRing, 0, 0, nil));
   Sleep(50);
-  AssertEquals('Pipe read pending', 0, Length(PopAll(FRing)));
+  LCompletions := PopAll(FRing);
+  if Length(LCompletions) > 0 then
+    Log('VERIFY: pipe read completed at once with ' + HrToStr(LCompletions[0].ResultCode));
+  AssertEquals('Pipe read pending', 0, Length(LCompletions));
 
   CheckResult('Build cancel', S_OK, BuildIoRingCancelRequest(FRing, IoRingHandleRefFromHandle(LClient), 1, 2));
   CheckResult('Submit', S_OK, SubmitIoRing(FRing, 2, WAIT_TIMEOUT_MS, nil));
 
   LCompletions := PopAll(FRing);
   AssertEquals('Completions', 2, Length(LCompletions));
+  Log(Format('VERIFY: cancelled read completes with %s, cancel request with %s',
+    [HrToStr(FindCompletion(LCompletions, 1).ResultCode), HrToStr(FindCompletion(LCompletions, 2).ResultCode)]));
   CheckResult('Cancelled read', HResultFromWin32(ERROR_OPERATION_ABORTED), FindCompletion(LCompletions, 1).ResultCode);
   CheckResult('Cancel request', S_OK, FindCompletion(LCompletions, 2).ResultCode);
 end;
@@ -519,17 +562,22 @@ var
   LClient: THandle;
   LBuffer: array[0..63] of Byte;
   LSubmitted: Cardinal;
+  LResult: HRESULT;
 begin
   FRing := NewRing;
   FResources.OpenPipePair(LServer, LClient);
 
   CheckResult('Build', S_OK, BuildIoRingReadFile(FRing, IoRingHandleRefFromHandle(LClient),
     IoRingBufferRefFromPointer(@LBuffer), SizeOf(LBuffer), 0, 1, IOSQE_FLAGS_NONE));
-  CheckResult('Wait timeout', HResultFromWin32(WIN32_ERROR_TIMEOUT), SubmitIoRing(FRing, 1, 50, nil));
+  LSubmitted := 4711;
+  LResult := SubmitIoRing(FRing, 1, 50, @LSubmitted);
+  Log(Format('VERIFY: SubmitIoRing wait timeout returns %s, submittedEntries %d', [HrToStr(LResult), LSubmitted]));
+  CheckResult('Wait timeout', HResultFromWin32(WIN32_ERROR_TIMEOUT), LResult);
 
   // The entry was submitted: nothing is left to submit
   LSubmitted := 4711;
   CheckResult('Second submit', S_OK, SubmitIoRing(FRing, 0, 0, @LSubmitted));
+  Log(Format('VERIFY: next SubmitIoRing submits %d entries', [LSubmitted]));
   AssertEquals('Left to submit', Int64(0), Int64(LSubmitted));
 
   CheckResult('Build cancel', S_OK, BuildIoRingCancelRequest(FRing, IoRingHandleRefFromHandle(LClient), 1, 2));
@@ -567,6 +615,7 @@ var
   LRound: Integer;
   LEntry: Integer;
   LUserData: NativeUInt;
+  LResult: HRESULT;
 begin
   FRing := NewRing(8);
   CheckResult('Info', S_OK, GetIoRingInfo(FRing, LInfo));
@@ -587,7 +636,10 @@ begin
         SubmitIoRing(FRing, IORING_SUBMIT_WAIT_ALL, WAIT_TIMEOUT_MS, nil));
   end;
 
-  CheckResult('CQ full', IORING_E_COMPLETION_QUEUE_TOO_FULL, SubmitIoRing(FRing, 0, 0, nil));
+  LResult := SubmitIoRing(FRing, 0, 0, nil);
+  Log(Format('VERIFY: submit with full CQ (SQ=%d CQ=%d) returns %s',
+    [LInfo.SubmissionQueueSize, LInfo.CompletionQueueSize, HrToStr(LResult)]));
+  CheckResult('CQ full', IORING_E_COMPLETION_QUEUE_TOO_FULL, LResult);
 
   AssertEquals('Popped', Integer(LInfo.CompletionQueueSize), Length(PopAll(FRing)));
   CheckResult('Submit after popping', S_OK, SubmitIoRing(FRing, IORING_SUBMIT_WAIT_ALL, WAIT_TIMEOUT_MS, nil));
@@ -611,9 +663,13 @@ begin
   try
     LThread.Start;
     Sleep(200);
+    // Main thread submits while the thread is waiting inside SubmitIoRing
     LMainResult := SubmitIoRing(FRing, 0, 0, nil);
+    Log('VERIFY: SubmitIoRing while another thread waits in SubmitIoRing returns ' + HrToStr(LMainResult));
+    // Complete the pipe read so the thread returns
     WriteByteToPipe(LServer, 42);
     LThread.WaitFor;
+    Log('VERIFY: waiting SubmitIoRing on the other thread returned ' + HrToStr(LThread.Result));
 
     CheckResult('Submit while the other thread waits', IORING_E_SUBMIT_IN_PROGRESS, LMainResult);
     CheckResult('Waiting thread', S_OK, LThread.Result);
@@ -633,7 +689,7 @@ var
   LCompletions: TCompletionArray;
   LCqe: IORING_CQE;
 begin
-  LFileName := TTestFileHelpers.CreatePatternFile(FILE_SIZE, 'FpcEof');
+  LFileName := TTestFileHelpers.CreatePatternFile(FILE_SIZE, 'Eof');
   FResources.AddFile(LFileName);
   FRing := NewRing;
   LFile := FResources.OpenFile(LFileName);
@@ -650,15 +706,18 @@ begin
   AssertEquals('Completions', 3, Length(LCompletions));
 
   LCqe := FindCompletion(LCompletions, 1);
+  Log(Format('VERIFY: read crossing EOF: %s, %d bytes', [HrToStr(LCqe.ResultCode), LCqe.Information]));
   CheckResult('Crossing EOF', S_OK, LCqe.ResultCode);
   AssertEquals('Crossing EOF bytes', Int64(FILE_SIZE), Int64(LCqe.Information));
   CheckPattern(0, @LBuffers[0], FILE_SIZE);
 
   LCqe := FindCompletion(LCompletions, 2);
+  Log(Format('VERIFY: read starting at EOF: %s, %d bytes', [HrToStr(LCqe.ResultCode), LCqe.Information]));
   CheckResult('At EOF', HResultFromWin32(ERROR_HANDLE_EOF), LCqe.ResultCode);
   AssertEquals('At EOF bytes', Int64(0), Int64(LCqe.Information));
 
   LCqe := FindCompletion(LCompletions, 3);
+  Log(Format('VERIFY: read starting after EOF: %s, %d bytes', [HrToStr(LCqe.ResultCode), LCqe.Information]));
   CheckResult('After EOF', HResultFromWin32(ERROR_HANDLE_EOF), LCqe.ResultCode);
 end;
 
@@ -677,6 +736,8 @@ begin
 
   LCompletions := PopAll(FRing);
   AssertEquals('Completions', 1, Length(LCompletions));
+  Log(Format('VERIFY: read on non-overlapped handle: %s, %d bytes',
+    [HrToStr(LCompletions[0].ResultCode), LCompletions[0].Information]));
   CheckResult('Read', S_OK, LCompletions[0].ResultCode);
   CheckPattern(8192, @LBuffer, SizeOf(LBuffer));
 end;
@@ -687,6 +748,8 @@ var
   LClient: THandle;
   LRing: HIORING;
   LRingBuffer: array[0..15] of Byte;
+  LStart: UInt64;
+  LCloseTime: UInt64;
 begin
   LRing := NewRing;
   FResources.OpenPipePair(LServer, LClient);
@@ -696,10 +759,15 @@ begin
     IoRingBufferRefFromPointer(@LRingBuffer), SizeOf(LRingBuffer), 0, 1, IOSQE_FLAGS_NONE));
   CheckResult('Submit', S_OK, SubmitIoRing(LRing, 0, 0, nil));
   Sleep(50);
+  LStart := TThread.GetTickCount64;
   CheckResult('Close', S_OK, CloseIoRing(LRing));
+  LCloseTime := TThread.GetTickCount64 - LStart;
 
   WriteByteToPipe(LServer, 42);
   Sleep(50);
+
+  Log(Format('VERIFY: CloseIoRing with a pending read took %d ms; ring buffer[0] afterwards = %d',
+    [LCloseTime, LRingBuffer[0]]));
 
   AssertEquals('The closed ring''s read still completed into the buffer', 42, LRingBuffer[0]);
 end;
@@ -723,10 +791,11 @@ begin
   CheckResult('Wait', S_OK, SubmitIoRing(FRing, 1, WAIT_TIMEOUT_MS, nil));
   LCompletions := PopAll(FRing);
   AssertEquals('Completions', 1, Length(LCompletions));
+  Log('VERIFY: ring read after CancelIoEx completes with ' + HrToStr(LCompletions[0].ResultCode));
   CheckResult('Cancelled', HResultFromWin32(ERROR_OPERATION_ABORTED), LCompletions[0].ResultCode);
 end;
 
 initialization
-  RegisterTest(TWindowsIoRingApiTests);
+  RegisterTests(TWindowsIoRingApiTests);
 
 end.

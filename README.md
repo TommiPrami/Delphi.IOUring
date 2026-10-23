@@ -224,6 +224,8 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
 
 ## Building and testing
 
+- The tests are one set for Delphi and Free Pascal (`Source\UnitTests\Common`);
+  each compiler has its own runner.
 - Tests, Delphi: `Source\UnitTests\Delphi.IOUring.UnitTests.dproj` (DUnitX, Win32 and Win64).
 - Tests, Free Pascal: `Source\Build-FPC.ps1 -Project Tests -Platform Win32 -Run`
   (FPCUnit; calls the compiler directly, no `fpc.exe` or `lazbuild` needed).
@@ -233,7 +235,8 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
   Lazarus project: `Source\UnitTests\FPC\Delphi.IOUring.UnitTests.FPC.lpi`.
 - Tests, Linux: `Source\Build-FPC.ps1 -Project Tests -Platform Linux64 -Run`
   builds and runs them in WSL, with the FPC installed there (Ubuntu:
-  `sudo apt install fpc`). So far they test the Linux API translation.
+  `sudo apt install fpc`). So far they test the Linux API translation (the
+  rest of the tests follow with the Linux ring).
 - Benchmarks: `Source\Benchmarks\Delphi.IOUring.Benchmarks.dproj`, and for Free
   Pascal `Source\Build-FPC.ps1 -Project Benchmarks` – see
   [Docs/Benchmarks.md](Docs/Benchmarks.md). The engine's data structures

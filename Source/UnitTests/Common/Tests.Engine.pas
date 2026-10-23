@@ -1,14 +1,14 @@
-﻿unit Tests.FPC.Engine;
+﻿unit Tests.Engine;
 
 {
-  Free Pascal version of Tests.Engine: reads, writes and flushes with their
-  results; end of file and errors; Wait with a timeout, TryGetResult,
-  WaitAll; callbacks on the I/O thread; batches; a full request pool;
-  Destroy with requests in flight; and stress with many producer threads
+  Tests for TIORingEngine (Delphi.IOUring.Engine): reads, writes and flushes
+  with their results; end of file and errors; Wait with a timeout,
+  TryGetResult, WaitAll; callbacks on the I/O thread; batches; a full request
+  pool; Destroy with requests in flight (they complete as cancelled, and a
+  thread blocked in Wait wakes up); and stress with many producer threads
   doing random reads whose data is checked.
 
-  The thread bodies are methods of the test case (Work*), run by
-  TWorkerThread (Tests.FPC.Support).
+  Pipes give requests that stay pending until the test writes to the pipe.
 }
 
 {$I Delphi.IOUring.inc}
@@ -16,12 +16,15 @@
 interface
 
 uses
+{$IFDEF FPC}
   Classes,
-  fpcunit,
+{$ELSE}
+  System.Classes,
+{$ENDIF}
   Delphi.IOUring,
   Delphi.IOUring.Engine,
   TestPlatformHelpers,
-  Tests.FPC.Support;
+  Tests.Support;
 
 type
   TIORingEngineTests = class(TIORingTestCase)
@@ -99,9 +102,13 @@ type
 implementation
 
 uses
+{$IFDEF FPC}
   SysUtils,
   Windows,
-  testregistry,
+{$ELSE}
+  System.SysUtils,
+  Winapi.Windows,
+{$ENDIF}
   Delphi.IOUring.Atomics,
   TestFileHelpers;
 
@@ -210,8 +217,8 @@ function TIORingEngineTests.WaitForCount(var AValue: Integer; const AExpected: I
 var
   LDeadline: UInt64;
 begin
-  LDeadline := GetTickCount64 + 5000;
-  while (TAtomic.LoadAcquire(AValue) <> AExpected) and (GetTickCount64 < LDeadline) do
+  LDeadline := TThread.GetTickCount64 + 5000;
+  while (TAtomic.LoadAcquire(AValue) <> AExpected) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
   Result := TAtomic.LoadAcquire(AValue) = AExpected;
 end;
@@ -354,10 +361,10 @@ begin
   FResources.OpenPipePair(LServer, LClient);
   LByte := 0;
   LHandle := FEngine.ReadAsync(LClient, LByte, 1, 0);
-  LStart := GetTickCount64;
+  LStart := TThread.GetTickCount64;
   AssertFalse('Times out', FEngine.Wait(LHandle, LCompletion, 50));
   // GetTickCount64 moves in steps of about 16 ms: 50 ms show as 46 or more
-  AssertTrue(Format('Waited only %d ms', [GetTickCount64 - LStart]), GetTickCount64 - LStart >= 45);
+  AssertTrue(Format('Waited only %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart >= 45);
 
   WriteByteToPipe(LServer, 42);
   AssertTrue('Still valid, completes', FEngine.Wait(LHandle, LCompletion, 5000));
@@ -382,12 +389,12 @@ begin
   LHandle := FEngine.ReadAsync(LClient, LByte, 1, 0);
   AssertFalse('Pending', FEngine.TryGetResult(LHandle, LCompletion));
   WriteByteToPipe(LServer, 7);
-  LDeadline := GetTickCount64 + 5000;
+  LDeadline := TThread.GetTickCount64 + 5000;
   repeat
     LDone := FEngine.TryGetResult(LHandle, LCompletion);
     if not LDone then
       Sleep(1);
-  until LDone or (GetTickCount64 > LDeadline);
+  until LDone or (TThread.GetTickCount64 > LDeadline);
   AssertTrue('Done after the write', LDone);
   AssertEquals('Byte', 7, LByte);
 end;
@@ -450,8 +457,8 @@ var
 begin
   FEngine := TIORingEngine.Create;
   FEngine.ReadAsync(FFile, LBuffer, SizeOf(LBuffer), 0, 0, RaiseInCallback);
-  LDeadline := GetTickCount64 + 5000;
-  while (FEngine.Stats.CallbackErrors = 0) and (GetTickCount64 < LDeadline) do
+  LDeadline := TThread.GetTickCount64 + 5000;
+  while (FEngine.Stats.CallbackErrors = 0) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
   CheckEqualsU64('Counted', 1, FEngine.Stats.CallbackErrors);
   // The I/O thread survived
@@ -660,9 +667,9 @@ begin
   Sleep(200);
   // Asleep, and it stays asleep: nothing wakes it without a reason
   AssertTrue(Format('Slept %d times when idle', [FEngine.Stats.Sleeps]), FEngine.Stats.Sleeps <= 2);
-  LStart := GetTickCount64;
+  LStart := TThread.GetTickCount64;
   FreeAndNil(FEngine);
-  AssertTrue(Format('Took %d ms', [GetTickCount64 - LStart]), GetTickCount64 - LStart < 1000);
+  AssertTrue(Format('Took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 1000);
 end;
 
 { Several I/O threads }
@@ -781,8 +788,8 @@ begin
     FResources.OpenPipePair(LServer[LIndex], LClient[LIndex]);
     FEngine.ReadAsync(LClient[LIndex], LBytes[LIndex], 1, 0, LIndex, RecordCompletion);
   end;
-  LDeadline := GetTickCount64 + 5000;
-  while (FEngine.Stats.Requests < PIPES) and (GetTickCount64 < LDeadline) do
+  LDeadline := TThread.GetTickCount64 + 5000;
+  while (FEngine.Stats.Requests < PIPES) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
   CheckEqualsU64('All taken by the I/O threads', PIPES, FEngine.Stats.Requests);
   AssertTrue(Format('%d I/O threads took requests', [BusyIOThreads]), BusyIOThreads >= 2);
@@ -896,6 +903,6 @@ begin
 end;
 
 initialization
-  RegisterTest(TIORingEngineTests);
+  RegisterTests(TIORingEngineTests);
 
 end.

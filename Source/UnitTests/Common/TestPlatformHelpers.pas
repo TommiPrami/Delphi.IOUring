@@ -2,10 +2,11 @@
 
 {
   Windows helpers for the tests: files, pipes and page-aligned memory that are
-  released automatically, plus small HRESULT helpers.
+  released automatically, a thread that writes to a pipe later, plus small
+  HRESULT helpers. The Linux side comes with TLinuxIORing (Phase 20).
 
-  No test framework dependency (failures raise exceptions), so the helpers can
-  later be used from FPCUnit tests too.
+  No test framework dependency (failures raise exceptions): used by the
+  Delphi and the Free Pascal tests.
 }
 
 {$I Delphi.IOUring.inc}
@@ -14,9 +15,11 @@ interface
 
 uses
 {$IFDEF FPC}
-  Windows;
+  Windows,
+  Classes;
 {$ELSE}
-  Winapi.Windows;
+  Winapi.Windows,
+  System.Classes;
 {$ENDIF}
 
 type
@@ -44,6 +47,19 @@ type
     // Connected named pipe pair, both ends overlapped. Reads from AClient stay
     // pending until something is written to AServer.
     procedure OpenPipePair(out AServer, AClient: THandle);
+  end;
+
+  // Writes one byte to a pipe after a delay. Create, then Start; WaitFor and
+  // Free when done.
+  TDelayedPipeWriter = class(TThread)
+  private
+    FPipe: THandle;
+    FDelayMilliseconds: Cardinal;
+    FValue: Byte;
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(const APipe: THandle; const ADelayMilliseconds: Cardinal; const AValue: Byte);
   end;
 
 // Writes one byte to an overlapped pipe handle and waits until it is written
@@ -171,6 +187,22 @@ begin
   finally
     CloseHandle(LOverlapped.hEvent);
   end;
+end;
+
+{ TDelayedPipeWriter }
+
+constructor TDelayedPipeWriter.Create(const APipe: THandle; const ADelayMilliseconds: Cardinal; const AValue: Byte);
+begin
+  FPipe := APipe;
+  FDelayMilliseconds := ADelayMilliseconds;
+  FValue := AValue;
+  inherited Create(True);
+end;
+
+procedure TDelayedPipeWriter.Execute;
+begin
+  Sleep(FDelayMilliseconds);
+  WriteByteToPipe(FPipe, FValue);
 end;
 
 function PageSize: NativeUInt;

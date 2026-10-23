@@ -1,9 +1,9 @@
-﻿unit Tests.FPC.Streams;
+﻿unit Tests.Streams;
 
 {
-  Free Pascal version of Tests.Streams: TSequentialReadOnlyFileStream with
-  FPC's TStream, compared with TFileStream, plus the seek/write rules and the
-  usual RTL helpers.
+  Tests for TSequentialReadOnlyFileStream (Delphi.IOUring.Streams): same
+  content as TFileStream, the seek and write rules, and use through the
+  usual RTL helpers (CopyFrom, LoadFromStream, TStreamReader).
 }
 
 {$I Delphi.IOUring.inc}
@@ -11,10 +11,13 @@
 interface
 
 uses
+{$IFDEF FPC}
   Classes,
-  fpcunit,
+{$ELSE}
+  System.Classes,
+{$ENDIF}
   TestPlatformHelpers,
-  Tests.FPC.Support;
+  Tests.Support;
 
 type
   TSequentialReadOnlyFileStreamTests = class(TIORingTestCase)
@@ -32,6 +35,10 @@ type
     procedure SeekOld32;
     procedure WriteBytes;
     procedure WriteBufferBytes;
+{$IFNDEF FPC}
+    procedure WriteTBytes;
+    procedure Write64TBytes;
+{$ENDIF}
     procedure SetSizeTen;
     procedure SetSizeSame;
   protected
@@ -40,11 +47,17 @@ type
   published
     procedure Content_SameAsFileStream;
     procedure Content_Unbuffered;
+{$IFNDEF FPC}
+    // TStream.Read(TBytes, ...), Read64 and ReadData: Free Pascal 3.2.2's
+    // TStream does not have them
+    procedure ReadOverloads_Work;
+{$ENDIF}
     procedure ReadBuffer_PastEnd_RaisesEReadError;
     procedure PositionAndSize_AtAllTimes;
     procedure SeekToCurrentPosition_IsAllowed;
     procedure SeekElsewhere_Raises;
-    procedure WriteAndSetSize_Raise;
+    procedure Write_Raises;
+    procedure SetSize_Raises;
     procedure StreamError_IsAnEStreamError;
     procedure MemoryStream_CopyFromWholeStream;
     procedure MemoryStream_CopyFromPartsThenRest;
@@ -58,9 +71,12 @@ type
 implementation
 
 uses
+{$IFDEF FPC}
   SysUtils,
-  streamex,
-  testregistry,
+  streamex,             // TStreamReader
+{$ELSE}
+  System.SysUtils,
+{$ENDIF}
   Delphi.IOUring,
   Delphi.IOUring.SequentialReader,
   Delphi.IOUring.Streams,
@@ -142,6 +158,24 @@ begin
   FillChar(LBytes, SizeOf(LBytes), 0);
   FStream.WriteBuffer(LBytes, SizeOf(LBytes));
 end;
+
+{$IFNDEF FPC}
+procedure TSequentialReadOnlyFileStreamTests.WriteTBytes;
+var
+  LBytes: TBytes;
+begin
+  SetLength(LBytes, 10);
+  FStream.Write(LBytes, 0, 10);
+end;
+
+procedure TSequentialReadOnlyFileStreamTests.Write64TBytes;
+var
+  LBytes: TBytes;
+begin
+  SetLength(LBytes, 10);
+  FStream.Write64(LBytes, 0, 10);
+end;
+{$ENDIF}
 
 procedure TSequentialReadOnlyFileStreamTests.SetSizeTen;
 begin
@@ -234,6 +268,30 @@ begin
   AssertEquals('Read after the end', 0, FStream.Read(LBuffer[0], 1));
 end;
 
+{$IFNDEF FPC}
+procedure TSequentialReadOnlyFileStreamTests.ReadOverloads_Work;
+const
+  FILE_SIZE = 10000;
+var
+  LBytes: TBytes;
+begin
+  FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 2);
+  SetLength(LBytes, 3000);
+
+  // TBytes + offset
+  AssertEquals('Read(TBytes, Offset, Count)', 1000, FStream.Read(LBytes, 500, 1000));
+  CheckPattern(0, @LBytes[500], 1000, 'Read(TBytes, Offset, Count)');
+
+  AssertEquals('Read64', 2000, FStream.Read64(LBytes, 0, 2000));
+  CheckPattern(1000, @LBytes[0], 2000, 'Read64');
+
+  AssertEquals('ReadData', 100, FStream.ReadData(LBytes, 100));
+  CheckPattern(3000, @LBytes[0], 100, 'ReadData');
+
+  AssertEquals('Position', 3100, FStream.Position);
+end;
+{$ENDIF}
+
 procedure TSequentialReadOnlyFileStreamTests.ReadBuffer_PastEnd_RaisesEReadError;
 var
   LBuffer: array[0..199] of Byte;
@@ -313,14 +371,23 @@ begin
   AssertEquals('Still reads', Int64(2 * SizeOf(LBuffer)), FStream.Position);
 end;
 
-procedure TSequentialReadOnlyFileStreamTests.WriteAndSetSize_Raise;
+procedure TSequentialReadOnlyFileStreamTests.Write_Raises;
 begin
   FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(SMALL_BUFFER), [], SMALL_BUFFER, 1);
   CheckRaisesStreamError('Write', WriteBytes);
   CheckRaisesStreamError('WriteBuffer', WriteBufferBytes);
+{$IFNDEF FPC}
+  CheckRaisesStreamError('Write(TBytes)', WriteTBytes);
+  CheckRaisesStreamError('Write64', Write64TBytes);
+{$ENDIF}
+  AssertEquals('Position', Int64(0), FStream.Position);
+end;
+
+procedure TSequentialReadOnlyFileStreamTests.SetSize_Raises;
+begin
+  FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(SMALL_BUFFER), [], SMALL_BUFFER, 1);
   CheckRaisesStreamError('Size := 10', SetSizeTen);
   CheckRaisesStreamError('Size := Size', SetSizeSame);
-  AssertEquals('Position', Int64(0), FStream.Position);
   AssertEquals('Size', Int64(SMALL_BUFFER), FStream.Size);
 end;
 
@@ -414,21 +481,35 @@ var
   LIndex: Integer;
   LReader: TStreamReader;
 begin
-  LFileName := TTestFileHelpers.NewTestFileName('FpcLines');
+  LFileName := TTestFileHelpers.NewTestFileName('Lines');
   FResources.AddFile(LFileName);
 
   LLines := TStringList.Create;
   try
     for LIndex := 1 to LINE_COUNT do
       LLines.Add(Format('Line %d: %s', [LIndex, StringOfChar(Char(Ord('a') + LIndex mod 26), LIndex mod 97)]));
+{$IFDEF FPC}
     LLines.SaveToFile(LFileName);
+{$ELSE}
+    LLines.WriteBOM := False;
+    LLines.SaveToFile(LFileName, TEncoding.UTF8);
+{$ENDIF}
 
     FStream := TSequentialReadOnlyFileStream.Create(LFileName, [], SMALL_BUFFER, 2);
+    // The two RTLs have different TStreamReader classes (FPC: unit streamex)
+{$IFDEF FPC}
     LReader := TStreamReader.Create(FStream, 4096, False);
+{$ELSE}
+    LReader := TStreamReader.Create(FStream, TEncoding.UTF8);
+{$ENDIF}
     try
       for LIndex := 0 to LINE_COUNT - 1 do
         AssertEquals(Format('Line %d', [LIndex + 1]), LLines[LIndex], LReader.ReadLine);
+{$IFDEF FPC}
       AssertTrue('End', LReader.EOF);
+{$ELSE}
+      AssertTrue('End', LReader.EndOfStream);
+{$ENDIF}
     finally
       LReader.Free;
     end;
@@ -445,10 +526,13 @@ var
 begin
   LRaised := False;
   try
-    TSequentialReadOnlyFileStream.Create(TTestFileHelpers.NewTestFileName('FpcMissing')).Free;
+    TSequentialReadOnlyFileStream.Create(TTestFileHelpers.NewTestFileName('Missing')).Free;
   except
-    on EFOpenError do
+    on E: EFOpenError do
+    begin
       LRaised := True;
+      Log(E.Message);
+    end;
   end;
   AssertTrue('Like TFileStream, a missing file raises EFOpenError', LRaised);
 end;
@@ -486,6 +570,6 @@ begin
 end;
 
 initialization
-  RegisterTest(TSequentialReadOnlyFileStreamTests);
+  RegisterTests(TSequentialReadOnlyFileStreamTests);
 
 end.

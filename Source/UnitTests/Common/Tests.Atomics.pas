@@ -1,14 +1,22 @@
-﻿unit Tests.FPC.Atomics;
+﻿unit Tests.Atomics;
 
 {
-  Free Pascal version of Tests.Atomics: TAtomic's result for every type
-  (64-bit values with different upper and lower halves), and the
-  multi-thread tests - exact counters, no torn 64-bit reads, data handed over
-  with StoreRelease/LoadAcquire, a spin loop that sees another thread's
-  write, and sleep/wake without lost wake-ups.
+  Tests for TAtomic (Delphi.IOUring.Atomics).
 
-  FPC 3.2.2 has no anonymous methods, so the thread bodies are methods of
-  the test case (Work*), run by TWorkerThread.
+  One thread: the result of every operation for every type. 64-bit values
+  have different upper and lower halves, so a Win32 version that handles
+  only one half fails.
+
+  Several threads: counters that must come out exact, 64-bit reads that must
+  never see half of a write, data handed over with StoreRelease/LoadAcquire,
+  a spin loop that must see another thread's write, and sleep/wake without
+  lost wake-ups.
+
+  The compiler-related tests (the spin loop, the hand-over) mean most with
+  optimization on: run them in the Release configuration too (Free Pascal:
+  Build-FPC.ps1 -Optimize).
+
+  The thread bodies are methods of the test (Work*), run by RunThreads.
 }
 
 {$I Delphi.IOUring.inc}
@@ -16,9 +24,12 @@
 interface
 
 uses
+{$IFDEF FPC}
   Classes,
-  fpcunit,
-  Tests.FPC.Support;
+{$ELSE}
+  System.Classes,
+{$ENDIF}
+  Tests.Support;
 
 type
   TAtomicTests = class(TIORingTestCase)
@@ -71,8 +82,11 @@ type
 implementation
 
 uses
+{$IFDEF FPC}
   SysUtils,
-  testregistry,
+{$ELSE}
+  System.SysUtils,
+{$ENDIF}
   Delphi.IOUring.Atomics;
 
 const
@@ -535,9 +549,9 @@ var
   LStart: UInt64;
 begin
   FValue32 := 1;
-  LStart := GetTickCount64;
+  LStart := TThread.GetTickCount64;
   AssertTrue('Result', TAtomic.WaitWhileEqual(FValue32, 0, 5000));
-  AssertTrue(Format('Waited %d ms', [GetTickCount64 - LStart]), GetTickCount64 - LStart < 1000);
+  AssertTrue(Format('Waited %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 1000);
 end;
 
 procedure TAtomicTests.Wait_Timeout_ReturnsFalse;
@@ -545,9 +559,9 @@ var
   LStart: UInt64;
   LElapsed: UInt64;
 begin
-  LStart := GetTickCount64;
+  LStart := TThread.GetTickCount64;
   AssertFalse('Result', TAtomic.WaitWhileEqual(FValue32, 0, 50));
-  LElapsed := GetTickCount64 - LStart;
+  LElapsed := TThread.GetTickCount64 - LStart;
   // GetTickCount64 moves in steps of about 16 ms
   AssertTrue(Format('Waited only %d ms', [LElapsed]), LElapsed >= 30);
 end;
@@ -561,7 +575,7 @@ begin
   try
     LThread.Start;
     Sleep(50); // let it fall asleep
-    LStart := GetTickCount64;
+    LStart := TThread.GetTickCount64;
     TAtomic.Exchange(FValue32, 1);
     TAtomic.WakeOne(FValue32);
     LThread.WaitFor;
@@ -569,7 +583,7 @@ begin
     LThread.Free;
   end;
   AssertEquals('Woken and saw the new value', 1, FWoken);
-  AssertTrue(Format('Wake-up took %d ms', [GetTickCount64 - LStart]), GetTickCount64 - LStart < 5000);
+  AssertTrue(Format('Wake-up took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 5000);
 end;
 
 procedure TAtomicTests.WakeAll_WakesAllSleepingThreads;
@@ -584,7 +598,7 @@ begin
     for LIndex := 0 to High(LThreads) do
       LThreads[LIndex].Start;
     Sleep(100); // let them fall asleep
-    LStart := GetTickCount64;
+    LStart := TThread.GetTickCount64;
     TAtomic.Exchange(FValue32, 1);
     TAtomic.WakeAll(FValue32);
     for LIndex := 0 to High(LThreads) do
@@ -594,7 +608,7 @@ begin
       LThreads[LIndex].Free;
   end;
   AssertEquals('Woken and saw the new value', THREAD_COUNT, FWoken);
-  AssertTrue(Format('Wake-up took %d ms', [GetTickCount64 - LStart]), GetTickCount64 - LStart < 5000);
+  AssertTrue(Format('Wake-up took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 5000);
 end;
 
 procedure TAtomicTests.Stress_PingPong_NoLostWakeUps;
@@ -611,6 +625,6 @@ begin
 end;
 
 initialization
-  RegisterTest(TAtomicTests);
+  RegisterTests(TAtomicTests);
 
 end.

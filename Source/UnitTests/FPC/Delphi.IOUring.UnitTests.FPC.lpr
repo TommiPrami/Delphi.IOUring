@@ -1,13 +1,16 @@
 ﻿program Delphi.IOUring.UnitTests.FPC;
 
 {
-  Free Pascal test runner (FPCUnit, console).
+  Free Pascal test runner (FPCUnit, console), for Windows and Linux.
 
-  The Delphi tests use DUnitX, which Free Pascal cannot compile, so the FPC
-  tests are separate units (Tests.FPC.*) that check the same things.
-  The helpers TestFileHelpers and TestPlatformHelpers are shared.
+  The tests are the same units as for Delphi (Source\UnitTests\Common: the
+  base class in Tests.Support hides the difference between FPCUnit and
+  DUnitX). Linux-only tests are in Source\UnitTests\Linux. On Linux only
+  what works there runs so far (the shared suites need TLinuxIORing,
+  Phase 20).
 
   Build and run:  Source\Build-FPC.ps1 -Project Tests -Platform Win32 -Run
+                  (Win64, or Linux64: built and run in WSL)
   Runs all tests, prints every test and failure, and exits with 1 if anything
   failed (a small runner of its own, so the exit code does not depend on the
   FPCUnit console runner's version).
@@ -16,24 +19,36 @@
 {$I Delphi.IOUring.inc}
 
 uses
+{$IFDEF UNIX}
+  cthreads,           // threads on Linux: must come first
+{$ENDIF}
   SysUtils,
   Classes,
+{$IFDEF UNIX}
+  BaseUnix,
+{$ENDIF}
   fpcunit,
   testregistry,
-  Tests.FPC.Support,
-  Tests.FPC.TestFileHelpers,
-  Tests.FPC.Backend.Windows.API.Layout,
-  Tests.FPC.Backend.Windows.API,
-  Tests.FPC.Ring,
-  Tests.FPC.SequentialReader,
-  Tests.FPC.Streams,
-  Tests.FPC.Atomics,
-  Tests.FPC.RequestPool,
-  Tests.FPC.RequestQueue,
-  Tests.FPC.Engine,
-  Tests.FPC.BlockReader,
-  Tests.FPC.EngineOverlap,
-  Tests.FPC.SequentialWriter;
+  Tests.Support,
+{$IFDEF MSWINDOWS}
+  Tests.Backend.Windows.API.Layout,
+  Tests.Backend.Windows.API,
+  Tests.Ring,
+  Tests.SequentialReader,
+  Tests.Streams,
+  Tests.Atomics,
+  Tests.RequestPool,
+  Tests.RequestQueue,
+  Tests.Engine,
+  Tests.BlockReader,
+  Tests.EngineOverlap,
+  Tests.SequentialWriter,
+{$ENDIF}
+{$IFDEF LINUX}
+  Tests.Linux.Backend.Posix.API.Layout,
+  Tests.Linux.Backend.Posix.API,
+{$ENDIF}
+  Tests.TestFileHelpers;
 
 type
   // TComponent: interface without reference counting, as TTestResult expects
@@ -81,11 +96,24 @@ procedure TConsoleListener.EndTestSuite(ATestSuite: TTestSuite);
 begin
 end;
 
+{$IFDEF UNIX}
+function KernelRelease: string;
+var
+  LName: UtsName;
+begin
+  if FpUname(LName) = 0 then
+    Result := PChar(@LName.Release[0])
+  else
+    Result := '?';
+end;
+{$ENDIF}
+
 var
   LResult: TTestResult;
   LListener: TConsoleListener;
 begin
-  Writeln('Delphi.IOUring tests (Free Pascal ', {$I %FPCVERSION%}, ', ', {$I %FPCTARGETCPU%}, ')');
+  Writeln('Delphi.IOUring tests (Free Pascal ', {$I %FPCVERSION%}, ', ', {$I %FPCTARGETCPU%}, '-',
+    {$I %FPCTARGETOS%}, {$IFDEF UNIX}', kernel ', KernelRelease, {$ENDIF}')');
   Writeln;
 
   LResult := TTestResult.Create;

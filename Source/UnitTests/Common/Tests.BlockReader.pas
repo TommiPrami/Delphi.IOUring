@@ -1,13 +1,12 @@
-﻿unit Tests.FPC.BlockReader;
+﻿unit Tests.BlockReader;
 
 {
-  Free Pascal version of Tests.BlockReader: order and data, a lazy provider,
-  merging (touching and MaxGap), blocks that go backwards or overlap, the end
-  of the file, TryGetBlock without waiting, errors, Close with a read in
-  flight, and several readers sharing one engine.
-
-  The thread body is a method of the test case (WorkReader), run by
-  TWorkerThread (Tests.FPC.Support).
+  Tests for TIORingBlockReader (Delphi.IOUring.BlockReader): blocks come out
+  in the provider's order with the right data; the provider is asked lazily;
+  neighbouring blocks are merged (touching, and with MaxGap); blocks that go
+  backwards or overlap; the end of the file; TryGetBlock without waiting;
+  errors (arguments, a failed read, wrong call order); Close with a read in
+  flight; and several readers on their own threads sharing one engine.
 }
 
 {$I Delphi.IOUring.inc}
@@ -15,13 +14,16 @@
 interface
 
 uses
+{$IFDEF FPC}
   Classes,
-  fpcunit,
+{$ELSE}
+  System.Classes,
+{$ENDIF}
   Delphi.IOUring,
   Delphi.IOUring.Engine,
   Delphi.IOUring.BlockReader,
   TestPlatformHelpers,
-  Tests.FPC.Support;
+  Tests.Support;
 
 type
   TBlockArray = array of TIORingBlock;
@@ -62,8 +64,11 @@ type
 implementation
 
 uses
+{$IFDEF FPC}
   SysUtils,
-  testregistry,
+{$ELSE}
+  System.SysUtils,
+{$ENDIF}
   Delphi.IOUring.Atomics,
   TestFileHelpers;
 
@@ -436,10 +441,10 @@ begin
   LWriter := TDelayedPipeWriter.Create(LServer, 100, 1);
   try
     LWriter.Start;
-    LStart := GetTickCount64;
+    LStart := TThread.GetTickCount64;
     LReader.Close;    // the pipe read writes into the reader's buffer: Close waits for it
     // GetTickCount64 moves in steps of about 16 ms
-    AssertTrue(Format('Closed after only %d ms', [GetTickCount64 - LStart]), GetTickCount64 - LStart >= 75);
+    AssertTrue(Format('Closed after only %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart >= 75);
     LWriter.WaitFor;
   finally
     LWriter.Free;
@@ -510,6 +515,6 @@ begin
 end;
 
 initialization
-  RegisterTest(TBlockReaderTests);
+  RegisterTests(TBlockReaderTests);
 
 end.

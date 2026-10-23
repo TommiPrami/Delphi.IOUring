@@ -40,31 +40,31 @@ Source/
     Delphi.IOUring.BlockReader.pas           TIORingBlockReader: known blocks, read-ahead, merging (new)
   Build-FPC.ps1                              builds/runs the FPC tests or benchmark (no fpc.exe/lazbuild needed; -Optimize; -Platform Linux64 in WSL)
   UnitTests/
-    Delphi.IOUring.UnitTests.dpr/.dproj      DUnitX console runner (Delphi)
-    FPC/                                     Free Pascal tests (FPCUnit), separate from the DUnitX ones
-      Delphi.IOUring.UnitTests.FPC.lpr/.lpi  runner (own small console runner on FPCUnit)
-      Tests.FPC.*.pas                        the same checks as the Delphi test units
-    Linux/                                   Linux tests (FPCUnit; built and run in WSL by Build-FPC.ps1 -Platform Linux64)
-      Delphi.IOUring.UnitTests.Linux.lpr     runner
+    Delphi.IOUring.UnitTests.dpr/.dproj      Delphi runner (DUnitX console, TestInsight)
+    Common/                                  the tests, the same for Delphi and Free Pascal (Design §12.4)
+      Tests.Support.pas                      base class over DUnitX / FPCUnit, threads, shared pattern files
+      Tests.Backend.Windows.API.Layout.pas   record layouts + helpers (Windows)
+      Tests.Backend.Windows.API.pas          live API calls (Windows)
+      Tests.Ring.pas                         the core ring (TIORing)
+      Tests.SequentialReader.pas             the read-ahead reader
+      Tests.Streams.pas                      TSequentialReadOnlyFileStream
+      Tests.Atomics.pas                      TAtomic, incl. multi-thread stress
+      Tests.RequestPool.pas                  free list and request pool, incl. an engine simulation
+      Tests.RequestQueue.pas                 request queue, incl. wrap-around and producer/consumer stress
+      Tests.Engine.pas                       the engine: results, waiting, callbacks, batches, Destroy, stress
+      Tests.BlockReader.pas                  the block reader: order, merging, end of file, errors, shared engine
+      Tests.EngineOverlap.pas                the overlap rule: order cases, pipes, model tests
+      Tests.SequentialWriter.pas             the writer and the write stream: round trips, Flush, unbuffered, failed writes
+      Tests.TestFileHelpers.pas              the test-file helpers themselves
+      TestFileHelpers.pas                    generates deterministic test files
+      TestPlatformHelpers.pas                files, pipes, page memory for tests (Windows; Linux in Phase 20)
+    FPC/                                     the Free Pascal runner, for Windows and Linux
+      Delphi.IOUring.UnitTests.FPC.lpr/.lpi  own small console runner on FPCUnit; Lazarus project (Windows)
+    Linux/                                   the Linux-only tests (built and run in WSL by Build-FPC.ps1 -Platform Linux64)
       Tests.Linux.Backend.Posix.API.Layout.pas  sizes, offsets and constants against the C header
       Tests.Linux.Backend.Posix.API.Layout.inc  those checks, generated from the C header (do not edit)
       Tests.Linux.Backend.Posix.API.pas      live calls to the kernel
       PosixApiLayout.c, Generate-PosixApiLayout.sh  the generator of the .inc (gcc, on Linux)
-    Tests.Backend.Windows.API.Layout.pas     record layouts + helpers
-    Tests.Backend.Windows.API.pas            live API calls
-    Tests.Ring.pas                           the core ring (TIORing)
-    Tests.SequentialReader.pas               the read-ahead reader
-    Tests.Streams.pas                        TSequentialReadOnlyFileStream
-    Tests.Atomics.pas                        TAtomic, incl. multi-thread stress
-    Tests.RequestPool.pas                    free list and request pool, incl. an engine simulation
-    Tests.RequestQueue.pas                   request queue, incl. wrap-around and producer/consumer stress
-    Tests.Engine.pas                         the engine: results, waiting, callbacks, batches, Destroy, stress
-    Tests.BlockReader.pas                    the block reader: order, merging, end of file, errors, shared engine
-    Tests.EngineOverlap.pas                  the overlap rule: order cases, pipes, model tests
-    Tests.SequentialWriter.pas               the writer and the write stream: round trips, Flush, unbuffered, failed writes
-    TestFileHelpers.pas                      generates deterministic test files
-    TestPlatformHelpers.pas                  files, pipes, page memory for tests
-    TestThreadHelpers.pas                    starting threads together, busy waiting (Delphi tests)
   Benchmarks/
     Delphi.IOUring.Benchmarks.dpr/.dproj     console app, CSV output
     Bench.Common.pas                         consumer, timing, cache purge, test files (Delphi + FPC)
@@ -287,16 +287,25 @@ Source/
   - [ ] AArch64: written for it, not tested yet – needs an ARM machine ([VERIFY], Design §6.4).
 
   **Done 2026-10-23** – Linux: 25 tests pass in WSL2 (kernel 6.18, x86-64), with and without `-O3`. Windows: no code changes; the FPC tests (235) still pass on Win32 and Win64 with the changed `Build-FPC.ps1`.
-- **Phase 19** – `TLinuxIORing` record in `Delphi.IOUring.Backend.Posix`; `Atomics` gets AArch64-correct acquire/release; same `Tests.Ring` / reader / stream / engine suites run on Linux (WSL2 is enough for x86-64 development).
-- **Phase 20** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only.
+- **Phase 19** – One set of tests for Delphi, Free Pascal and Linux (Design §12.4): one shared unit per test topic in `Source/UnitTests/Common`, a base class over DUnitX and FPCUnit, the tests that only Delphi has ported, one Free Pascal test program for Windows and Linux. Ends with Delphi and FPC running the same tests on Windows.
+  - [x] Decided first (Design §12.4, decision 18): FPCUnit names for the checks, one Free Pascal runner for Windows and Linux, on main.
+  - [x] `Tests.Support`: the base class `TIORingTestCase` (FPCUnit's `TTestCase`, or a DUnitX fixture that resets itself before each test), `RegisterTests`, `RunThreads`, `Log`, `CheckPattern`, shared pattern files. Compiles on Linux too.
+  - [x] The 13 test topics moved to `Source/UnitTests/Common`, one unit each, made from the FPC twins; the tests and log lines that only Delphi had were ported. Old twins and `TestThreadHelpers` removed.
+  - [x] One Free Pascal runner (`FPC/Delphi.IOUring.UnitTests.FPC.lpr`) for Windows and Linux; the Linux tests use the same base class; `Build-FPC.ps1 -Platform Linux64` builds it in WSL.
+  - [x] Found on the way: DUnitX runs all tests of a class on one object (FPCUnit: one object per test); three tests had no counted check; RTL differences (`GetTickCount64`, `constref`, `TStreamReader`, `string` size) – Design §12.4.
+
+  **Done 2026-10-23** – Delphi 242 tests (Win32 and Win64, Debug and Release), FPC 241 on Windows (Win32 and Win64, with and without `-O3`), FPC 32 on Linux (WSL2, with and without `-O3`); `lazbuild` builds the Lazarus test project. Delphi has one test more (`ReadOverloads_Work`: overloads FPC 3.2.2's `TStream` lacks).
+- **Phase 20** – `TLinuxIORing` record in `Delphi.IOUring.Backend.Posix`; `Atomics` gets AArch64-correct acquire/release; same `Tests.Ring` / reader / stream / engine suites run on Linux (WSL2 is enough for x86-64 development).
+- **Phase 21** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only.
 
 ---
 
 ## Immediate next step
 
-Phase 18 is done: the Linux API unit with its layout and live tests. Next:
-**Phase 19 – `TLinuxIORing`** in `Delphi.IOUring.Backend.Posix`, built on the
-API unit: the ring memory with the right memory barriers, prepare / submit /
-complete like `TWindowsIORing`, and the shared test suites (ring, reader,
-stream, engine) running on Linux. To decide first: how those tests run on
-Linux – the FPC tests and their helpers call Windows in many places.
+Phase 19 is done: Delphi and Free Pascal run one set of tests
+(`Source/UnitTests/Common`), and one Free Pascal runner serves Windows and
+Linux. Next: **Phase 20 – `TLinuxIORing`** in `Delphi.IOUring.Backend.Posix`,
+built on the API unit: the ring memory with the right memory barriers,
+prepare / submit / complete like `TWindowsIORing`; the atomics' waiting on
+Linux (futex); the Linux side of `TestPlatformHelpers`; and the shared suites
+(ring, reader, stream, engine) running on Linux. Decisions first.
