@@ -24,7 +24,8 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Atomics for the engine (`Delphi.IOUring.Atomics`: CAS, acquire/release, wait/wake) | done, tested (Delphi and FPC) |
 | Request pool for the engine (`Delphi.IOUring.RequestPool`: slots, handles, lock-free free list) | done, tested, benchmarked against a lock |
 | Request queue for the engine (`Delphi.IOUring.RequestQueue`: lock-free, producers → I/O thread) | done, tested, benchmarked against a lock |
-| I/O engine (threads, many requests in flight), write stream | in progress |
+| I/O engine `TIORingEngine` (`Delphi.IOUring.Engine`: many threads, one I/O thread, many requests in flight) | done, tested; speed not measured yet |
+| Read stream with a block provider, more I/O threads, overlap rules, write stream | planned |
 | Linux `io_uring` through Free Pascal | planned |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
@@ -83,6 +84,34 @@ begin
   end;
 end;
 ```
+
+### The engine (many threads)
+
+```pascal
+uses
+  Delphi.IOUring, Delphi.IOUring.Engine;
+
+var
+  LEngine: TIORingEngine;             // one for the program, shared by all threads
+  LHandle: TIORingRequestHandle;
+  LCompletion: TIORingCompletion;
+begin
+  LEngine := TIORingEngine.Create;    // starts the I/O thread
+  try
+    // From any thread: start, do other work, then wait
+    LHandle := LEngine.ReadAsync(LFile, LBuffer, SizeOf(LBuffer), LOffset);
+    ...
+    LEngine.Wait(LHandle, LCompletion);
+    LCompletion.RaiseIfFailed('Read');
+  finally
+    LEngine.Free;                     // cancels what is left and waits for it
+  end;
+end;
+```
+
+Requests can also report back through a callback on the I/O thread, and
+`BeginBatch`/`EndBatch` sends many requests to the kernel with one call. The
+buffer and the file handle must stay valid until the request has completed.
 
 ### The ring itself
 

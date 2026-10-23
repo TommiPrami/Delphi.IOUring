@@ -6,7 +6,8 @@ complete Windows API unit, core ring (implementation notes in §5.2),
 sequential reader (notes in §7), read-only stream (notes in §8.1),
 benchmarks ([Benchmarks.md](Benchmarks.md)). Milestone 3 started: the
 atomics unit (Phase 10, notes in §10.6), the request pool (Phase 11, notes
-in §10.7) and the request queue (Phase 12, notes in §10.8). Things marked **[DECIDE]**
+in §10.7), the request queue (Phase 12, notes in §10.8) and the engine with one
+I/O thread (Phase 13, notes in §10.9). Things marked **[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
 **[VERIFIED]** with the answer once a test proves them. Decisions already made
@@ -234,8 +235,8 @@ barrier. That is the shape of the core API. Everything outside the subset
  ├────────────────────────────────────────────────────────────────────────┤
  │ Layer 2 – Helpers / engine (records where possible)                    │
  │   Delphi.IOUring.SequentialReader  TIORingSequentialReader (record)   │
- │   later: Delphi.IOUring.Engine     I/O thread(s), request pool,        │
- │                                    read streams, overlap handling      │
+ │   Delphi.IOUring.Engine            the I/O thread, Wait, callbacks     │
+ │                                    later: streams, overlap handling    │
  │   Delphi.IOUring.Atomics           CAS / fences / wait-on-address      │
  │   Delphi.IOUring.RequestPool       request slots, lock-free free list  │
  │   Delphi.IOUring.RequestQueue      lock-free queue to the I/O thread   │
@@ -267,7 +268,7 @@ Unit responsibilities:
 | `Delphi.IOUring.Atomics` *(new)* | `TAtomic`: one place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5, §10.6) | RTL only |
 | `Delphi.IOUring.RequestPool` *(new)* | `TIORingRequestPool` (request slots, states, handles, waiting) and `TIORingFreeList` (lock-free stack) (§10.3, §10.7) | `Delphi.IOUring`, Atomics |
 | `Delphi.IOUring.RequestQueue` *(new)* | `TIORingRequestQueue`: bounded lock-free queue from the producers to an I/O thread (§10.5, §10.8) | `Delphi.IOUring`, Atomics |
-| `Delphi.IOUring.Engine` *(later)* | §10, §11 | `Delphi.IOUring`, Atomics, RequestPool |
+| `Delphi.IOUring.Engine` *(new)* | `TIORingEngine`: one I/O thread with its own ring; `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`, callbacks, batches (§10.4, §10.9); later more threads and the overlap rules (§11) | `Delphi.IOUring`, Atomics, RequestPool, RequestQueue |
 
 The "all OS-specific code lives in the `Backend.<OS>` units" rule still holds:
 the `.API` units are the raw translation, the `Backend.<OS>` unit next to it
@@ -1060,7 +1061,8 @@ collect requests from all threads into a few rings. That is the engine.
 
 ### 10.4 Engine APIs (sketch)
 
-**Phase 13 decisions (2026-10-22, before coding; for review):**
+**Phase 13 decisions (2026-10-22, before coding; for review)** – built as
+written; implementation notes and findings in §10.9:
 
 - `TIORingEngine` (class, unit `Delphi.IOUring.Engine`):
   `Create(AMaxRequests = 1024, ASubmissionQueueSize = 256)` – request pool of
@@ -1124,7 +1126,7 @@ shutdown). On the hot path:
 | Producers → I/O thread | **Bounded MPSC/MPMC array queue** with a sequence number per cell (Vyukov style): producers claim a cell with one CAS on the tail counter, the I/O thread reads without CAS. No allocation, fixed memory. **Built in Phase 12 as a full MPMC queue (the consumer uses one CAS too), with backoff; it beats an SRW-lock queue everywhere** (§10.8, [Benchmarks.md](Benchmarks.md#request-queue-phase-12)). |
 | Request pool free list | **Lock-free stack** (Treiber) of slot indices. ABA problem solved with a tag/generation in the same word as the index, swapped with one CAS (64-bit CAS on Win32 = `CMPXCHG8B`). Optional per-thread small cache of free slots to avoid contention. **Built in Phase 11, with exponential backoff; it wins or ties against an SRW lock in every case measured** (§10.7, [Benchmarks.md](Benchmarks.md#engine-structures-phase-11)). The per-thread cache is not needed so far. |
 | I/O thread → waiting producer | Per-request **state word**. The waiter spins briefly, then sleeps with `WaitOnAddress` (Windows) / `futex` (Linux). The I/O thread calls `WakeByAddressSingle` only if the "someone is waiting" bit is set – no syscall when nobody sleeps. |
-| I/O thread sleeping | Waits on {request-queue signal, ring completion event}. Producers signal only when the I/O thread has announced it is going to sleep (a flag set with CAS), so a busy engine costs producers no syscall. |
+| I/O thread sleeping | Waits on {request-queue signal, ring completion event}. Producers signal only when the I/O thread has announced it is going to sleep (a flag set with CAS), so a busy engine costs producers no syscall. **Built in Phase 13** (§10.9). |
 | Counters / stats | Owned by one thread where possible; otherwise atomic increments on counters padded to their own **cache line** (64 bytes) to avoid false sharing. Queue head/tail counters are padded the same way. |
 
 All atomics go through one small unit, `Delphi.IOUring.Atomics` (CAS,
@@ -1342,6 +1344,107 @@ value, 2–65× with 8–27 producers, 3–290× in a tight loop – in Delphi a
 FPC, Win32 and Win64. With the lock, the consumer has to win the same lock
 as every producer and starves when there are many of them. **It stays.**
 
+### 10.9 Engine – implementation notes (Phase 13)
+
+`Delphi.IOUring.Engine` has `TIORingEngine` (a class, shared by threads), built
+as decided in §10.4. Its parts: a request pool of `MaxRequests` slots (the
+payload holds the operation, file, buffer, count, offset, the caller's
+`UserData`, the callback and the result), a request queue of the same size
+(a request is in it at most once, so it is never full), one ring, the I/O
+thread, and an auto-reset "new requests" event. The unit re-exports
+`TIORingRequestHandle`, so users need only `Delphi.IOUring` and
+`Delphi.IOUring.Engine`.
+
+**The I/O thread**, one round:
+
+1. Take requests from the queue and prepare them on the ring. A request that
+   does not fit (the ring is full) waits in a one-place "deferred" slot for
+   the next round. A request the ring refuses at once (for example a bad file
+   handle) completes at once, with the ring's error code.
+2. If anything was prepared: one `Submit(0)` for all of it (no waiting
+   inside `SubmitIoRing` – only the I/O thread submits, §2.1).
+3. Pop all completions; store each result and mark the request Completed
+   (this wakes its `Wait`), or call its callback and free its slot.
+4. Only if nothing happened in the round: set the sleeping flag with
+   `Exchange`, look at the queue once more, then sleep in
+   `WaitForMultipleObjects` on {"new requests" event, ring completion
+   event}.
+
+**Waking without lost wake-ups.** A producer puts its request in the queue
+(a compare-exchange: a full barrier) and then looks at the sleeping flag; it
+sets the event only if it can `Exchange` the flag from 1 to 0. The I/O thread
+sets the flag (also a full barrier) and then looks at the queue. With full
+barriers on both sides, at least one of the two sees the other's write: the
+request is never left sleeping in the queue. The ring's completion event is
+auto-reset and fires when the completion queue goes from empty to non-empty;
+the I/O thread always pops until the queue is empty before it sleeps.
+
+**A full pool.** When all requests are in use, `ReadAsync` (etc.) sleeps on
+a "slot released" counter (`WaitWhileEqual`); every release increments it and
+wakes the sleepers only if there are any. Rule: `MaxRequests` must be more
+than the sum, over all threads, of the requests a thread keeps (started, not
+waited for) while it starts a new one – otherwise all threads can wait for
+each other forever. The stress test ran into exactly that at first (8 threads
+keeping 6 requests each with 32 slots), see below.
+
+**Destroy**, in this order: (1) no new requests (`ReadAsync` raises), and
+threads waiting for a free slot give up; (2) wait until no thread is half-way
+through starting a request (a counter); (3) the I/O thread completes the
+queued requests as cancelled without starting them, asks the ring to cancel
+each request in it (`PrepareCancel`; the cancel operations use `UserData` 0),
+waits until all have completed, and ends; (4) wait until the threads still in
+`Wait` – woken by step 3 with "cancelled" – have left (another counter); only
+then are the pool and the queue freed. Cancelled =
+`IORING_RESULT_CANCELLED` (`HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED)`,
+the same code the ring gives), `TIORingCompletion.IsCancelled`.
+
+**Other details**
+
+- The words that several threads write (sleeping flag, stopping flag, the
+  two counters of Destroy, the slot-release counter) each have a cache line
+  of their own.
+- Callbacks run on the I/O thread; an exception in one is caught and counted
+  (`Stats.CallbackErrors`), and the I/O thread goes on.
+- `BeginBatch`/`EndBatch` use two thread variables (the engine and the
+  depth): a thread can batch for one engine at a time.
+- Stats are counted by the I/O thread alone (a plain add, stored whole with
+  `StoreRelease`, so a 64-bit counter is never read half-written on Win32).
+- Known limits: one `Wait` per request; no cancelling of single requests;
+  plain file handles only (no registered files or buffers yet); if the ring
+  itself fails (a system call error, not an I/O error) the I/O thread stops
+  and requests in flight do not complete.
+
+**Tests:** `Tests.Engine` (DUnitX) and `Tests.FPC.Engine` (FPCUnit), 19 each –
+a read with its data and `UserData`; 500 reads through a ring of 8 entries;
+write + flush + read back; end of file (at and across); a bad file handle
+(completes with an error, no exception); `Wait` with a timeout (the handle
+stays valid), `TryGetResult`, a second `Wait` and an empty handle (raise);
+callbacks (on the I/O thread; an exception is counted); a batch of 20 reads
+goes to the ring in **one** submit; a full pool (the third start waits until
+a request is freed); stats; `Destroy` with pending pipe reads (all complete as
+cancelled), with a thread blocked in `Wait` (it wakes with "cancelled"), and
+of an idle engine (quick, and the engine slept at most twice in 200 ms);
+stress: 8 threads × 1500 random reads of up to 64 KiB with every byte
+checked, and 4 threads mixing callbacks and waits. All pass with Delphi
+Debug and Release and FPC with and without `-O3`, Win32 and Win64; the engine
+tests also passed 100 repeated runs (Delphi Win64 and Win32) and 10 full FPC
+runs.
+
+**Findings:**
+
+- **A pool that is too small can deadlock its users** (see "A full pool"
+  above): the first version of the stress test hung, and `RunThreads` failed
+  it after 60 s instead of hanging the run (Phase 12). Fixed in the test (5
+  requests per thread, 36 slots: 8 × 4 < 36 guarantees progress, 8 × 5 > 36
+  still fills the pool), and the rule is now in the unit's comments.
+- **A busy engine does not sleep at all**: one thread starting requests one
+  after another keeps the I/O thread awake – the next request is in the
+  queue before the I/O thread would sleep. A test that expected at least one
+  sleep failed now and then (5 of 40 runs) for exactly this reason; it now
+  checks sleeping on an idle engine.
+- Performance is not measured yet: the benchmark comes with the read stream
+  (Phase 14).
+
 ---
 
 ## 11. Overlapping reads and writes (later) – options
@@ -1457,6 +1560,21 @@ tested.
 - OS constants as typed constants, not enums.
 - Parameter style matching the existing skeletons: `A`-prefixed, `const`
   where possible; locals `L`-prefixed, fields `F`-prefixed.
+- **`inline` only works when all of these hold** (Delphi):
+  1. Inlining is on – the default `{$INLINE ON}`; the projects must not turn
+     it off.
+  2. The body comes **before** the first call in the same unit. Delphi
+     compiles in one pass: a call it meets before the body becomes a normal
+     call, **without any hint**. So implement inline routines (and the
+     overloads they call) before the code that uses them.
+  3. The caller's unit has the unit with the body in its `uses` (otherwise
+     hint H2443). So no `inline` on methods of types that other units
+     re-export under an alias (`TIORing`, `TIORingRequestHandle`): their
+     users do not have the original unit in `uses`.
+
+  Checked 2026-10-23 for all units (Atomics, RequestPool, the API unit):
+  no inline routine is called before its body. Free Pascal inlines by
+  default too (seen in its assembler output, §10.6).
 
 ---
 

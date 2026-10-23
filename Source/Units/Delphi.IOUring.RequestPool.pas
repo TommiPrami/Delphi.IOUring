@@ -114,8 +114,10 @@ type
   // One request: slot index + generation. 0 = no request.
   TIORingRequestHandle = record
     Value: TIORingUserData;    // also the ring's UserData for the request
-    class function FromUserData(const AUserData: TIORingUserData): TIORingRequestHandle; static; inline;
-    function IsEmpty: Boolean; inline;
+    // Not inline: the engine re-exports this type, and Delphi does not
+    // inline through an alias (hint H2443)
+    class function FromUserData(const AUserData: TIORingUserData): TIORingRequestHandle; static;
+    function IsEmpty: Boolean;
   end;
 
   TIORingRequestPool = record

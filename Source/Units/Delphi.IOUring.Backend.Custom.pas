@@ -26,6 +26,10 @@ const
   // NativeResult of a read that starts at or after the end of the file:
   // HRESULT_FROM_WIN32(ERROR_HANDLE_EOF). (On Linux such a read returns 0.)
   IORING_RESULT_END_OF_FILE = Integer($80070026);
+  // NativeResult of a cancelled operation:
+  // HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED). The engine uses it also for
+  // requests it cancels before they reach the ring.
+  IORING_RESULT_CANCELLED = Integer($800703E3);
 {$ENDIF}
 
 type
@@ -95,6 +99,8 @@ type
     function Succeeded: Boolean;
     // Read started at or after the end of the file (not an error)
     function IsEndOfFile: Boolean;
+    // The operation was cancelled
+    function IsCancelled: Boolean;
     function ErrorMessage: string;
     procedure RaiseIfFailed(const AOperation: string = '');
   end;
@@ -167,6 +173,15 @@ begin
   Result := NativeResult = IORING_RESULT_END_OF_FILE;
 {$ELSE}
   Result := NativeResult = 0;
+{$ENDIF}
+end;
+
+function TIORingCompletion.IsCancelled: Boolean;
+begin
+{$IFDEF MSWINDOWS}
+  Result := NativeResult = IORING_RESULT_CANCELLED;
+{$ELSE}
+  Result := NativeResult = -125; // -ECANCELED
 {$ENDIF}
 end;
 

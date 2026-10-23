@@ -35,7 +35,7 @@ Source/
     Delphi.IOUring.Atomics.pas               TAtomic: CAS / fences / wait-wake (new)
     Delphi.IOUring.RequestPool.pas           request slots, handles, lock-free free list (new)
     Delphi.IOUring.RequestQueue.pas          lock-free queue: producers -> I/O thread (new)
-    Delphi.IOUring.Engine.pas                I/O thread(s), request pool       (Milestone 3)
+    Delphi.IOUring.Engine.pas                TIORingEngine: the I/O thread, Wait, callbacks (new)
   Build-FPC.ps1                              builds/runs the FPC tests or benchmark (no fpc.exe/lazbuild needed; -Optimize)
   UnitTests/
     Delphi.IOUring.UnitTests.dpr/.dproj      DUnitX console runner (Delphi)
@@ -50,6 +50,7 @@ Source/
     Tests.Atomics.pas                        TAtomic, incl. multi-thread stress
     Tests.RequestPool.pas                    free list and request pool, incl. an engine simulation
     Tests.RequestQueue.pas                   request queue, incl. wrap-around and producer/consumer stress
+    Tests.Engine.pas                         the engine: results, waiting, callbacks, batches, Destroy, stress
     TestFileHelpers.pas                      generates deterministic test files
     TestPlatformHelpers.pas                  files, pipes, page memory for tests
     TestThreadHelpers.pas                    starting threads together, busy waiting (Delphi tests)
@@ -210,6 +211,14 @@ Source/
 
   **Done 2026-10-22** – Delphi 171 tests and FPC 157 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 13 – Engine with one I/O thread**: I/O thread loop (drain → prepare → one submit → reap → notify), sleep/wake protocol without syscalls when busy, `WaitOnAddress` waiting, `BeginBatch`/`EndBatch`, clean shutdown with requests in flight (every request completes: ok / error / cancelled). Stress test: many producer threads, random reads, all data verified. Stats counters.
+  - [x] API decided first (Design §10.4) and built as decided: `Delphi.IOUring.Engine` – `TIORingEngine` with `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`/`TryGetResult`/`WaitAll`, callbacks on the I/O thread, `BeginBatch`/`EndBatch`, `Stats` (Design §10.9).
+  - [x] I/O thread: drain → prepare (one request may wait for room) → one submit → pop all → sleep only after an idle round; producers wake it only when it sleeps.
+  - [x] A full pool makes starting a request sleep until one is freed; `Destroy` cancels queued and in-flight requests, waits for all, and lets threads blocked in `Wait` leave first.
+  - [x] New in the core: `IORING_RESULT_CANCELLED`, `TIORingCompletion.IsCancelled`; `Delphi.IOUring` re-exports both result codes.
+  - [x] Tests `Tests.Engine` / `Tests.FPC.Engine` (19 each), incl. the shutdown cases and stress (8 threads × 1500 random reads, data checked; callbacks and waits mixed). Repeated 100× (Delphi) and 10× (FPC) to find flaky tests: one found and fixed (a busy engine never sleeps – Design §10.9).
+  - [x] Found on the way: a request pool that is too small for what the threads keep can deadlock them – rule written into the unit and Design §10.9.
+
+  **Done 2026-10-22** – Delphi 190 tests and FPC 176 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets. Not measured yet: the engine's speed (Phase 14's benchmark).
 - **Phase 14 – Read stream with block provider**: look-ahead distance, merging adjacent requests (contiguous buffer or scatter), in-order delivery. Benchmark: many small "known in advance" random reads vs `TFileStream` + seek.
 - **Phase 15 – Several I/O threads** (only if Phase 13 benchmarks show one thread is the limit): per-file routing, wake-up policy that avoids thundering herd.
 - **Phase 16 – Overlap handling (decision first, Design §11)**: decide A only vs B opt-in. If B: in-flight range table per file on the I/O thread; write-after-read/write ordering, read-after-write ordering or serve-from-buffer, attach duplicate reads. Tests for each case in the Design §11 table.
@@ -227,9 +236,9 @@ Source/
 
 ## Immediate next step
 
-Phase 13 – the engine with one I/O thread: it takes requests from the queue
-(Phase 12), prepares and submits them on its ring, reaps the completions and
-wakes the waiting producers through the request pool (Phase 11); it sleeps
-only when there is nothing to do, and producers wake it only then. Before
-starting: decide the request data (the pool's payload) and the engine API
-(Design §10.4).
+Phase 14 – the read stream with a block provider on top of the engine: the
+caller says which (offset, length) blocks it will need, the stream keeps a
+number of them in flight, merges neighbours, and hands them out in order.
+With it the first benchmark of the engine: many small reads known in advance
+against `TFileStream` + seek. Before starting: decide the stream's API (how
+the caller gives the blocks: callback or list).

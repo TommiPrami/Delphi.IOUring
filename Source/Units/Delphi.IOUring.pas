@@ -30,6 +30,10 @@ uses
 
 const
   IORING_INFINITE = Delphi.IOUring.Backend.Custom.IORING_INFINITE;
+{$IFDEF MSWINDOWS}
+  IORING_RESULT_END_OF_FILE = Delphi.IOUring.Backend.Custom.IORING_RESULT_END_OF_FILE;
+  IORING_RESULT_CANCELLED = Delphi.IOUring.Backend.Custom.IORING_RESULT_CANCELLED;
+{$ENDIF}
 
 type
   TIORingUserData = Delphi.IOUring.Backend.Custom.TIORingUserData;
