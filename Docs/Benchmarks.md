@@ -1,10 +1,11 @@
-# Delphi.IOUring – Benchmarks
+﻿# Delphi.IOUring – Benchmarks
 
 Measured 2026-10-22 (Plan, Phase 5) with `Source/Benchmarks/Delphi.IOUring.Benchmarks`,
 Release builds, Delphi 13. Raw data (every single run): [BenchmarkResults/](BenchmarkResults/).
 The engine's data structures (Phase 11 and later) have a benchmark of their
 own: [Engine structures](#engine-structures-phase-11), and so has the engine
-with the block reader: [Blocks known in advance](#blocks-known-in-advance-phase-14).
+with the block reader: [Blocks known in advance](#blocks-known-in-advance-phase-14)
+and [Several I/O threads](#several-io-threads-phase-15).
 
 ## Short version
 
@@ -46,8 +47,14 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
   `Seek`** and 1.2–2.1× faster than 8 threads with `ReadFile`. For sorted
   blocks with small gaps, reading the gaps too (`MaxGap`) makes it
   **17–22× faster**. With the data already in the cache, plain `ReadFile`
-  stays faster (the reader gets 85–92 % of its speed on the fast cores of
-  this CPU, 43–50 % on the slow ones).
+  stays faster than one I/O thread (the reader gets 85–92 % of its speed on
+  the fast cores of this CPU, 43–50 % on the slow ones).
+- **Several I/O threads (Phase 15):** with cached data and with unbuffered
+  reads, one I/O thread is the limit – Windows does the work of a request
+  inside the submit call. With 4 I/O threads the block reader read **3.2×
+  as many unbuffered 4 KiB blocks** as with one, and with cached data it is
+  now **1.3–1.6× faster than `ReadFile`**. Data from the disk through the
+  file cache gains nothing.
 
 ## Machine
 
@@ -476,12 +483,61 @@ What the numbers say:
   Even on the fast cores the reader stays below `ReadFile`: on an overlapped
   handle every read takes the asynchronous way, even when the data is in the
   cache, and that path costs more per read (Design §2.1, §10.10).
-- **Where one engine stops:** with a buffered handle (the normal case) a bare
-  ring without the engine got no further either (about 125–140 thousand reads
-  per second), so Windows' cache path is the limit, not the engine. With an
-  unbuffered handle one engine stayed at about 70 thousand reads per second
-  whatever the read-ahead, while two engines reached 114–126: there, the one
-  I/O thread is the limit (Design §10.10).
+- **Where one engine stops:** with a buffered handle and data from the disk,
+  a bare ring without the engine got no further either (about 125–140
+  thousand reads per second), so Windows' cache path is the limit, not the
+  engine. With cached data and with unbuffered reads, the one I/O thread is
+  the limit – Phase 15 added more ([Several I/O threads](#several-io-threads-phase-15)).
+
+## Several I/O threads (Phase 15)
+
+The same benchmark (blocks known in advance, 20 000 blocks of 4 KiB from a
+4 GiB file), now also with **unbuffered** reads (`FILE_FLAG_NO_BUFFERING`:
+every read goes to the disk) and with the block reader on engines of **2 and
+4 I/O threads**. Measured 2026-10-23, same machine. Raw data:
+[2026-10-23-blocks-io-threads.csv](BenchmarkResults/2026-10-23-blocks-io-threads.csv)
+(all four builds, all cases; the Phase 14 contenders were measured again).
+
+Thousand blocks per second, Delphi, Win64, block reader with read-ahead 128:
+
+| Case | 1 I/O thread | 2 I/O threads | 4 I/O threads | ReadFile | ReadFile, 8 threads |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| random, cold | 142.0 | 136.3 | 137.9 | 14.1 | 113.9 |
+| random, warm | 268.5 | 340.3 | **405.7** | 311.8 | 427.9 |
+| random, unbuffered | 124.3 | 222.5 | **397.7** | 14.2 | 124.6 |
+| sorted, cold | 139.6 | 129.9 | 131.6 | 17.8 | 114.4 |
+| sorted, warm | 409.1 | 576.8 | **715.9** | 454.1 | 591.5 |
+| sorted, unbuffered | 148.9 | 249.9 | **407.1** | 15.0 | 119.8 |
+
+2 and 4 I/O threads ÷ 1 I/O thread, all four builds:
+
+| Build | random, warm | random, unbuffered | sorted, warm | sorted, unbuffered |
+| --- | ---: | ---: | ---: | ---: |
+| Delphi Win64 | 1.27 / 1.51 | 1.79 / 3.20 | 1.41 / 1.75 | 1.68 / 2.73 |
+| FPC Win64 | 1.31 / 1.56 | 1.75 / 2.98 | 1.11 / 1.05 | 2.10 / 1.53 |
+| Delphi Win32 | 1.17 / 1.50 | 2.29 / 2.71 | 1.37 / 1.40 | 2.06 / 1.46 |
+| FPC Win32 | 1.25 / 1.32 | 2.19 / 1.53 | 1.31 / 1.39 | 2.12 / 2.16 |
+
+What the numbers say:
+
+- **Cached data and unbuffered reads: more I/O threads help.** Windows does
+  the work of a request inside the submit call, in the I/O thread (Design
+  §10.11), so one I/O thread can submit only so many requests per second.
+  With 4 I/O threads the block reader read **3.2× as many unbuffered
+  blocks** as with one (Delphi Win64), 28× as many as `ReadFile` and 3.2×
+  as many as 8 threads with `ReadFile`. With cached data it now **beats
+  `ReadFile`** (1.3× on random, 1.6× on sorted blocks), which one I/O thread
+  could not.
+- **Data from the disk through the file cache (cold): no gain.** There the
+  limit is Windows' cache path, not the I/O thread (Phase 14).
+- **2 I/O threads always helped**; 4 helped more in most runs, but in some
+  runs of the other builds less than 2. Those are the runs where the threads
+  landed on the slower E-cores (see "Fast and slow cores" below).
+- **The CPU time grows only a little:** 109 → 156 ms with 4 I/O threads
+  (random, warm, Delphi Win64), 78 → 141 ms unbuffered.
+- **The default stays 1 I/O thread**, because it costs nothing extra and is
+  enough for data from the disk through the cache. For many small reads of
+  cached data, or unbuffered reads, use 2–4 and measure.
 
 ## Known limits of these measurements
 
@@ -547,7 +603,7 @@ Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Structures.exe --runs 
 Source\Build-FPC.ps1 -Project Structures -Platform Win64 -Run
 ```
 
-Blocks known in advance (about 1 minute per build; options `--dir`,
+Blocks known in advance (about 1.5 minutes per build; options `--dir`,
 `--size-gib` (default 4), `--blocks` (default 20 000), `--runs`, `--csv`,
 `--keep`):
 

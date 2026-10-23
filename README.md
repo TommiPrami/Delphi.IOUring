@@ -1,4 +1,4 @@
-# Delphi.IOUring
+﻿# Delphi.IOUring
 
 Fast file I/O for Delphi with the operating system's I/O rings: **IoRing** on
 Windows (and later `io_uring` on Linux through Free Pascal).
@@ -24,9 +24,9 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Atomics for the engine (`Delphi.IOUring.Atomics`: CAS, acquire/release, wait/wake) | done, tested (Delphi and FPC) |
 | Request pool for the engine (`Delphi.IOUring.RequestPool`: slots, handles, lock-free free list) | done, tested, benchmarked against a lock |
 | Request queue for the engine (`Delphi.IOUring.RequestQueue`: lock-free, producers → I/O thread) | done, tested, benchmarked against a lock |
-| I/O engine `TIORingEngine` (`Delphi.IOUring.Engine`: many threads, one I/O thread, many requests in flight) | done, tested, benchmarked through the block reader |
+| I/O engine `TIORingEngine` (`Delphi.IOUring.Engine`: many threads, one or more I/O threads, many requests in flight) | done, tested, benchmarked through the block reader |
 | Block reader `TIORingBlockReader` (`Delphi.IOUring.BlockReader`: blocks known in advance, read ahead, neighbours merged, handed out in order) | done, tested, benchmarked |
-| Overlap rules, write stream (more I/O threads only if a benchmark asks for them) | planned |
+| Overlap rules, write stream | planned |
 | Linux `io_uring` through Free Pascal | planned |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
@@ -114,6 +114,11 @@ Requests can also report back through a callback on the I/O thread, and
 `BeginBatch`/`EndBatch` sends many requests to the kernel with one call. The
 buffer and the file handle must stay valid until the request has completed.
 
+For many small requests of cached data, or unbuffered requests, give the
+engine more I/O threads: `TIORingEngine.Create(1024, 256, 4)`. With 4 I/O
+threads it carried out up to 3.2× as many 4 KiB reads per second
+([Benchmarks](Docs/Benchmarks.md#several-io-threads-phase-15)).
+
 ### Blocks known in advance
 
 ```pascal
@@ -144,7 +149,9 @@ between them be read too).
 
 With data from the disk, 20 000 random 4 KiB blocks are read **7–10× faster
 than with `TFileStream` + `Seek`** ([Benchmarks](Docs/Benchmarks.md#blocks-known-in-advance-phase-14)).
-For data that is already in the file cache, plain `ReadFile` stays faster.
+For data that is already in the file cache, plain `ReadFile` is faster than
+an engine with one I/O thread; with 2–4 I/O threads the block reader beats
+it.
 
 ### The ring itself
 

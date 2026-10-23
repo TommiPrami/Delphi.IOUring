@@ -1,4 +1,4 @@
-# Delphi.IOUring – Implementation Plan
+﻿# Delphi.IOUring – Implementation Plan
 
 Companion to [Design.md](Design.md). Each phase ends in something that
 compiles, has passing tests, and is committed.
@@ -235,6 +235,15 @@ Source/
 
   **Done 2026-10-23** – Delphi 205 tests and FPC 191 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 15 – Several I/O threads** (only if Phase 13 benchmarks show one thread is the limit): per-file routing, wake-up policy that avoids thundering herd. Phase 14 found one such case: unbuffered small reads (Design §10.10).
+  - [x] First measured where the I/O thread's time goes (Design §10.11): Windows does the work of a request inside `SubmitIoRing` (about 7.5 µs per unbuffered 4 KiB read), the engine's own work is about 0.2 µs. So only more submitting threads help.
+  - [x] Tried and left out: registered file and buffers (at most about 3 %); a longer spin, a spin learned per thread, and spinning only while the I/O thread is awake (none better than a short spin). `WaitFor` now spins 4 µs (a time, not a number of pauses) instead of 100 pauses (Design §10.11).
+  - [x] API decided first (Design §10.4, "Phase 15 decisions"): `TIORingEngine.Create(…, AIOThreads = 1)`; the engine owns its I/O threads, each with its own ring, all taking requests from the shared queue; `IOThreadCount`, `IOThreadStats`, `IsIOThread` (replaces `IOThreadId`). Per-file routing left to Phase 16.
+  - [x] Waking: a producer wakes an I/O thread only when all sleep; an I/O thread takes at most 16 requests per round and wakes a sleeping sibling when more are waiting (Design §10.12).
+  - [x] Found and fixed: `Destroy` could hang when a ring was full of requests that only a cancel ends (also with one I/O thread). One place in each ring now stays free for a cancel.
+  - [x] Tests (6 new in `Tests.Engine` / `Tests.FPC.Engine`): bad thread counts, a backlog is shared, a light load stays on one thread, `Destroy` cancels over 4 rings, both stress tests with 4 I/O threads; 30 repeated runs without a failure.
+  - [x] Benchmark (`Delphi.IOUring.Benchmarks.Blocks`, now also unbuffered and with 2 and 4 I/O threads): with 4 I/O threads the block reader read **3.2× as many unbuffered 4 KiB blocks** as with one, and with cached data it is now **1.3–1.6× faster than `ReadFile`**; data from the disk through the file cache gains nothing ([Benchmarks.md](Benchmarks.md#several-io-threads-phase-15)). The default stays 1 I/O thread.
+
+  **Done 2026-10-23** – Delphi 211 tests and FPC 197 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 16 – Overlap handling (decision first, Design §11)**: decide A only vs B opt-in. If B: in-flight range table per file on the I/O thread; write-after-read/write ordering, read-after-write ordering or serve-from-buffer, attach duplicate reads. Tests for each case in the Design §11 table.
 - **Phase 17 – `TSequentialWriteOnlyFileStream`** (write-behind; can use the engine or its own ring).
 
@@ -250,15 +259,8 @@ Source/
 
 ## Immediate next step
 
-Phase 14 is done. Two questions from its measurements, to decide before the
-next phase (Design §10.10):
-
-1. **Spin count before a wait sleeps** (now 100 `PAUSE`s): keep it, raise it
-   (4 000 made cached reads on the E-cores 49 % faster but costs 67 % more
-   CPU time with reads from the disk), or make it a setting of the engine.
-2. **Phase 15 or not.** One I/O thread is the limit for unbuffered small
-   reads: about 14 µs of I/O-thread time per read, where a bare ring needs
-   8–10 µs. Proposal: first measure where that time goes – a cheaper I/O
-   thread may be enough – and do Phase 15 only if it is not. Otherwise next
-   is Phase 16 (overlap rules, decision first, Design §11) or Phase 17 (the
-   write stream).
+Phases 14 and 15 are done. Next: **Phase 16 – overlap handling**, decision
+first (Design §11): A only (the user keeps overlapping requests apart) or B
+as an opt-in (a table of the ranges in flight per file). If B, the requests
+of such a file must all go to one I/O thread, which Phase 15 left out on
+purpose. Or **Phase 17 – the write stream**, if writing is needed sooner.

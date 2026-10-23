@@ -52,14 +52,14 @@ uses
 const
   IORING_POOL_MAX_CAPACITY = 1 shl 20;
   IORING_POOL_MAX_PAYLOAD_SIZE = 64 * 1024;
-  // Before WaitFor goes to sleep, it checks the state for a while, with CPU
-  // pauses ("spinning"). A request that completes meanwhile costs neither
-  // thread a sleep and a wake-up. How long to spin, each thread learns from
-  // its own recent waits (Docs/Design.md §10.11): about twice as long as they
-  // took, if that was short (cached data); the minimum, if they took longer
-  // than the maximum (reads from a disk), so long waits waste little CPU time.
-  IORING_POOL_MIN_SPIN_MICROSECONDS = 2;
-  IORING_POOL_DEFAULT_MAX_SPIN_MICROSECONDS = 64;
+  // Before WaitFor goes to sleep, it checks the state for this long, with
+  // CPU pauses ("spinning"). A request that completes meanwhile costs neither
+  // thread a sleep and a wake-up. A time, not a number of pauses: a pause
+  // takes 17 ns on an E-core of an Intel i7-14700 and 33 ns on a P-core, and
+  // much less on older CPUs. Longer spins (up to 64 µs) and spins learned
+  // from earlier waits were measured too and did not pay off (Docs/Design.md
+  // §10.11).
+  IORING_POOL_DEFAULT_SPIN_MICROSECONDS = 4;
 
 type
   TCardinalArray = array[0..MaxInt div SizeOf(Cardinal) - 1] of Cardinal;
@@ -136,7 +136,7 @@ type
     FIndexMask: NativeUInt;
     FGenerationBits: Cardinal;
     FGenerationMask: Cardinal;
-    FMaxSpinMicroseconds: Cardinal;
+    FSpinMicroseconds: Cardinal;
     FFreeList: TIORingFreeList;
     // The state word of the handle's slot; nil if the index is out of range
     function StateWordOf(const AHandle: TIORingRequestHandle): PCardinal; inline;
@@ -175,9 +175,8 @@ type
     // The current state, or rsStale
     function State(const AHandle: TIORingRequestHandle): TIORingRequestState;
 
-    // Waits until the request is Completed: spins for the time this thread
-    // has learned (at most MaxSpinMicroseconds), then sleeps. A timeout of 0
-    // only checks.
+    // Waits until the request is Completed: spins SpinMicroseconds, then
+    // sleeps. A timeout of 0 only checks.
     function WaitFor(const AHandle: TIORingRequestHandle;
       const ATimeoutMilliseconds: Cardinal = IORING_INFINITE): TIORingWaitResult;
 
@@ -191,12 +190,8 @@ type
     property PayloadSize: Cardinal read FPayloadSize;
     // Bits of the generation in a handle (depends on the capacity on Win32)
     property GenerationBits: Cardinal read FGenerationBits;
-    // The spin time the calling thread has learned so far, in µs (before the
-    // MaxSpinMicroseconds limit of a pool); for tests and measurements
-    class function ThreadSpinMicroseconds: Cardinal; static;
-
-    // Upper limit of the spinning in WaitFor; 0: no spinning, sleep at once
-    property MaxSpinMicroseconds: Cardinal read FMaxSpinMicroseconds write FMaxSpinMicroseconds;
+    // How long WaitFor spins before it sleeps; 0: no spinning, sleep at once
+    property SpinMicroseconds: Cardinal read FSpinMicroseconds write FSpinMicroseconds;
   end;
 
 implementation
@@ -215,46 +210,9 @@ const
   // The state word, then padding: the payload starts 8-byte aligned
   SLOT_HEADER_SIZE = 8;
 
-  // Adaptive spinning: the learned time is kept in 1/16 µs; a thread starts
-  // with SPIN_START_MICROSECONDS; while spinning, the clock is read every
-  // SPIN_CLOCK_CHECK_MASK + 1 pauses
-  SPIN_SCALE = 16;
-  SPIN_START_MICROSECONDS = 8;
+  // While spinning, WaitFor reads the clock every SPIN_CLOCK_CHECK_MASK + 1
+  // pauses
   SPIN_CLOCK_CHECK_MASK = 7;
-
-threadvar
-  // How long this thread spins in WaitFor before it sleeps (1/16 µs);
-  // 0: nothing learned yet
-  GSpinTime: Integer;
-
-// The spin time of this thread for its next wait, in µs, at most AMax
-function SpinMicroseconds(const AMax: Cardinal): Cardinal;
-begin
-  if GSpinTime = 0 then
-    GSpinTime := SPIN_START_MICROSECONDS * SPIN_SCALE;
-  Result := Cardinal(GSpinTime) div SPIN_SCALE;
-  if Result > AMax then
-    Result := AMax;
-end;
-
-// Learns from a wait that took AMicroseconds until the request completed:
-// the next spins aim at twice that, or at the minimum when the wait took
-// longer than AMax - spinning for those would only waste CPU time
-procedure LearnSpin(const AMicroseconds: UInt64; const AMax: Cardinal);
-var
-  LTarget: Integer;
-begin
-  if AMicroseconds <= AMax then
-    LTarget := 2 * Integer(AMicroseconds)
-  else
-    LTarget := IORING_POOL_MIN_SPIN_MICROSECONDS;
-  if LTarget < IORING_POOL_MIN_SPIN_MICROSECONDS then
-    LTarget := IORING_POOL_MIN_SPIN_MICROSECONDS;
-  if LTarget > Integer(AMax) then
-    LTarget := AMax;
-  // A quarter of the way to the target: one odd wait does not undo the rest
-  Inc(GSpinTime, (LTarget * SPIN_SCALE - GSpinTime) div 4);
-end;
 
 { TIORingFreeList }
 
@@ -399,7 +357,7 @@ begin
   ADest.FIndexMask := 0;
   ADest.FGenerationBits := 0;
   ADest.FGenerationMask := 0;
-  ADest.FMaxSpinMicroseconds := IORING_POOL_DEFAULT_MAX_SPIN_MICROSECONDS;
+  ADest.FSpinMicroseconds := IORING_POOL_DEFAULT_SPIN_MICROSECONDS;
 end;
 
 class operator TIORingRequestPool.Finalize(var ADest: TIORingRequestPool);
@@ -618,11 +576,6 @@ begin
     Result := TIORingRequestState(LWord and STATE_MASK);
 end;
 
-class function TIORingRequestPool.ThreadSpinMicroseconds: Cardinal;
-begin
-  Result := SpinMicroseconds(High(Cardinal));
-end;
-
 function TIORingRequestPool.WaitFor(const AHandle: TIORingRequestHandle;
   const ATimeoutMilliseconds: Cardinal): TIORingWaitResult;
 var
@@ -647,12 +600,9 @@ begin
   if ATimeoutMilliseconds = 0 then
     Exit(wrTimeout);
 
-  // A real wait: its time is measured, for the timeout and to learn from
+  // A real wait: its time counts for the spinning and the timeout
   LStart := TIORingPlatform.TimestampMicroseconds;
-  if FMaxSpinMicroseconds > 0 then
-    LSpinMicroseconds := SpinMicroseconds(FMaxSpinMicroseconds)
-  else
-    LSpinMicroseconds := 0;
+  LSpinMicroseconds := FSpinMicroseconds;
   LSpins := 0;
 
   repeat
@@ -660,11 +610,7 @@ begin
     if LWord shr GENERATION_SHIFT <> LGeneration then
       Exit(wrStale);
     if LWord and STATE_MASK = Cardinal(Ord(rsCompleted)) then
-    begin
-      if FMaxSpinMicroseconds > 0 then
-        LearnSpin(TIORingPlatform.TimestampMicroseconds - LStart, FMaxSpinMicroseconds);
       Exit(wrCompleted);
-    end;
 
     if LSpinMicroseconds > 0 then
     begin

@@ -52,7 +52,7 @@ type
     // the handles from them
     FMailboxes: array[0..7] of NativeUInt;
     FProducersDone: Integer;
-    procedure RunEngineSimulation(const AMaxSpinMicroseconds: Cardinal);
+    procedure RunEngineSimulation(const ASpinMicroseconds: Cardinal);
     procedure CheckAllSlotsFree;
     procedure StartWaiter(out AThread: TWorkerThread);
     // Thread bodies
@@ -760,11 +760,11 @@ begin
   end;
 end;
 
-procedure TRequestPoolTests.RunEngineSimulation(const AMaxSpinMicroseconds: Cardinal);
+procedure TRequestPoolTests.RunEngineSimulation(const ASpinMicroseconds: Cardinal);
 begin
   // Fewer slots than producers: TryAcquire also fails now and then
   FPool.Open(ENGINE_PRODUCERS - 1, SizeOf(TTestPayload));
-  FPool.MaxSpinMicroseconds := AMaxSpinMicroseconds;
+  FPool.SpinMicroseconds := ASpinMicroseconds;
   // Thread 0 is the I/O thread, 1..ENGINE_PRODUCERS the producers
   RunThreads(1 + ENGINE_PRODUCERS, WorkEngine);
   AssertEquals('Wrong states, wrong answers or lost wake-ups', 0, FFailures);
@@ -773,7 +773,7 @@ end;
 
 procedure TRequestPoolTests.Stress_EngineSimulation;
 begin
-  RunEngineSimulation(IORING_POOL_DEFAULT_MAX_SPIN_MICROSECONDS);
+  RunEngineSimulation(IORING_POOL_DEFAULT_SPIN_MICROSECONDS);
 end;
 
 procedure TRequestPoolTests.Stress_EngineSimulation_WithoutSpinning;

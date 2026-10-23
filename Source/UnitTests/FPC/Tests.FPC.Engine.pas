@@ -49,6 +49,11 @@ type
     procedure CheckData(const AFileOffset: UInt64; const ABuffer: Pointer; const ACount: NativeInt);
     // Waits until AValue reaches AExpected (at most 5 s)
     function WaitForCount(var AValue: Integer; const AExpected: Integer): Boolean;
+    // The stress tests, with AIOThreads I/O threads
+    procedure RunManyProducers(const AIOThreads: Integer);
+    procedure RunCallbacksAndWaits(const AIOThreads: Integer);
+    // I/O threads that took at least one request
+    function BusyIOThreads: Integer;
     // Thread bodies
     procedure WorkStartThirdRead(AIndex: Integer);
     procedure WorkWait(AIndex: Integer);
@@ -79,9 +84,16 @@ type
     procedure Destroy_CancelsRequestsInFlight;
     procedure Destroy_WakesAThreadInWait;
     procedure Destroy_IdleEngine_IsQuick;
-    // Several threads
+    // Several I/O threads
+    procedure IOThreads_BadCount_Raises;
+    procedure IOThreads_ABacklogIsShared;
+    procedure IOThreads_LightLoad_StaysOnOneThread;
+    procedure IOThreads_Destroy_CancelsEverything;
+    // Several producer threads
     procedure Stress_ManyProducers_RandomReads;
+    procedure Stress_ManyProducers_FourIOThreads;
     procedure Stress_CallbacksAndWaitsMixed;
+    procedure Stress_CallbacksAndWaitsMixed_FourIOThreads;
   end;
 
 implementation
@@ -182,7 +194,8 @@ var
 begin
   LRead := PCallbackRead(ACompletion.UserData);
   if not ACompletion.Succeeded or (ACompletion.BytesTransferred <> LRead^.Count) or
-    not TTestFileHelpers.CheckPattern(LRead^.Offset, LRead^.Buffer, LRead^.Count, LBadOffset) then
+    not TTestFileHelpers.CheckPattern(LRead^.Offset, LRead^.Buffer, LRead^.Count, LBadOffset) or
+    not FEngine.IsIOThread(GetCurrentThreadId) then
     TAtomic.Increment(FFailures);
   Dispose(LRead);
   TAtomic.Increment(FCallbackCount);
@@ -201,6 +214,16 @@ begin
   while (TAtomic.LoadAcquire(AValue) <> AExpected) and (GetTickCount64 < LDeadline) do
     Sleep(1);
   Result := TAtomic.LoadAcquire(AValue) = AExpected;
+end;
+
+function TIORingEngineTests.BusyIOThreads: Integer;
+var
+  LIndex: Integer;
+begin
+  Result := 0;
+  for LIndex := 0 to FEngine.IOThreadCount - 1 do
+    if FEngine.IOThreadStats(LIndex).Requests > 0 then
+      Inc(Result);
 end;
 
 { Requests and results }
@@ -411,7 +434,7 @@ begin
   LHandle := FEngine.ReadAsync(FFile, LBuffer, SizeOf(LBuffer), 5000, 31, RecordCompletion);
   AssertTrue('A request with a callback has no handle', LHandle.IsEmpty);
   AssertTrue('Callback called', WaitForCount(FCallbackCount, 1));
-  AssertTrue('On the I/O thread', FCallbackThreadId = FEngine.IOThreadId);
+  AssertTrue('On the I/O thread', FEngine.IsIOThread(FCallbackThreadId));
   AssertTrue('Not on the main thread', FCallbackThreadId <> MainThreadID);
   AssertTrue(FCallbackCompletion.ErrorMessage, FCallbackCompletion.Succeeded);
   CheckEqualsU64('UserData', 31, FCallbackCompletion.UserData);
@@ -642,7 +665,128 @@ begin
   AssertTrue(Format('Took %d ms', [GetTickCount64 - LStart]), GetTickCount64 - LStart < 1000);
 end;
 
-{ Several threads }
+{ Several I/O threads }
+
+procedure TIORingEngineTests.IOThreads_BadCount_Raises;
+var
+  LRaised: Boolean;
+begin
+  LRaised := False;
+  try
+    TIORingEngine.Create(16, 8, 0).Free;
+  except
+    on EIORingError do
+      LRaised := True;
+  end;
+  AssertTrue('0 I/O threads', LRaised);
+  LRaised := False;
+  try
+    TIORingEngine.Create(16, 8, IORING_ENGINE_MAX_IO_THREADS + 1).Free;
+  except
+    on EIORingError do
+      LRaised := True;
+  end;
+  AssertTrue('Too many I/O threads', LRaised);
+  FEngine := TIORingEngine.Create(16, 8, 4);
+  AssertEquals('IOThreadCount', 4, FEngine.IOThreadCount);
+  LRaised := False;
+  try
+    FEngine.IOThreadStats(4);
+  except
+    on EIORingError do
+      LRaised := True;
+  end;
+  AssertTrue('No I/O thread 4', LRaised);
+end;
+
+procedure TIORingEngineTests.IOThreads_ABacklogIsShared;
+const
+  READS = 2000;
+  READ_SIZE = 4096;
+var
+  LBuffers: TBytes;
+  LHandles: array of TIORingRequestHandle;
+  LCompletions: array of TIORingCompletion;
+  LIndex: Integer;
+begin
+  FEngine := TIORingEngine.Create(READS, 64, 4);
+  SetLength(LBuffers, READS * READ_SIZE);
+  SetLength(LHandles, READS);
+  SetLength(LCompletions, READS);
+  Sleep(20);    // all I/O threads asleep
+  // EndBatch wakes one I/O thread; it takes a share and wakes the next one,
+  // which does the same
+  FEngine.BeginBatch;
+  try
+    for LIndex := 0 to READS - 1 do
+      LHandles[LIndex] := FEngine.ReadAsync(FFile, LBuffers[LIndex * READ_SIZE], READ_SIZE,
+        UInt64(LIndex) * 2039);
+  finally
+    FEngine.EndBatch;
+  end;
+  FEngine.WaitAll(LHandles, LCompletions);
+  for LIndex := 0 to READS - 1 do
+  begin
+    AssertTrue(LCompletions[LIndex].ErrorMessage, LCompletions[LIndex].Succeeded);
+    CheckData(UInt64(LIndex) * 2039, @LBuffers[LIndex * READ_SIZE], READ_SIZE);
+  end;
+  CheckEqualsU64('Requests of all I/O threads', READS, FEngine.Stats.Requests);
+  AssertTrue(Format('%d I/O threads took requests', [BusyIOThreads]), BusyIOThreads >= 2);
+end;
+
+procedure TIORingEngineTests.IOThreads_LightLoad_StaysOnOneThread;
+const
+  READS = 200;
+var
+  LBuffer: array[0..511] of Byte;
+  LCompletion: TIORingCompletion;
+  LIndex: Integer;
+begin
+  FEngine := TIORingEngine.Create(16, 8, 4);
+  Sleep(20);
+  // One request at a time: the first I/O thread is enough, and the others
+  // are not woken. (Rarely one is: a producer can come just while the first
+  // one wakes up.)
+  for LIndex := 1 to READS do
+  begin
+    AssertTrue('Wait', FEngine.Wait(FEngine.ReadAsync(FFile, LBuffer, SizeOf(LBuffer), LIndex * 1000), LCompletion));
+    AssertTrue(LCompletion.ErrorMessage, LCompletion.Succeeded);
+  end;
+  AssertTrue(Format('The first I/O thread took %d of %d', [FEngine.IOThreadStats(0).Requests, READS]),
+    FEngine.IOThreadStats(0).Requests >= READS * 9 div 10);
+end;
+
+procedure TIORingEngineTests.IOThreads_Destroy_CancelsEverything;
+const
+  PIPES = 32;
+var
+  LServer: array[0..PIPES - 1] of THandle;
+  LClient: array[0..PIPES - 1] of THandle;
+  LBytes: array[0..PIPES - 1] of Byte;
+  LIndex: Integer;
+  LDeadline: UInt64;
+begin
+  // Rings of 8: one ring cannot hold them all, so they spread over the I/O
+  // threads (a thread with a full ring wakes a sibling)
+  FEngine := TIORingEngine.Create(64, 8, 4);
+  for LIndex := 0 to PIPES - 1 do
+  begin
+    FResources.OpenPipePair(LServer[LIndex], LClient[LIndex]);
+    FEngine.ReadAsync(LClient[LIndex], LBytes[LIndex], 1, 0, LIndex, RecordCompletion);
+  end;
+  LDeadline := GetTickCount64 + 5000;
+  while (FEngine.Stats.Requests < PIPES) and (GetTickCount64 < LDeadline) do
+    Sleep(1);
+  CheckEqualsU64('All taken by the I/O threads', PIPES, FEngine.Stats.Requests);
+  AssertTrue(Format('%d I/O threads took requests', [BusyIOThreads]), BusyIOThreads >= 2);
+  AssertEquals('Pending', 0, TAtomic.LoadAcquire(FCallbackCount));
+
+  FreeAndNil(FEngine);    // returns only when all have completed
+  AssertEquals('Every request completed', PIPES, FCallbackCount);
+  AssertEquals('As cancelled', PIPES, FCancelledCount);
+end;
+
+{ Several producer threads }
 
 procedure TIORingEngineTests.WorkRandomReads(AIndex: Integer);
 var
@@ -677,7 +821,17 @@ end;
 
 procedure TIORingEngineTests.Stress_ManyProducers_RandomReads;
 begin
-  FEngine := TIORingEngine.Create(STRESS_POOL, 16);
+  RunManyProducers(1);
+end;
+
+procedure TIORingEngineTests.Stress_ManyProducers_FourIOThreads;
+begin
+  RunManyProducers(4);
+end;
+
+procedure TIORingEngineTests.RunManyProducers(const AIOThreads: Integer);
+begin
+  FEngine := TIORingEngine.Create(STRESS_POOL, 16, AIOThreads);
   RunThreads(STRESS_PRODUCERS, WorkRandomReads);
   AssertEquals('Reads with wrong results or data', 0, FFailures);
   CheckEqualsU64('Completed', STRESS_PRODUCERS * STRESS_READS, FEngine.Stats.Completed);
@@ -715,9 +869,19 @@ end;
 
 procedure TIORingEngineTests.Stress_CallbacksAndWaitsMixed;
 begin
-  // Every second request has a callback, which checks the data on the I/O
-  // thread; the others are waited for by the producer
-  FEngine := TIORingEngine.Create(16, 8);
+  RunCallbacksAndWaits(1);
+end;
+
+procedure TIORingEngineTests.Stress_CallbacksAndWaitsMixed_FourIOThreads;
+begin
+  RunCallbacksAndWaits(4);
+end;
+
+procedure TIORingEngineTests.RunCallbacksAndWaits(const AIOThreads: Integer);
+begin
+  // Every second request has a callback, which checks the data (and that it
+  // runs on an I/O thread); the others are waited for by the producer
+  FEngine := TIORingEngine.Create(16, 8, AIOThreads);
   RunThreads(MIXED_PRODUCERS, WorkMixed);
   AssertTrue('All callbacks ran', WaitForCount(FCallbackCount, MIXED_PRODUCERS * MIXED_READS div 2));
   AssertEquals('Reads with wrong results or data', 0, FFailures);

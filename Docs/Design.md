@@ -1,4 +1,4 @@
-# Delphi.IOUring – Design Specification
+﻿# Delphi.IOUring – Design Specification
 
 Status: **Draft v1.1** (2026-10-22) – Milestones 1 and 2 complete: Delphi 13 and
 Free Pascal 3.2.2 on Windows, Win32 and Win64 (§12.1). Milestone 1 (Phases 1–5):
@@ -7,8 +7,9 @@ sequential reader (notes in §7), read-only stream (notes in §8.1),
 benchmarks ([Benchmarks.md](Benchmarks.md)). Milestone 3 started: the
 atomics unit (Phase 10, notes in §10.6), the request pool (Phase 11, notes
 in §10.7), the request queue (Phase 12, notes in §10.8), the engine with one
-I/O thread (Phase 13, notes in §10.9) and the block reader (Phase 14, notes in
-§10.10). Things marked **[DECIDE]**
+I/O thread (Phase 13, notes in §10.9), the block reader (Phase 14, notes in
+§10.10) and several I/O threads (Phase 15, measurements in §10.11, notes in
+§10.12). Things marked **[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
 **[VERIFIED]** with the answer once a test proves them. Decisions already made
@@ -206,8 +207,9 @@ Important semantics:
   asynchronous way (`ERROR_IO_PENDING`), even when the data is already in the
   file cache. For cached data that costs about 20–25 % more per read than a
   synchronous `ReadFile`, and IoRing reads pay it too (Phase 14, §10.10). So
-  for small reads of cached data, synchronous `ReadFile` stays the fastest;
-  IoRing wins when the data comes from the disk.
+  for small reads of cached data, synchronous `ReadFile` is faster than one
+  IoRing thread; the engine with 2–4 I/O threads beats it (Phase 15,
+  §10.12).
 - **[VERIFIED]** A thread that waits inside `SubmitIoRing` blocks all other
   submits on that ring. So when more than one thread may submit, wait with the
   completion event, never with `SubmitIoRing(…, waitOperations > 0, …)`.
@@ -1165,6 +1167,39 @@ stream with a block provider:
   sizes), cold and warm cache, against `TFileStream` + `Seek` and positioned
   `ReadFile`.
 
+**Phase 15 decisions (2026-10-23, before coding)** – several I/O threads.
+Why: Windows does the work of a request inside `SubmitIoRing`, in the
+submitting thread – about 7.5 µs per unbuffered 4 KiB read here (§10.11) – so
+one I/O thread cannot go beyond about 130 thousand such reads per second.
+Only more submitting threads help. (With buffered reads of data that comes
+from the disk, Windows' cache path is the limit first. That more threads
+also help with *cached* data was found only in the Phase 15 benchmark.)
+
+- **The engine owns its I/O threads**; users register nothing. The number is
+  fixed for the engine's life: `Create(AMaxRequests, ASubmissionQueueSize,
+  AIOThreads = 1)`. Default 1: it costs nothing extra, and it is enough for
+  data that comes from the disk through the file cache. No automatic number
+  for now: no measured rule for it yet.
+- **Each I/O thread has its own ring**, "new requests" event and list of
+  requests in flight. **All take requests from the one shared request
+  queue** (it is safe for many consumers, §10.8), so the load spreads by
+  itself. The pool is shared: handles, `Wait`, `TryGetResult` and callbacks
+  stay as they are. A callback runs on the I/O thread that completed its
+  request.
+- **Waking:** a producer wakes an I/O thread only when *all* of them sleep,
+  and then only one. An I/O thread with siblings takes at most
+  `IORING_ENGINE_SHARE_SIZE` (16) requests per round; if more are waiting, it
+  first wakes one sleeping sibling. So a light load stays on one thread (few
+  wake-ups), and a single busy producer can still use all of them. Before an
+  I/O thread sleeps with a full ring, it also wakes a sibling if requests are
+  waiting.
+- **Destroy:** every I/O thread cancels the requests in its own ring; the
+  queued ones are cancelled by whichever thread takes them.
+- `Stats` adds up the I/O threads; `IOThreadStats(AIndex)` gives one;
+  `IOThreadCount`; `IsIOThread(AThreadId)` replaces `IOThreadId`.
+- Left out: routing the requests of one file to one I/O thread – only Phase
+  16's overlap rules would need it, so Phase 16 decides.
+
 ### 10.5 Lock-free hand-over between threads
 
 Locks are used only on cold paths (start-up, registration changes,
@@ -1287,7 +1322,7 @@ request".
 | --- | --- |
 | `TryAcquire` | Takes a free slot: Free → Defined. False if all slots are in use. |
 | `TryChangeState(H, From, To)` | One compare-exchange; False if the handle is stale or the request is not in `From`. Any change among Defined, Queued, Submitted and Completed; a change to Completed also wakes the waiters. |
-| `WaitFor(H, Timeout)` | Checks `SpinCount` times (default 100, with a CPU pause), then sets the waiting flag and sleeps on the state word (`TAtomic.WaitWhileEqual`). Timeout 0 only checks. |
+| `WaitFor(H, Timeout)` | Checks the state for `SpinMicroseconds` (default 4 µs, with CPU pauses; until Phase 15: 100 pauses – §10.11), then sets the waiting flag and sleeps on the state word (`TAtomic.WaitWhileEqual`). Timeout 0 only checks. |
 | `Release(H)` | Defined or Completed → Free with the next generation: the old handle becomes stale at once; wakes waiters; gives the index back to the free list. |
 | `State`, `IndexOf`, `Payload` | The state (or `rsStale`), the slot index, the payload address. |
 
@@ -1569,29 +1604,28 @@ separate runs):
   Two threads that hand work to each other (reader ↔ I/O thread) suffer
   most from the slower cores, because every wait means a sleep and a
   wake-up.
-- **Spinning longer before sleeping** (`IORING_POOL_DEFAULT_SPIN_COUNT`, now
-  100 `PAUSE`s): 4 000 made cached reads on the E-cores 49 % faster (83 →
-  124) and on the P-cores 6–8 % faster, but with data from the disk it gave
-  no speed and cost 67 % more CPU time (188 → 313 ms for 20 000 blocks). Not
-  changed: open question for review (a setting of the engine?).
+- **Spinning before a wait sleeps:** a first measurement suggested that a
+  much longer spin makes cached reads on the E-cores 49 % faster. Repeated
+  measurements did not confirm it – E-core results move that much from run
+  to run – so the spin stayed short (§10.11).
 
 **Is one I/O thread the limit?** (the question for Phase 15; probe, Delphi
 Win64, 4 GiB file, cold, random 4 KiB blocks, median of 5)
 
-- **Buffered handle (the normal case): no.** A bare ring in one thread,
+- **Buffered handle, data from the disk: no.** A bare ring in one thread,
   without the engine, reached 125–140 thousand reads/s even with 256 reads in
   flight; the block reader with read-ahead 128 got 103–119 in the probe (141
   in the full benchmark), and two readers on two engines (two I/O threads)
-  129–133. The limit is Windows' cache path.
+  129–133. The limit is Windows' cache path. (With *cached* data, more I/O
+  threads do help – found in Phase 15, §10.12.)
 - **Unbuffered handle** (`FILE_FLAG_NO_BUFFERING`; works with the block
   reader when every block's offset and length are multiples of the sector
-  size): **yes.** One engine stayed at about 70 thousand reads/s whatever the
-  read-ahead (32, 128 or 256), also with two readers on it (65–69); two
-  readers on two engines reached 114–126, a bare ring with 128 reads in
-  flight 95–123. Grouped refill
-  did not help here either (63 → 66) although it cut the sleeps of the I/O
-  thread almost to zero (81 reads per submit) – so the cost is in the I/O
-  thread's own work per request, not in waking it.
+  size): **yes.** In these first probes one engine stayed at about 70
+  thousand reads/s, two engines reached 114–126. A closer look (§10.11)
+  showed that the 70 came mostly from the E-cores; on the P-cores one engine
+  is as fast as a bare ring (about 128), and the limit is the work Windows
+  does inside the submit call – which only more submitting threads can
+  share. Grouped refill did not help here either (63 → 66).
 - Handing blocks out in order costs something by itself: a bare ring that
   frees its buffers only in order dropped from 103 to 85 thousand reads/s
   (128 in flight, unbuffered).
@@ -1614,6 +1648,107 @@ a failed read raises every time; `Close` waits for reads in flight; stats
 (5 blocks, 3 reads, 400 bytes); stress: 20 000 random blocks (read-ahead 64)
 and 4 readers sharing one engine, all data checked. All pass with Delphi
 Debug and Release and FPC with and without `-O3`, Win32 and Win64.
+
+### 10.11 Where the I/O thread's time goes, and spinning (measured before Phase 15)
+
+Probes with Delphi Win64, unbuffered random 4 KiB reads of a 4 GiB file,
+the block reader with read-ahead 128 against a bare ring with 128 reads in
+flight; the I/O thread's loop timed part by part (an instrumented copy of
+the engine), the process pinned to one kind of core.
+
+| Pinned to | Bare ring | Block reader | Time inside `SubmitIoRing`, per read | The engine's own work, per read |
+| --- | ---: | ---: | ---: | ---: |
+| P-cores | 125–132 | 126–128 | 7.5 µs | 0.2 µs |
+| E-cores | 87–94 | 70–75 | 11 µs | 2–2.7 µs |
+
+(thousand reads per second)
+
+- **Windows does the work of a request inside `SubmitIoRing`**, in the
+  submitting thread: about 7.5 µs per unbuffered 4 KiB read on a P-core.
+  So one submitting thread – a bare ring or the engine's I/O thread – cannot
+  go beyond about 130 thousand such reads per second. Only more submitting
+  threads help (Phase 15).
+- **The engine itself costs little:** taking requests from the queue and
+  handing out the results took 0.2 µs per read on the P-cores. On the E-cores
+  it was 2–2.7 µs – mostly waking the waiting reader.
+- **Registered file and buffers** (`PrepareRegisterFiles`,
+  `PrepareRegisterBuffers`) gave at most about 3 % in the bare ring, and no
+  less time inside `SubmitIoRing`. Not added to the engine.
+- **Basic costs:** a `PAUSE` takes 33 ns on a P-core and 17 ns on an E-core
+  (on older CPUs much less); reading the clock
+  (`TIORingPlatform.TimestampMicroseconds`) 22 ns and 33 ns.
+
+**Spinning before a wait sleeps.** `WaitFor` checked the state 100 times
+(with a `PAUSE`) before it slept. Tried, with cached data on P- and E-cores
+and with data from the disk (random 4 KiB, the block reader with read-ahead
+32, 5–9 runs each):
+
+- *Longer fixed spins* (1 000 to 16 000 pauses, or 16 to 64 µs): no speed
+  gain that held up in repeated runs, and 60–80 % more CPU time with data from
+  the disk. (One early run showed +49 % on the E-cores; E-core results move
+  that much between runs.)
+- *A spin learned per thread* from its recent waits (about twice as long as
+  they took, the minimum when they took longer than 64 µs): worse. With data
+  from the disk the waits are often short – results arrive every few µs –
+  so it learned to spin, which only cost CPU time (188 → 281 ms); on the
+  E-cores it was slower too (91 → 67). A spin that ends in the result is not
+  the same as a spin that helps.
+- *Spinning only while the I/O thread is awake* (the classic adaptive-mutex
+  rule: spin while the thread that will do the work runs): no better than a
+  short fixed spin.
+- *Short fixed spins* – 100 pauses, 2, 4 or 8 µs – were all equal within the
+  noise, in every case.
+
+**Decision:** a short spin, now given as a time: `WaitFor` spins
+`SpinMicroseconds` (default 4 µs, `IORING_POOL_DEFAULT_SPIN_MICROSECONDS`),
+reading the clock every 8 pauses, then sleeps. The same behaviour as before
+on this PC, but the same wait on every CPU. No setting in the engine and no
+compiler define: no use case was found where another spin is clearly
+better.
+
+### 10.12 Several I/O threads – implementation notes (Phase 15)
+
+Built as decided in §10.4 ("Phase 15 decisions"). The I/O-thread code moved
+into `TIORingIOThread` (in the implementation part of the unit): its own
+ring, "new requests" event, sleeping flag (on a cache line of its own), list
+of requests in flight, deferred request and stats. The engine keeps the
+shared parts: pool, queue, the words of `Destroy`, and a count of the
+sleeping I/O threads.
+
+**Waking.** An I/O thread that goes to sleep sets its flag, adds itself to
+the sleeping count (both full barriers) and then looks at the queue once
+more. A producer, after putting a request in the queue (a full barrier),
+reads the count: only if all I/O threads sleep does it wake one – the first
+whose flag it can take from 1 to 0. So, as with one thread, a request is
+never left in the queue with everyone asleep, and while any I/O thread is
+awake, starting a request costs no system call. An I/O thread with siblings
+takes at most 16 requests per round (`IORING_ENGINE_SHARE_SIZE`); if more are
+waiting, it wakes one sleeping sibling before it submits, and that one does
+the same. An I/O thread whose ring is full wakes a sibling before it sleeps,
+if requests are waiting.
+
+**Found on the way: `Destroy` could hang** – also with one I/O thread. When a
+ring was full of requests that only a cancel ends (reads from pipes that get
+no data), there was no room in it for the cancel operation, and `Destroy`
+waited forever. The new test with 32 pipe reads on rings of 8 found it. Now
+one place in each ring always stays free for a cancel.
+
+**Tests** (DUnitX and FPCUnit, 6 new each): bad I/O thread counts raise; a
+backlog of 2 000 reads in one batch is shared (at least 2 of 4 I/O threads
+take requests; all data checked); one request at a time stays on the first
+I/O thread (at least 90 %); `Destroy` with 32 pending pipe reads spread over
+4 rings (all complete as cancelled); both stress tests again with 4 I/O
+threads, and every callback must run on an I/O thread (`IsIOThread`). The
+engine tests passed 30 repeated runs (Delphi Win64 Release).
+
+**Benchmark** (Benchmarks.md, "Several I/O threads"; block reader with
+read-ahead 128, Delphi Win64): with cached data, 4 I/O threads read 1.5–1.75×
+as many blocks per second as one, and the reader now beats `ReadFile`
+(1.3–1.6×); with unbuffered reads 2.7–3.2× as many – 28× `ReadFile` and
+3.2× 8 threads with `ReadFile`. Data from the disk through the file cache
+gains nothing. 2 I/O threads always helped in all four builds; 4 helped more
+in most runs. The CPU time grows a little (109 → 156 ms for 20 000 cached
+blocks). The default stays 1 I/O thread.
 
 ---
 

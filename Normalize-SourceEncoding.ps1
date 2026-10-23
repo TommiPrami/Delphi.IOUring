@@ -43,7 +43,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [string]   $Root           = '.',
-    [string[]] $Extensions     = @('.pas', '.inc', '.dpr', '.dpk', '.dproj', '.iss'),
+    [string[]] $Extensions     = @('.pas', '.inc', '.dpr', '.dpk', '.dproj', '.iss', '.md', '.csv'),
     [string]   $ExcludePattern = '(?i)(thirdparty|3rdparty)'
 )
 

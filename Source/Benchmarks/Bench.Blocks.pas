@@ -16,8 +16,12 @@
                            N reads in flight (and with MaxGap for the sorted
                            list: neighbours up to 32 KiB apart become one read),
                            on an overlapped handle; once more on a synchronous
-                           handle, to show that Windows then reads one at a time
-  Cache: cold (the file is purged from the cache before every run) and warm.
+                           handle, to show that Windows then reads one at a time;
+                           read-ahead 128 also with an engine of 2 and of 4 I/O
+                           threads (Phase 15)
+  Cache: cold (the file is purged from the cache before every run), warm, and
+  unbuffered (FILE_FLAG_NO_BUFFERING: every read goes to the disk; not for
+  TFileStream, whose buffers are not aligned).
   Reported: thousand blocks per second, MiB/s of block data, CPU time of all
   threads; median of the runs. All contenders must get the same checksum.
 
@@ -74,13 +78,13 @@ type
   TBlockList = array of TIORingBlock;
 
   TListKind = (lkRandom, lkSortedGaps);
-  TCacheState = (csCold, csWarm);
+  TCacheState = (csCold, csWarm, csUnbuffered);
   TContender = (cnFileStream, cnReadFile, cnReadFileThreads, cnReader1, cnReader8, cnReader32, cnReader128,
-    cnReader32Gap, cnReader32Sync);
+    cnReader128IO2, cnReader128IO4, cnReader32Gap, cnReader32Sync);
 
 const
   LIST_NAMES: array[TListKind] of string = ('random 4 KiB', 'sorted, gaps');
-  CACHE_NAMES: array[TCacheState] of string = ('cold', 'warm');
+  CACHE_NAMES: array[TCacheState] of string = ('cold', 'warm', 'unbuffered');
   CONTENDER_NAMES: array[TContender] of string = (
     'TFileStream, Seek + Read',
     'ReadFile at offset',
@@ -89,9 +93,13 @@ const
     'Block reader, read-ahead 8',
     'Block reader, read-ahead 32',
     'Block reader, read-ahead 128',
+    'Block reader, read-ahead 128, 2 I/O threads',
+    'Block reader, read-ahead 128, 4 I/O threads',
     'Block reader, read-ahead 32, MaxGap 32 KiB',
     'Block reader, read-ahead 32, synchronous handle');
-  READ_AHEAD: array[TContender] of Cardinal = (0, 0, 0, 1, 8, 32, 128, 32, 32);
+  READ_AHEAD: array[TContender] of Cardinal = (0, 0, 0, 1, 8, 32, 128, 128, 128, 32, 32);
+  // I/O threads of the engine a block reader uses
+  IO_THREADS: array[TContender] of Integer = (0, 0, 0, 1, 1, 1, 1, 2, 4, 1, 1);
 
 type
   TRunResult = record
@@ -107,6 +115,7 @@ type
   TReadFileThread = class(TThread)
   private
     FFileName: string;
+    FUnbuffered: Boolean;
     FBlocks: TBlockList;
     FFirst: Integer;
     FReady: PInteger;
@@ -114,8 +123,8 @@ type
     procedure Execute; override;
   public
     Consumer: TBenchConsumer;
-    constructor Create(const AFileName: string; const ABlocks: TBlockList; const AFirst: Integer;
-      const AReady: PInteger);
+    constructor Create(const AFileName: string; const AUnbuffered: Boolean; const ABlocks: TBlockList;
+      const AFirst: Integer; const AReady: PInteger);
   end;
 
 var
@@ -126,7 +135,10 @@ var
   GRuns: Integer = 3;
   GCsvFile: string;
   GKeep: Boolean;
+  // Engines with 1, 2 and 4 I/O threads
   GEngine: TIORingEngine;
+  GEngine2: TIORingEngine;
+  GEngine4: TIORingEngine;
 
 // Small random numbers (fixed seed: the same lists every time)
 function NextRandom(var AState: Cardinal): Cardinal;
@@ -166,14 +178,17 @@ end;
 // AOverlapped = False: a synchronous handle - positioned ReadFile waits for
 // the data. Windows runs the I/O of such a handle one at a time, also from
 // several threads and also through IoRing; the block reader needs
-// AOverlapped = True to have many reads in flight.
-function OpenForReading(const AFileName: string; const AOverlapped: Boolean): THandle;
+// AOverlapped = True to have many reads in flight. AUnbuffered: past the
+// file cache; buffers, offsets and lengths must then be sector-aligned.
+function OpenForReading(const AFileName: string; const AOverlapped, AUnbuffered: Boolean): THandle;
 var
   LFlags: DWORD;
 begin
   LFlags := FILE_ATTRIBUTE_NORMAL;
   if AOverlapped then
     LFlags := LFlags or FILE_FLAG_OVERLAPPED;
+  if AUnbuffered then
+    LFlags := LFlags or FILE_FLAG_NO_BUFFERING;
   Result := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING,
     LFlags, 0);
   if Result = INVALID_HANDLE_VALUE then
@@ -197,10 +212,11 @@ end;
 
 { TReadFileThread }
 
-constructor TReadFileThread.Create(const AFileName: string; const ABlocks: TBlockList; const AFirst: Integer;
-  const AReady: PInteger);
+constructor TReadFileThread.Create(const AFileName: string; const AUnbuffered: Boolean; const ABlocks: TBlockList;
+  const AFirst: Integer; const AReady: PInteger);
 begin
   FFileName := AFileName;
+  FUnbuffered := AUnbuffered;
   FBlocks := ABlocks;
   FFirst := AFirst;
   FReady := AReady;
@@ -211,10 +227,12 @@ end;
 procedure TReadFileThread.Execute;
 var
   LFile: THandle;
-  LBuffer: array[0..BLOCK_SIZE - 1] of Byte;
+  LBuffer: PByte;
   LIndex: Integer;
 begin
-  LFile := OpenForReading(FFileName, False);
+  // Page-aligned, as unbuffered reads need
+  LBuffer := TIORingPlatform.AllocPages(BLOCK_SIZE);
+  LFile := OpenForReading(FFileName, False, FUnbuffered);
   try
     TAtomic.Increment(FReady^);
     while TAtomic.LoadAcquire(FReady^) < THREAD_COUNT do
@@ -222,12 +240,13 @@ begin
     LIndex := FFirst;
     while LIndex <= High(FBlocks) do
     begin
-      ReadAt(LFile, LBuffer, FBlocks[LIndex].Length, FBlocks[LIndex].Offset);
-      Consumer.Consume(@LBuffer[0], FBlocks[LIndex].Length);
+      ReadAt(LFile, LBuffer^, FBlocks[LIndex].Length, FBlocks[LIndex].Offset);
+      Consumer.Consume(LBuffer, FBlocks[LIndex].Length);
       Inc(LIndex, THREAD_COUNT);
     end;
   finally
     CloseHandle(LFile);
+    TIORingPlatform.FreePages(LBuffer);
   end;
 end;
 
@@ -254,17 +273,24 @@ end;
 
 procedure ReadWithReadFile(const AFile: THandle; const ABlocks: TBlockList; var AConsumer: TBenchConsumer);
 var
-  LBuffer: array[0..BLOCK_SIZE - 1] of Byte;
+  LBuffer: PByte;
   LIndex: Integer;
 begin
-  for LIndex := 0 to High(ABlocks) do
-  begin
-    ReadAt(AFile, LBuffer, ABlocks[LIndex].Length, ABlocks[LIndex].Offset);
-    AConsumer.Consume(@LBuffer[0], ABlocks[LIndex].Length);
+  // Page-aligned, as unbuffered reads need
+  LBuffer := TIORingPlatform.AllocPages(BLOCK_SIZE);
+  try
+    for LIndex := 0 to High(ABlocks) do
+    begin
+      ReadAt(AFile, LBuffer^, ABlocks[LIndex].Length, ABlocks[LIndex].Offset);
+      AConsumer.Consume(LBuffer, ABlocks[LIndex].Length);
+    end;
+  finally
+    TIORingPlatform.FreePages(LBuffer);
   end;
 end;
 
-procedure ReadWithThreads(const AFileName: string; const ABlocks: TBlockList; var AConsumer: TBenchConsumer);
+procedure ReadWithThreads(const AFileName: string; const AUnbuffered: Boolean; const ABlocks: TBlockList;
+  var AConsumer: TBenchConsumer);
 var
   LThreads: array[0..THREAD_COUNT - 1] of TReadFileThread;
   LReady: Integer;
@@ -272,7 +298,7 @@ var
 begin
   LReady := 0;
   for LIndex := 0 to THREAD_COUNT - 1 do
-    LThreads[LIndex] := TReadFileThread.Create(AFileName, ABlocks, LIndex, @LReady);
+    LThreads[LIndex] := TReadFileThread.Create(AFileName, AUnbuffered, ABlocks, LIndex, @LReady);
   try
     for LIndex := 0 to THREAD_COUNT - 1 do
       LThreads[LIndex].Start;
@@ -289,19 +315,40 @@ begin
   end;
 end;
 
-procedure ReadWithBlockReader(const AFile: THandle; const ABlocks: TBlockList; const AReadAhead, AMaxGap: Cardinal;
-  var AConsumer: TBenchConsumer);
+procedure ReadWithBlockReader(const AEngine: TIORingEngine; const AFile: THandle; const ABlocks: TBlockList;
+  const AReadAhead, AMaxGap: Cardinal; var AConsumer: TBenchConsumer);
 var
   LReader: TIORingBlockReader;
   LBlock: TIORingBlock;
   LData: PByte;
   LLength: Cardinal;
 begin
-  LReader.Open(GEngine, AFile, ABlocks, AReadAhead, IORING_BLOCK_READER_DEFAULT_BUFFER_SIZE, AMaxGap);
+  LReader.Open(AEngine, AFile, ABlocks, AReadAhead, IORING_BLOCK_READER_DEFAULT_BUFFER_SIZE, AMaxGap);
   while LReader.TryGetBlock(LBlock, LData, LLength) do
   begin
     AConsumer.Consume(LData, LLength);
     LReader.ReleaseBlock;
+  end;
+end;
+
+// Does this contender run in this case?
+function Runs(const AContender: TContender; const AKind: TListKind; const ACache: TCacheState): Boolean;
+begin
+  if (AContender = cnReader32Gap) and (AKind = lkRandom) then
+    Result := False    // random blocks have no neighbours to merge
+  else if (AContender = cnFileStream) and (ACache = csUnbuffered) then
+    Result := False    // its buffers are not aligned
+  else
+    Result := True;
+end;
+
+function EngineFor(const AContender: TContender): TIORingEngine;
+begin
+  case IO_THREADS[AContender] of
+    2: Result := GEngine2;
+    4: Result := GEngine4;
+  else
+    Result := GEngine;
   end;
 end;
 
@@ -311,17 +358,14 @@ var
   LConsumer: TBenchConsumer;
   LMeasurement: TBenchMeasurement;
   LFile: THandle;
+  LUnbuffered: Boolean;
 begin
   if ACache = csCold then
     PurgeFileCache(AFileName);
+  LUnbuffered := ACache = csUnbuffered;
   LConsumer.Init(0);
   // The block readers need an overlapped handle (see OpenForReading)
-  LFile := OpenForReading(AFileName, READ_AHEAD[AContender] > 0);
-  if AContender = cnReader32Sync then
-  begin
-    CloseHandle(LFile);
-    LFile := OpenForReading(AFileName, False);
-  end;
+  LFile := OpenForReading(AFileName, (READ_AHEAD[AContender] > 0) and (AContender <> cnReader32Sync), LUnbuffered);
   try
     LMeasurement.Start;
     case AContender of
@@ -330,11 +374,11 @@ begin
       cnReadFile:
         ReadWithReadFile(LFile, ABlocks, LConsumer);
       cnReadFileThreads:
-        ReadWithThreads(AFileName, ABlocks, LConsumer);
+        ReadWithThreads(AFileName, LUnbuffered, ABlocks, LConsumer);
       cnReader32Gap:
-        ReadWithBlockReader(LFile, ABlocks, READ_AHEAD[AContender], MAX_GAP, LConsumer);
+        ReadWithBlockReader(EngineFor(AContender), LFile, ABlocks, READ_AHEAD[AContender], MAX_GAP, LConsumer);
     else
-      ReadWithBlockReader(LFile, ABlocks, READ_AHEAD[AContender], 0, LConsumer);
+      ReadWithBlockReader(EngineFor(AContender), LFile, ABlocks, READ_AHEAD[AContender], 0, LConsumer);
     end;
     LMeasurement.Stop;
   finally
@@ -487,6 +531,8 @@ begin
   Writeln(Format('%d blocks of %d bytes per list; median of %d runs', [GBlockCount, BLOCK_SIZE, GRuns], GInvariant));
 
   GEngine := TIORingEngine.Create;
+  GEngine2 := TIORingEngine.Create(IORING_ENGINE_DEFAULT_MAX_REQUESTS, IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE, 2);
+  GEngine4 := TIORingEngine.Create(IORING_ENGINE_DEFAULT_MAX_REQUESTS, IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE, 4);
   try
     for LKind := Low(TListKind) to High(TListKind) do
     begin
@@ -510,8 +556,8 @@ begin
         for LRun := 1 to GRuns do
           for LContender := Low(TContender) to High(TContender) do
           begin
-            if (LContender = cnReader32Gap) and (LKind = lkRandom) then
-              Continue;    // random blocks have no neighbours to merge
+            if not Runs(LContender, LKind, LCache) then
+              Continue;
             LResult := RunContender(LContender, LFileName, LBlocks, LCache);
             if not LHaveExpected then
             begin
@@ -527,7 +573,7 @@ begin
           end;
         for LContender := Low(TContender) to High(TContender) do
         begin
-          if (LContender = cnReader32Gap) and (LKind = lkRandom) then
+          if not Runs(LContender, LKind, LCache) then
             Continue;
           LMedian := Median(LSeconds[LContender]);
           if LAllOK[LContender] then
@@ -540,6 +586,8 @@ begin
       end;
     end;
   finally
+    GEngine4.Free;
+    GEngine2.Free;
     GEngine.Free;
   end;
   if not GKeep then
