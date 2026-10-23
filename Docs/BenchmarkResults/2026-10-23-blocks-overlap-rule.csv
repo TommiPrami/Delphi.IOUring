@@ -1,0 +1,877 @@
+timestamp,compiler,platform,blocks,scenario,cache,contender,run,seconds,blocks_per_s,mib_per_s,cpu_ms,checksum_ok
+2026-10-23 12:15:39,Delphi,Win64,20000,random 4 KiB,cold,"TFileStream, Seek + Read",1,1.3676,14624,57.1,281.3,True
+2026-10-23 12:15:40,Delphi,Win64,20000,random 4 KiB,cold,"ReadFile at offset",1,1.3499,14816,57.9,187.5,True
+2026-10-23 12:15:40,Delphi,Win64,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",1,0.1780,112329,438.8,343.8,True
+2026-10-23 12:15:42,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 1",1,1.6644,12016,46.9,515.6,True
+2026-10-23 12:15:42,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 8",1,0.2612,76572,299.1,281.3,True
+2026-10-23 12:15:43,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32",1,0.2356,84886,331.6,234.4,True
+2026-10-23 12:15:43,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128",1,0.1418,141052,551.0,140.6,True
+2026-10-23 12:15:43,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",1,0.1440,138867,542.4,218.8,True
+2026-10-23 12:15:43,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",1,0.1397,143172,559.3,171.9,True
+2026-10-23 12:15:43,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",1,0.1450,137905,538.7,203.1,True
+2026-10-23 12:15:43,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1429,139918,546.6,125.0,True
+2026-10-23 12:15:45,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",1,1.3970,14317,55.9,234.4,True
+2026-10-23 12:15:46,Delphi,Win64,20000,random 4 KiB,cold,"TFileStream, Seek + Read",2,1.3871,14419,56.3,234.4,True
+2026-10-23 12:15:48,Delphi,Win64,20000,random 4 KiB,cold,"ReadFile at offset",2,1.3844,14446,56.4,234.4,True
+2026-10-23 12:15:48,Delphi,Win64,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",2,0.1755,113944,445.1,296.9,True
+2026-10-23 12:15:49,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 1",2,1.6468,12145,47.4,390.6,True
+2026-10-23 12:15:50,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 8",2,0.2661,75157,293.6,218.8,True
+2026-10-23 12:15:50,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32",2,0.2344,85337,333.3,250.0,True
+2026-10-23 12:15:50,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128",2,0.1407,142182,555.4,125.0,True
+2026-10-23 12:15:50,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",2,0.1364,146581,572.6,140.6,True
+2026-10-23 12:15:50,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",2,0.1376,145360,567.8,171.9,True
+2026-10-23 12:15:51,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",2,0.1402,142703,557.4,203.1,True
+2026-10-23 12:15:51,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1388,144069,562.8,156.3,True
+2026-10-23 12:15:52,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",2,1.2942,15454,60.4,234.4,True
+2026-10-23 12:15:53,Delphi,Win64,20000,random 4 KiB,cold,"TFileStream, Seek + Read",3,1.2876,15533,60.7,203.1,True
+2026-10-23 12:15:55,Delphi,Win64,20000,random 4 KiB,cold,"ReadFile at offset",3,1.2268,16303,63.7,156.3,True
+2026-10-23 12:15:55,Delphi,Win64,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",3,0.1625,123104,480.9,375.0,True
+2026-10-23 12:15:57,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 1",3,1.6860,11863,46.3,312.5,True
+2026-10-23 12:15:57,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 8",3,0.2588,77274,301.9,187.5,True
+2026-10-23 12:15:57,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32",3,0.2373,84280,329.2,281.3,True
+2026-10-23 12:15:57,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128",3,0.1403,142535,556.8,109.4,True
+2026-10-23 12:15:57,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",3,0.1434,139464,544.8,203.1,True
+2026-10-23 12:15:58,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",3,0.1398,143074,558.9,250.0,True
+2026-10-23 12:15:58,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",3,0.1441,138794,542.2,171.9,True
+2026-10-23 12:15:58,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1456,137335,536.5,171.9,True
+2026-10-23 12:15:59,Delphi,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",3,1.3643,14659,57.3,171.9,True
+2026-10-23 12:15:59,Delphi,Win64,20000,random 4 KiB,warm,"TFileStream, Seek + Read",1,0.0702,284968,1113.2,78.1,True
+2026-10-23 12:15:59,Delphi,Win64,20000,random 4 KiB,warm,"ReadFile at offset",1,0.0686,291407,1138.3,62.5,True
+2026-10-23 12:15:59,Delphi,Win64,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",1,0.0446,448861,1753.4,296.9,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 1",1,0.2064,96896,378.5,312.5,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 8",1,0.0844,236908,925.4,109.4,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32",1,0.0772,259235,1012.6,140.6,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128",1,0.0758,263695,1030.1,62.5,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",1,0.0588,340387,1329.6,125.0,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",1,0.0462,433088,1691.7,218.8,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",1,0.0820,243984,953.1,78.1,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.0800,250021,976.6,93.8,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",1,0.0771,259473,1013.6,78.1,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"TFileStream, Seek + Read",2,0.0699,285928,1116.9,62.5,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"ReadFile at offset",2,0.0676,295749,1155.3,62.5,True
+2026-10-23 12:16:00,Delphi,Win64,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",2,0.0444,450088,1758.2,265.6,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 1",2,0.2083,96019,375.1,359.4,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 8",2,0.0894,223779,874.1,125.0,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32",2,0.0781,256242,1000.9,109.4,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128",2,0.0759,263678,1030.0,78.1,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",2,0.0580,344734,1346.6,140.6,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",2,0.0460,434796,1698.4,187.5,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",2,0.0786,254574,994.4,78.1,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.0813,246011,961.0,78.1,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",2,0.0806,248202,969.5,93.8,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"TFileStream, Seek + Read",3,0.0691,289406,1130.5,78.1,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"ReadFile at offset",3,0.0660,303116,1184.0,62.5,True
+2026-10-23 12:16:01,Delphi,Win64,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",3,0.0478,418701,1635.6,218.8,True
+2026-10-23 12:16:02,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 1",3,0.2090,95707,373.9,328.1,True
+2026-10-23 12:16:02,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 8",3,0.0895,223476,873.0,109.4,True
+2026-10-23 12:16:02,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32",3,0.0780,256270,1001.1,78.1,True
+2026-10-23 12:16:02,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128",3,0.0769,260244,1016.6,93.8,True
+2026-10-23 12:16:02,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",3,0.0587,340740,1331.0,109.4,True
+2026-10-23 12:16:02,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",3,0.0464,431094,1684.0,171.9,True
+2026-10-23 12:16:02,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",3,0.0788,253930,991.9,78.1,True
+2026-10-23 12:16:02,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.0803,249003,972.7,93.8,True
+2026-10-23 12:16:02,Delphi,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",3,0.0771,259422,1013.4,78.1,True
+2026-10-23 12:16:04,Delphi,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset",1,1.4094,14191,55.4,187.5,True
+2026-10-23 12:16:04,Delphi,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",1,0.1626,122981,480.4,312.5,True
+2026-10-23 12:16:05,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",1,1.4078,14206,55.5,406.3,True
+2026-10-23 12:16:05,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",1,0.1989,100535,392.7,156.3,True
+2026-10-23 12:16:06,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",1,0.1592,125592,490.6,109.4,True
+2026-10-23 12:16:06,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",1,0.1551,128909,503.6,109.4,True
+2026-10-23 12:16:06,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",1,0.0896,223271,872.2,93.8,True
+2026-10-23 12:16:06,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",1,0.0506,395555,1545.1,125.0,True
+2026-10-23 12:16:06,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",1,0.1561,128151,500.6,140.6,True
+2026-10-23 12:16:06,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1561,128126,500.5,78.1,True
+2026-10-23 12:16:07,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",1,1.0967,18237,71.2,171.9,True
+2026-10-23 12:16:09,Delphi,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset",2,1.2787,15641,61.1,62.5,True
+2026-10-23 12:16:09,Delphi,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",2,0.1580,126617,494.6,93.8,True
+2026-10-23 12:16:10,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",2,1.4575,13722,53.6,468.8,True
+2026-10-23 12:16:10,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",2,0.2016,99226,387.6,125.0,True
+2026-10-23 12:16:11,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",2,0.1595,125413,489.9,93.8,True
+2026-10-23 12:16:11,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",2,0.1552,128902,503.5,156.3,True
+2026-10-23 12:16:11,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",2,0.0892,224157,875.6,187.5,True
+2026-10-23 12:16:11,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",2,0.0477,419271,1637.8,140.6,True
+2026-10-23 12:16:11,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",2,0.1558,128397,501.6,93.8,True
+2026-10-23 12:16:11,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1574,127070,496.4,78.1,True
+2026-10-23 12:16:12,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",2,1.0743,18618,72.7,109.4,True
+2026-10-23 12:16:13,Delphi,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset",3,1.2517,15978,62.4,46.9,True
+2026-10-23 12:16:14,Delphi,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",3,0.1596,125308,489.5,203.1,True
+2026-10-23 12:16:15,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",3,1.3937,14351,56.1,375.0,True
+2026-10-23 12:16:15,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",3,0.2038,98146,383.4,218.8,True
+2026-10-23 12:16:15,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",3,0.1581,126474,494.0,93.8,True
+2026-10-23 12:16:16,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",3,0.1551,128959,503.7,125.0,True
+2026-10-23 12:16:16,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",3,0.0882,226643,885.3,156.3,True
+2026-10-23 12:16:16,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",3,0.0516,387614,1514.1,93.8,True
+2026-10-23 12:16:16,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",3,0.1564,127888,499.6,93.8,True
+2026-10-23 12:16:16,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1561,128149,500.6,125.0,True
+2026-10-23 12:16:17,Delphi,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",3,1.0912,18328,71.6,93.8,True
+2026-10-23 12:16:18,Delphi,Win64,20000,sorted, gaps,cold,"TFileStream, Seek + Read",1,0.9867,20269,79.2,125.0,True
+2026-10-23 12:16:19,Delphi,Win64,20000,sorted, gaps,cold,"ReadFile at offset",1,1.0153,19699,77.0,203.1,True
+2026-10-23 12:16:19,Delphi,Win64,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",1,0.1755,113934,445.1,62.5,True
+2026-10-23 12:16:21,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 1",1,1.4397,13892,54.3,406.3,True
+2026-10-23 12:16:21,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 8",1,0.2348,85172,332.7,109.4,True
+2026-10-23 12:16:21,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32",1,0.2020,98995,386.7,109.4,True
+2026-10-23 12:16:21,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128",1,0.1178,169797,663.3,156.3,True
+2026-10-23 12:16:21,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",1,0.1228,162840,636.1,93.8,True
+2026-10-23 12:16:22,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",1,0.1205,165922,648.1,125.0,True
+2026-10-23 12:16:22,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",1,0.1197,167144,652.9,140.6,True
+2026-10-23 12:16:22,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1192,167752,655.3,109.4,True
+2026-10-23 12:16:22,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0596,335400,1310.2,0.0,True
+2026-10-23 12:16:23,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",1,1.2165,16440,64.2,328.1,True
+2026-10-23 12:16:24,Delphi,Win64,20000,sorted, gaps,cold,"TFileStream, Seek + Read",2,1.0262,19489,76.1,218.8,True
+2026-10-23 12:16:25,Delphi,Win64,20000,sorted, gaps,cold,"ReadFile at offset",2,1.0121,19761,77.2,187.5,True
+2026-10-23 12:16:25,Delphi,Win64,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",2,0.1838,108786,424.9,359.4,True
+2026-10-23 12:16:27,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 1",2,1.4146,14138,55.2,421.9,True
+2026-10-23 12:16:27,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 8",2,0.2291,87289,341.0,218.8,True
+2026-10-23 12:16:27,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32",2,0.2026,98700,385.5,140.6,True
+2026-10-23 12:16:27,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128",2,0.1179,169672,662.8,109.4,True
+2026-10-23 12:16:27,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",2,0.1212,164981,644.5,46.9,True
+2026-10-23 12:16:28,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",2,0.1274,156935,613.0,109.4,True
+2026-10-23 12:16:28,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",2,0.1205,165939,648.2,78.1,True
+2026-10-23 12:16:28,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1207,165656,647.1,171.9,True
+2026-10-23 12:16:28,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0600,333390,1302.3,62.5,True
+2026-10-23 12:16:29,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",2,1.1026,18139,70.9,203.1,True
+2026-10-23 12:16:30,Delphi,Win64,20000,sorted, gaps,cold,"TFileStream, Seek + Read",3,0.9208,21720,84.8,93.8,True
+2026-10-23 12:16:31,Delphi,Win64,20000,sorted, gaps,cold,"ReadFile at offset",3,0.8844,22615,88.3,187.5,True
+2026-10-23 12:16:31,Delphi,Win64,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",3,0.1564,127906,499.6,296.9,True
+2026-10-23 12:16:33,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 1",3,1.5273,13095,51.2,515.6,True
+2026-10-23 12:16:33,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 8",3,0.2308,86663,338.5,171.9,True
+2026-10-23 12:16:33,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32",3,0.2015,99246,387.7,218.8,True
+2026-10-23 12:16:33,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128",3,0.1169,171054,668.2,109.4,True
+2026-10-23 12:16:33,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",3,0.1178,169788,663.2,156.3,True
+2026-10-23 12:16:33,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",3,0.1203,166254,649.4,46.9,True
+2026-10-23 12:16:34,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",3,0.1233,162142,633.4,125.0,True
+2026-10-23 12:16:34,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1199,166809,651.6,109.4,True
+2026-10-23 12:16:34,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0560,357421,1396.2,46.9,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",3,1.1813,16930,66.1,93.8,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,warm,"TFileStream, Seek + Read",1,0.0478,418768,1635.8,46.9,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,warm,"ReadFile at offset",1,0.0430,465345,1817.8,46.9,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",1,0.0305,656207,2563.3,171.9,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 1",1,0.1536,130209,508.6,218.8,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 8",1,0.0558,358108,1398.9,46.9,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32",1,0.0501,399522,1560.6,78.1,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128",1,0.0476,420427,1642.3,46.9,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",1,0.0333,600994,2347.6,109.4,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",1,0.0234,852882,3331.6,62.5,True
+2026-10-23 12:16:35,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",1,0.0504,396692,1549.6,62.5,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.0531,376792,1471.8,46.9,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0536,373109,1457.5,31.3,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",1,0.0494,404642,1580.6,46.9,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"TFileStream, Seek + Read",2,0.0456,438286,1712.1,46.9,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"ReadFile at offset",2,0.0439,455459,1779.1,46.9,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",2,0.0306,654123,2555.2,125.0,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 1",2,0.1415,141382,552.3,187.5,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 8",2,0.0534,374767,1463.9,109.4,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32",2,0.0493,405421,1583.7,78.1,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128",2,0.0475,421164,1645.2,46.9,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",2,0.0348,574818,2245.4,78.1,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",2,0.0235,850420,3322.0,140.6,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",2,0.0516,387954,1515.4,62.5,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.0535,374009,1461.0,46.9,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0500,399897,1562.1,78.1,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",2,0.0496,403355,1575.6,31.3,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"TFileStream, Seek + Read",3,0.0455,439256,1715.8,46.9,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"ReadFile at offset",3,0.0430,465329,1817.7,46.9,True
+2026-10-23 12:16:36,Delphi,Win64,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",3,0.0312,640311,2501.2,203.1,True
+2026-10-23 12:16:37,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 1",3,0.1540,129875,507.3,250.0,True
+2026-10-23 12:16:37,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 8",3,0.0549,364171,1422.5,78.1,True
+2026-10-23 12:16:37,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32",3,0.0499,400502,1564.5,31.3,True
+2026-10-23 12:16:37,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128",3,0.0468,427007,1668.0,62.5,True
+2026-10-23 12:16:37,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",3,0.0337,593801,2319.5,78.1,True
+2026-10-23 12:16:37,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",3,0.0235,850420,3322.0,78.1,True
+2026-10-23 12:16:37,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",3,0.0504,396776,1549.9,62.5,True
+2026-10-23 12:16:37,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.0515,388520,1517.7,78.1,True
+2026-10-23 12:16:37,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0481,415763,1624.1,46.9,True
+2026-10-23 12:16:37,Delphi,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",3,0.0490,408038,1593.9,78.1,True
+2026-10-23 12:16:38,Delphi,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset",1,1.3332,15001,58.6,187.5,True
+2026-10-23 12:16:39,Delphi,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",1,0.1585,126151,492.8,156.3,True
+2026-10-23 12:16:40,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",1,1.2357,16185,63.2,421.9,True
+2026-10-23 12:16:40,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",1,0.1900,105272,411.2,218.8,True
+2026-10-23 12:16:40,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",1,0.1350,148115,578.6,93.8,True
+2026-10-23 12:16:40,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",1,0.1398,143113,559.0,46.9,True
+2026-10-23 12:16:40,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",1,0.0784,255067,996.4,156.3,True
+2026-10-23 12:16:40,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",1,0.0420,476359,1860.8,93.8,True
+2026-10-23 12:16:40,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",1,0.1364,146652,572.9,93.8,True
+2026-10-23 12:16:41,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1360,147013,574.3,109.4,True
+2026-10-23 12:16:41,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0579,345422,1349.3,31.3,True
+2026-10-23 12:16:42,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",1,0.9843,20319,79.4,93.8,True
+2026-10-23 12:16:43,Delphi,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset",2,1.2786,15642,61.1,62.5,True
+2026-10-23 12:16:43,Delphi,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",2,0.1572,127198,496.9,203.1,True
+2026-10-23 12:16:44,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",2,1.2269,16301,63.7,296.9,True
+2026-10-23 12:16:45,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",2,0.1945,102834,401.7,250.0,True
+2026-10-23 12:16:45,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",2,0.1352,147926,577.8,93.8,True
+2026-10-23 12:16:45,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",2,0.1333,150040,586.1,93.8,True
+2026-10-23 12:16:45,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",2,0.0756,264550,1033.4,156.3,True
+2026-10-23 12:16:45,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",2,0.0421,474985,1855.4,31.3,True
+2026-10-23 12:16:45,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",2,0.1353,147871,577.6,109.4,True
+2026-10-23 12:16:45,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1353,147826,577.4,140.6,True
+2026-10-23 12:16:45,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0596,335564,1310.8,15.6,True
+2026-10-23 12:16:46,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",2,0.9776,20459,79.9,140.6,True
+2026-10-23 12:16:47,Delphi,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset",3,1.2669,15787,61.7,125.0,True
+2026-10-23 12:16:48,Delphi,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",3,0.1626,122996,480.5,109.4,True
+2026-10-23 12:16:49,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",3,1.2462,16049,62.7,281.3,True
+2026-10-23 12:16:49,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",3,0.1920,104152,406.8,203.1,True
+2026-10-23 12:16:49,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",3,0.1347,148489,580.0,125.0,True
+2026-10-23 12:16:49,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",3,0.1316,151974,593.6,125.0,True
+2026-10-23 12:16:49,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",3,0.0761,262725,1026.3,140.6,True
+2026-10-23 12:16:49,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",3,0.0418,478181,1867.9,156.3,True
+2026-10-23 12:16:50,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",3,0.1347,148444,579.9,78.1,True
+2026-10-23 12:16:50,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1362,146799,573.4,109.4,True
+2026-10-23 12:16:50,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0585,341627,1334.5,15.6,True
+2026-10-23 12:16:51,Delphi,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",3,0.9671,20680,80.8,156.3,True
+2026-10-23 12.16.52,FPC,Win64,20000,random 4 KiB,cold,"TFileStream, Seek + Read",1,1.2663,15794,61.7,218.8,True
+2026-10-23 12.16.53,FPC,Win64,20000,random 4 KiB,cold,"ReadFile at offset",1,1.2416,16108,62.9,250.0,True
+2026-10-23 12.16.54,FPC,Win64,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",1,0.1630,122662,479.1,406.3,True
+2026-10-23 12.16.55,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 1",1,1.6667,12000,46.9,406.3,True
+2026-10-23 12.16.56,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 8",1,0.2603,76840,300.2,156.3,True
+2026-10-23 12.16.56,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32",1,0.2348,85173,332.7,109.4,True
+2026-10-23 12.16.56,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128",1,0.1410,141841,554.1,156.3,True
+2026-10-23 12.16.56,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",1,0.1388,144052,562.7,140.6,True
+2026-10-23 12.16.56,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",1,0.1373,145703,569.2,109.4,True
+2026-10-23 12.16.56,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",1,0.1404,142413,556.3,156.3,True
+2026-10-23 12.16.57,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1404,142436,556.4,109.4,True
+2026-10-23 12.16.58,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",1,1.3628,14676,57.3,265.6,True
+2026-10-23 12.16.59,FPC,Win64,20000,random 4 KiB,cold,"TFileStream, Seek + Read",2,1.3667,14634,57.2,171.9,True
+2026-10-23 12.17.01,FPC,Win64,20000,random 4 KiB,cold,"ReadFile at offset",2,1.3700,14598,57.0,156.3,True
+2026-10-23 12.17.01,FPC,Win64,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",2,0.1764,113404,443.0,421.9,True
+2026-10-23 12.17.03,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 1",2,1.6623,12031,47.0,296.9,True
+2026-10-23 12.17.03,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 8",2,0.2633,75970,296.8,234.4,True
+2026-10-23 12.17.03,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32",2,0.2360,84731,331.0,93.8,True
+2026-10-23 12.17.03,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128",2,0.1381,144773,565.5,140.6,True
+2026-10-23 12.17.04,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",2,0.1398,143015,558.7,187.5,True
+2026-10-23 12.17.04,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",2,0.1410,141833,554.0,218.8,True
+2026-10-23 12.17.04,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",2,0.1445,138369,540.5,125.0,True
+2026-10-23 12.17.04,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1397,143140,559.1,171.9,True
+2026-10-23 12.17.05,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",2,1.3632,14672,57.3,234.4,True
+2026-10-23 12.17.07,FPC,Win64,20000,random 4 KiB,cold,"TFileStream, Seek + Read",3,1.3781,14513,56.7,250.0,True
+2026-10-23 12.17.08,FPC,Win64,20000,random 4 KiB,cold,"ReadFile at offset",3,1.3365,14965,58.5,218.8,True
+2026-10-23 12.17.08,FPC,Win64,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",3,0.1775,112674,440.1,546.9,True
+2026-10-23 12.17.10,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 1",3,1.6360,12225,47.8,406.3,True
+2026-10-23 12.17.10,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 8",3,0.2645,75610,295.4,171.9,True
+2026-10-23 12.17.10,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32",3,0.2335,85667,334.6,218.8,True
+2026-10-23 12.17.11,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128",3,0.1386,144306,563.7,140.6,True
+2026-10-23 12.17.11,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",3,0.1404,142442,556.4,171.9,True
+2026-10-23 12.17.11,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",3,0.1419,140981,550.7,203.1,True
+2026-10-23 12.17.11,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",3,0.1406,142267,555.7,171.9,True
+2026-10-23 12.17.11,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1371,145907,569.9,171.9,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",3,1.3600,14705,57.4,140.6,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,warm,"TFileStream, Seek + Read",1,0.0669,298951,1167.8,62.5,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,warm,"ReadFile at offset",1,0.0626,319660,1248.7,62.5,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",1,0.0439,455136,1777.9,171.9,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 1",1,0.2027,98691,385.5,328.1,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 8",1,0.0834,239706,936.3,109.4,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32",1,0.0773,258789,1010.9,125.0,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128",1,0.0763,262107,1023.9,78.1,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",1,0.0581,344302,1344.9,140.6,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",1,0.0457,438069,1711.2,125.0,True
+2026-10-23 12.17.13,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",1,0.0784,254966,996.0,93.8,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.0824,242767,948.3,78.1,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",1,0.0793,252091,984.7,93.8,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"TFileStream, Seek + Read",2,0.0673,297327,1161.4,62.5,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"ReadFile at offset",2,0.0643,311111,1215.3,62.5,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",2,0.0462,432619,1689.9,125.0,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 1",2,0.1996,100180,391.3,281.3,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 8",2,0.0893,223846,874.4,140.6,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32",2,0.0782,255788,999.2,93.8,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128",2,0.0758,263772,1030.4,78.1,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",2,0.0568,352343,1376.3,109.4,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",2,0.0448,446731,1745.0,156.3,True
+2026-10-23 12.17.14,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",2,0.0790,253165,988.9,78.1,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.0808,247392,966.4,125.0,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",2,0.0774,258376,1009.3,109.4,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"TFileStream, Seek + Read",3,0.0674,296813,1159.4,62.5,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"ReadFile at offset",3,0.0630,317429,1240.0,62.5,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",3,0.0430,465470,1818.2,234.4,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 1",3,0.2091,95640,373.6,265.6,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 8",3,0.0851,234945,917.8,140.6,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32",3,0.0789,253325,989.6,109.4,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128",3,0.0743,269204,1051.6,62.5,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",3,0.0562,355681,1389.4,140.6,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",3,0.0452,442268,1727.6,187.5,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",3,0.0787,253997,992.2,93.8,True
+2026-10-23 12.17.15,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.0781,256217,1000.8,93.8,True
+2026-10-23 12.17.16,FPC,Win64,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",3,0.0815,245511,959.0,78.1,True
+2026-10-23 12.17.17,FPC,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset",1,1.2594,15880,62.0,140.6,True
+2026-10-23 12.17.17,FPC,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",1,0.1609,124278,485.5,156.3,True
+2026-10-23 12.17.18,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",1,1.3908,14380,56.2,375.0,True
+2026-10-23 12.17.19,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",1,0.1981,100953,394.3,250.0,True
+2026-10-23 12.17.19,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",1,0.1560,128229,500.9,140.6,True
+2026-10-23 12.17.19,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",1,0.1553,128820,503.2,140.6,True
+2026-10-23 12.17.19,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",1,0.0884,226220,883.7,125.0,True
+2026-10-23 12.17.19,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",1,0.0508,393589,1537.5,140.6,True
+2026-10-23 12.17.19,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",1,0.1548,129166,504.6,78.1,True
+2026-10-23 12.17.19,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1550,129007,503.9,125.0,True
+2026-10-23 12.17.20,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",1,1.0889,18366,71.7,109.4,True
+2026-10-23 12.17.22,FPC,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset",2,1.2338,16210,63.3,78.1,True
+2026-10-23 12.17.22,FPC,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",2,0.1606,124550,486.5,234.4,True
+2026-10-23 12.17.23,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",2,1.4007,14279,55.8,234.4,True
+2026-10-23 12.17.23,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",2,0.1991,100468,392.5,156.3,True
+2026-10-23 12.17.24,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",2,0.1569,127443,497.8,109.4,True
+2026-10-23 12.17.24,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",2,0.1531,130611,510.2,62.5,True
+2026-10-23 12.17.24,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",2,0.0888,225233,879.8,109.4,True
+2026-10-23 12.17.24,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",2,0.0475,421199,1645.3,156.3,True
+2026-10-23 12.17.24,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",2,0.1551,128988,503.9,109.4,True
+2026-10-23 12.17.24,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1554,128715,502.8,125.0,True
+2026-10-23 12.17.25,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",2,1.0743,18616,72.7,125.0,True
+2026-10-23 12.17.26,FPC,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset",3,1.2021,16638,65.0,140.6,True
+2026-10-23 12.17.27,FPC,Win64,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",3,0.1428,140042,547.0,187.5,True
+2026-10-23 12.17.28,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",3,1.4188,14097,55.1,484.4,True
+2026-10-23 12.17.28,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",3,0.1939,103170,403.0,140.6,True
+2026-10-23 12.17.28,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",3,0.1606,124500,486.3,171.9,True
+2026-10-23 12.17.29,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",3,0.1539,129951,507.6,109.4,True
+2026-10-23 12.17.29,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",3,0.0893,224065,875.3,140.6,True
+2026-10-23 12.17.29,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",3,0.0485,412320,1610.6,171.9,True
+2026-10-23 12.17.29,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",3,0.1561,128163,500.6,93.8,True
+2026-10-23 12.17.29,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1562,128045,500.2,140.6,True
+2026-10-23 12.17.30,FPC,Win64,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",3,1.0804,18511,72.3,203.1,True
+2026-10-23 12.17.31,FPC,Win64,20000,sorted, gaps,cold,"TFileStream, Seek + Read",1,0.8438,23702,92.6,140.6,True
+2026-10-23 12.17.32,FPC,Win64,20000,sorted, gaps,cold,"ReadFile at offset",1,0.8873,22541,88.1,109.4,True
+2026-10-23 12.17.32,FPC,Win64,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",1,0.1567,127661,498.7,218.8,True
+2026-10-23 12.17.33,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 1",1,1.4750,13559,53.0,515.6,True
+2026-10-23 12.17.34,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 8",1,0.2347,85220,332.9,281.3,True
+2026-10-23 12.17.34,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32",1,0.2036,98219,383.7,140.6,True
+2026-10-23 12.17.34,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128",1,0.1191,167868,655.7,140.6,True
+2026-10-23 12.17.34,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",1,0.1227,163018,636.8,109.4,True
+2026-10-23 12.17.34,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",1,0.1226,163162,637.4,140.6,True
+2026-10-23 12.17.34,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",1,0.1234,162092,633.2,171.9,True
+2026-10-23 12.17.35,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1235,161978,632.7,125.0,True
+2026-10-23 12.17.35,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0554,360960,1410.0,0.0,True
+2026-10-23 12.17.36,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",1,1.1605,17234,67.3,218.8,True
+2026-10-23 12.17.37,FPC,Win64,20000,sorted, gaps,cold,"TFileStream, Seek + Read",2,1.0063,19875,77.6,140.6,True
+2026-10-23 12.17.38,FPC,Win64,20000,sorted, gaps,cold,"ReadFile at offset",2,1.0125,19753,77.2,93.8,True
+2026-10-23 12.17.38,FPC,Win64,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",2,0.1827,109449,427.5,296.9,True
+2026-10-23 12.17.40,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 1",2,1.4878,13443,52.5,187.5,True
+2026-10-23 12.17.40,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 8",2,0.2356,84882,331.6,250.0,True
+2026-10-23 12.17.40,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32",2,0.2022,98911,386.4,156.3,True
+2026-10-23 12.17.40,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128",2,0.1196,167181,653.0,109.4,True
+2026-10-23 12.17.40,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",2,0.1169,171073,668.3,125.0,True
+2026-10-23 12.17.40,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",2,0.1235,161899,632.4,156.3,True
+2026-10-23 12.17.40,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",2,0.1226,163194,637.5,93.8,True
+2026-10-23 12.17.41,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1216,164407,642.2,78.1,True
+2026-10-23 12.17.41,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0602,332181,1297.6,15.6,True
+2026-10-23 12.17.42,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",2,1.1817,16925,66.1,187.5,True
+2026-10-23 12.17.43,FPC,Win64,20000,sorted, gaps,cold,"TFileStream, Seek + Read",3,1.0244,19523,76.3,250.0,True
+2026-10-23 12.17.44,FPC,Win64,20000,sorted, gaps,cold,"ReadFile at offset",3,1.1455,17460,68.2,187.5,True
+2026-10-23 12.17.44,FPC,Win64,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",3,0.1783,112190,438.2,265.6,True
+2026-10-23 12.17.46,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 1",3,1.4615,13684,53.5,218.8,True
+2026-10-23 12.17.46,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 8",3,0.2371,84346,329.5,156.3,True
+2026-10-23 12.17.46,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32",3,0.2071,96592,377.3,140.6,True
+2026-10-23 12.17.46,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128",3,0.1191,167981,656.2,93.8,True
+2026-10-23 12.17.46,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",3,0.1175,170164,664.7,125.0,True
+2026-10-23 12.17.47,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",3,0.1211,165129,645.0,187.5,True
+2026-10-23 12.17.47,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",3,0.1194,167553,654.5,62.5,True
+2026-10-23 12.17.47,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1186,168614,658.6,140.6,True
+2026-10-23 12.17.47,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0582,343921,1343.4,15.6,True
+2026-10-23 12.17.48,FPC,Win64,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",3,1.1600,17242,67.4,171.9,True
+2026-10-23 12.17.48,FPC,Win64,20000,sorted, gaps,warm,"TFileStream, Seek + Read",1,0.0438,457092,1785.5,46.9,True
+2026-10-23 12.17.48,FPC,Win64,20000,sorted, gaps,warm,"ReadFile at offset",1,0.0402,497676,1944.0,46.9,True
+2026-10-23 12.17.48,FPC,Win64,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",1,0.0311,643244,2512.7,140.6,True
+2026-10-23 12.17.48,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 1",1,0.1554,128666,502.6,265.6,True
+2026-10-23 12.17.48,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 8",1,0.0574,348611,1361.8,62.5,True
+2026-10-23 12.17.48,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32",1,0.0496,403260,1575.2,78.1,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128",1,0.0479,417527,1631.0,62.5,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",1,0.0346,578063,2258.1,78.1,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",1,0.0234,854062,3336.2,78.1,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",1,0.0513,389984,1523.4,62.5,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.0511,391522,1529.4,62.5,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0546,366469,1431.5,46.9,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",1,0.0497,402117,1570.8,62.5,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"TFileStream, Seek + Read",2,0.0441,453330,1770.8,46.9,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"ReadFile at offset",2,0.0405,494215,1930.5,31.3,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",2,0.0329,608617,2377.4,140.6,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 1",2,0.1597,125212,489.1,265.6,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 8",2,0.0551,362824,1417.3,78.1,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32",2,0.0495,403884,1577.7,78.1,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128",2,0.0483,413674,1615.9,62.5,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",2,0.0337,593190,2317.1,93.8,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",2,0.0236,847131,3309.1,62.5,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",2,0.0504,396966,1550.6,46.9,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.0553,361402,1411.7,78.1,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0490,407825,1593.1,46.9,True
+2026-10-23 12.17.49,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",2,0.0498,401266,1567.4,46.9,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"TFileStream, Seek + Read",3,0.0438,456204,1782.0,46.9,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"ReadFile at offset",3,0.0412,485539,1896.6,46.9,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",3,0.0369,542124,2117.7,125.0,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 1",3,0.1617,123683,483.1,296.9,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 8",3,0.0576,347411,1357.1,93.8,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32",3,0.0488,409532,1599.7,46.9,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128",3,0.0475,420667,1643.2,46.9,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",3,0.0338,591527,2310.7,109.4,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",3,0.0247,810498,3166.0,62.5,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",3,0.0507,394428,1540.7,78.1,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.0513,389739,1522.4,46.9,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0479,417355,1630.3,78.1,True
+2026-10-23 12.17.50,FPC,Win64,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",3,0.0497,402166,1571.0,93.8,True
+2026-10-23 12.17.51,FPC,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset",1,1.2886,15520,60.6,171.9,True
+2026-10-23 12.17.52,FPC,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",1,0.1506,132769,518.6,218.8,True
+2026-10-23 12.17.53,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",1,1.2883,15525,60.6,437.5,True
+2026-10-23 12.17.53,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",1,0.1833,109097,426.2,234.4,True
+2026-10-23 12.17.53,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",1,0.1384,144487,564.4,93.8,True
+2026-10-23 12.17.53,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",1,0.1355,147587,576.5,78.1,True
+2026-10-23 12.17.53,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",1,0.0778,257110,1004.3,125.0,True
+2026-10-23 12.17.54,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",1,0.0437,457159,1785.8,78.1,True
+2026-10-23 12.17.54,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",1,0.1392,143634,561.1,93.8,True
+2026-10-23 12.17.54,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1386,144336,563.8,140.6,True
+2026-10-23 12.17.54,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0572,349377,1364.8,15.6,True
+2026-10-23 12.17.55,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",1,0.9424,21223,82.9,140.6,True
+2026-10-23 12.17.56,FPC,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset",2,1.1596,17248,67.4,187.5,True
+2026-10-23 12.17.56,FPC,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",2,0.1506,132813,518.8,250.0,True
+2026-10-23 12.17.57,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",2,1.2541,15947,62.3,484.4,True
+2026-10-23 12.17.58,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",2,0.1932,103500,404.3,140.6,True
+2026-10-23 12.17.58,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",2,0.1373,145653,569.0,109.4,True
+2026-10-23 12.17.58,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",2,0.1346,148537,580.2,93.8,True
+2026-10-23 12.17.58,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",2,0.0794,251842,983.8,109.4,True
+2026-10-23 12.17.58,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",2,0.0428,467619,1826.6,187.5,True
+2026-10-23 12.17.58,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",2,0.1388,144124,563.0,93.8,True
+2026-10-23 12.17.58,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1359,147193,575.0,109.4,True
+2026-10-23 12.17.58,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0579,345516,1349.7,15.6,True
+2026-10-23 12.17.59,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",2,1.0898,18352,71.7,140.6,True
+2026-10-23 12.18.01,FPC,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset",3,1.2586,15890,62.1,125.0,True
+2026-10-23 12.18.01,FPC,Win64,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",3,0.1659,120584,471.0,46.9,True
+2026-10-23 12.18.02,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",3,1.2504,15995,62.5,406.3,True
+2026-10-23 12.18.02,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",3,0.1946,102788,401.5,125.0,True
+2026-10-23 12.18.02,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",3,0.1362,146792,573.4,93.8,True
+2026-10-23 12.18.03,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",3,0.1330,150403,587.5,125.0,True
+2026-10-23 12.18.03,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",3,0.0774,258368,1009.2,125.0,True
+2026-10-23 12.18.03,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",3,0.0434,460701,1799.6,109.4,True
+2026-10-23 12.18.03,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",3,0.1362,146876,573.7,78.1,True
+2026-10-23 12.18.03,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1369,146121,570.8,109.4,True
+2026-10-23 12.18.03,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0579,345337,1349.0,31.3,True
+2026-10-23 12.18.04,FPC,Win64,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",3,1.0857,18422,72.0,125.0,True
+2026-10-23 12:18:06,Delphi,Win32,20000,random 4 KiB,cold,"TFileStream, Seek + Read",1,1.3610,14695,57.4,265.6,True
+2026-10-23 12:18:07,Delphi,Win32,20000,random 4 KiB,cold,"ReadFile at offset",1,1.3569,14740,57.6,265.6,True
+2026-10-23 12:18:07,Delphi,Win32,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",1,0.1759,113730,444.3,171.9,True
+2026-10-23 12:18:09,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 1",1,1.6654,12009,46.9,546.9,True
+2026-10-23 12:18:09,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 8",1,0.2692,74289,290.2,234.4,True
+2026-10-23 12:18:09,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32",1,0.2377,84123,328.6,140.6,True
+2026-10-23 12:18:10,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128",1,0.1423,140542,549.0,140.6,True
+2026-10-23 12:18:10,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",1,0.1410,141857,554.1,156.3,True
+2026-10-23 12:18:10,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",1,0.1396,143285,559.7,203.1,True
+2026-10-23 12:18:10,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",1,0.1396,143242,559.5,140.6,True
+2026-10-23 12:18:10,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1443,138586,541.4,203.1,True
+2026-10-23 12:18:12,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",1,1.3767,14528,56.7,281.3,True
+2026-10-23 12:18:13,Delphi,Win32,20000,random 4 KiB,cold,"TFileStream, Seek + Read",2,1.3615,14689,57.4,250.0,True
+2026-10-23 12:18:14,Delphi,Win32,20000,random 4 KiB,cold,"ReadFile at offset",2,1.3539,14772,57.7,156.3,True
+2026-10-23 12:18:15,Delphi,Win32,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",2,0.1765,113342,442.7,328.1,True
+2026-10-23 12:18:16,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 1",2,1.6907,11830,46.2,562.5,True
+2026-10-23 12:18:17,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 8",2,0.2741,72969,285.0,218.8,True
+2026-10-23 12:18:17,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32",2,0.2336,85603,334.4,187.5,True
+2026-10-23 12:18:17,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128",2,0.1416,141259,551.8,140.6,True
+2026-10-23 12:18:17,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",2,0.1447,138244,540.0,203.1,True
+2026-10-23 12:18:17,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",2,0.1479,135261,528.4,187.5,True
+2026-10-23 12:18:17,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",2,0.1444,138465,540.9,171.9,True
+2026-10-23 12:18:18,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1425,140397,548.4,140.6,True
+2026-10-23 12:18:19,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",2,1.3581,14726,57.5,218.8,True
+2026-10-23 12:18:20,Delphi,Win32,20000,random 4 KiB,cold,"TFileStream, Seek + Read",3,1.3600,14706,57.4,203.1,True
+2026-10-23 12:18:22,Delphi,Win32,20000,random 4 KiB,cold,"ReadFile at offset",3,1.3812,14480,56.6,125.0,True
+2026-10-23 12:18:22,Delphi,Win32,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",3,0.1753,114117,445.8,500.0,True
+2026-10-23 12:18:24,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 1",3,1.7101,11695,45.7,609.4,True
+2026-10-23 12:18:24,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 8",3,0.2818,70979,277.3,265.6,True
+2026-10-23 12:18:24,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32",3,0.2350,85112,332.5,187.5,True
+2026-10-23 12:18:24,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128",3,0.1399,143009,558.6,156.3,True
+2026-10-23 12:18:24,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",3,0.1437,139137,543.5,156.3,True
+2026-10-23 12:18:25,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",3,0.1443,138553,541.2,156.3,True
+2026-10-23 12:18:25,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",3,0.1402,142686,557.4,187.5,True
+2026-10-23 12:18:25,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1386,144303,563.7,140.6,True
+2026-10-23 12:18:26,Delphi,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",3,1.3196,15156,59.2,250.0,True
+2026-10-23 12:18:26,Delphi,Win32,20000,random 4 KiB,warm,"TFileStream, Seek + Read",1,0.0752,265823,1038.4,62.5,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"ReadFile at offset",1,0.0687,291044,1136.9,62.5,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",1,0.0466,428860,1675.2,203.1,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 1",1,0.2279,87750,342.8,328.1,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 8",1,0.0874,228845,893.9,156.3,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32",1,0.0798,250680,979.2,78.1,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128",1,0.0755,265057,1035.4,78.1,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",1,0.0588,340118,1328.6,125.0,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",1,0.0470,425852,1663.5,187.5,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",1,0.0810,246906,964.5,78.1,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.0792,252673,987.0,78.1,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",1,0.0805,248413,970.4,109.4,True
+2026-10-23 12:18:27,Delphi,Win32,20000,random 4 KiB,warm,"TFileStream, Seek + Read",2,0.0761,262828,1026.7,78.1,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"ReadFile at offset",2,0.0704,283924,1109.1,78.1,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",2,0.0439,455703,1780.1,296.9,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 1",2,0.2215,90307,352.8,328.1,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 8",2,0.0895,223360,872.5,156.3,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32",2,0.0776,257837,1007.2,78.1,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128",2,0.0758,263976,1031.2,62.5,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",2,0.0582,343450,1341.6,125.0,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",2,0.0448,446678,1744.8,171.9,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",2,0.0813,245972,960.8,93.8,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.0819,244208,953.9,109.4,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",2,0.0772,259181,1012.4,93.8,True
+2026-10-23 12:18:28,Delphi,Win32,20000,random 4 KiB,warm,"TFileStream, Seek + Read",3,0.0761,262806,1026.6,62.5,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"ReadFile at offset",3,0.0709,281919,1101.2,62.5,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",3,0.0452,442268,1727.6,265.6,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 1",3,0.2208,90591,353.9,343.8,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 8",3,0.0880,227213,887.6,140.6,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32",3,0.0815,245546,959.2,125.0,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128",3,0.0758,264005,1031.3,78.1,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",3,0.0574,348691,1362.1,125.0,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",3,0.0471,425065,1660.4,203.1,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",3,0.0809,247252,965.8,78.1,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.0804,248863,972.1,78.1,True
+2026-10-23 12:18:29,Delphi,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",3,0.0819,244241,954.1,62.5,True
+2026-10-23 12:18:31,Delphi,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset",1,1.2933,15465,60.4,203.1,True
+2026-10-23 12:18:31,Delphi,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",1,0.1512,132258,516.6,265.6,True
+2026-10-23 12:18:32,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",1,1.4431,13859,54.1,468.8,True
+2026-10-23 12:18:33,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",1,0.2056,97290,380.0,203.1,True
+2026-10-23 12:18:33,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",1,0.1586,126121,492.7,171.9,True
+2026-10-23 12:18:33,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",1,0.1545,129460,505.7,125.0,True
+2026-10-23 12:18:33,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",1,0.0895,223575,873.3,78.1,True
+2026-10-23 12:18:33,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",1,0.0477,419489,1638.6,156.3,True
+2026-10-23 12:18:33,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",1,0.1578,126752,495.1,78.1,True
+2026-10-23 12:18:33,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1567,127630,498.6,125.0,True
+2026-10-23 12:18:34,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",1,1.1319,17669,69.0,156.3,True
+2026-10-23 12:18:36,Delphi,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset",2,1.3061,15313,59.8,62.5,True
+2026-10-23 12:18:36,Delphi,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",2,0.1753,114115,445.8,203.1,True
+2026-10-23 12:18:37,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",2,1.4297,13989,54.6,484.4,True
+2026-10-23 12:18:38,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",2,0.2062,96976,378.8,171.9,True
+2026-10-23 12:18:38,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",2,0.1595,125415,489.9,109.4,True
+2026-10-23 12:18:38,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",2,0.1547,129256,504.9,140.6,True
+2026-10-23 12:18:38,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",2,0.0901,222088,867.5,78.1,True
+2026-10-23 12:18:38,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",2,0.0513,389906,1523.1,203.1,True
+2026-10-23 12:18:38,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",2,0.1576,126872,495.6,109.4,True
+2026-10-23 12:18:38,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1577,126861,495.6,78.1,True
+2026-10-23 12:18:39,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",2,1.0957,18253,71.3,171.9,True
+2026-10-23 12:18:41,Delphi,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset",3,1.3314,15022,58.7,140.6,True
+2026-10-23 12:18:41,Delphi,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",3,0.1703,117436,458.7,250.0,True
+2026-10-23 12:18:42,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",3,1.4286,13999,54.7,484.4,True
+2026-10-23 12:18:43,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",3,0.2079,96216,375.8,171.9,True
+2026-10-23 12:18:43,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",3,0.1594,125491,490.2,109.4,True
+2026-10-23 12:18:43,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",3,0.1544,129565,506.1,140.6,True
+2026-10-23 12:18:43,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",3,0.0914,218751,854.5,171.9,True
+2026-10-23 12:18:43,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",3,0.0479,417568,1631.1,171.9,True
+2026-10-23 12:18:43,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",3,0.1572,127251,497.1,109.4,True
+2026-10-23 12:18:43,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1582,126430,493.9,187.5,True
+2026-10-23 12:18:44,Delphi,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",3,1.0767,18576,72.6,93.8,True
+2026-10-23 12:18:45,Delphi,Win32,20000,sorted, gaps,cold,"TFileStream, Seek + Read",1,1.0311,19396,75.8,296.9,True
+2026-10-23 12:18:46,Delphi,Win32,20000,sorted, gaps,cold,"ReadFile at offset",1,1.0297,19423,75.9,156.3,True
+2026-10-23 12:18:47,Delphi,Win32,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",1,0.1763,113443,443.1,421.9,True
+2026-10-23 12:18:48,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 1",1,1.4552,13744,53.7,437.5,True
+2026-10-23 12:18:48,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 8",1,0.2467,81068,316.7,250.0,True
+2026-10-23 12:18:49,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32",1,0.2068,96726,377.8,140.6,True
+2026-10-23 12:18:49,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128",1,0.1178,169847,663.5,140.6,True
+2026-10-23 12:18:49,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",1,0.1182,169244,661.1,140.6,True
+2026-10-23 12:18:49,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",1,0.1201,166592,650.8,203.1,True
+2026-10-23 12:18:49,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",1,0.1222,163627,639.2,93.8,True
+2026-10-23 12:18:49,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1216,164436,642.3,109.4,True
+2026-10-23 12:18:49,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0557,359288,1403.5,15.6,True
+2026-10-23 12:18:50,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",1,1.2032,16622,64.9,171.9,True
+2026-10-23 12:18:51,Delphi,Win32,20000,sorted, gaps,cold,"TFileStream, Seek + Read",2,0.9648,20730,81.0,234.4,True
+2026-10-23 12:18:52,Delphi,Win32,20000,sorted, gaps,cold,"ReadFile at offset",2,0.9097,21984,85.9,187.5,True
+2026-10-23 12:18:53,Delphi,Win32,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",2,0.1609,124283,485.5,171.9,True
+2026-10-23 12:18:54,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 1",2,1.4983,13348,52.1,328.1,True
+2026-10-23 12:18:54,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 8",2,0.2372,84313,329.3,250.0,True
+2026-10-23 12:18:54,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32",2,0.2088,95796,374.2,93.8,True
+2026-10-23 12:18:55,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128",2,0.1233,162173,633.5,93.8,True
+2026-10-23 12:18:55,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",2,0.1215,164668,643.2,125.0,True
+2026-10-23 12:18:55,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",2,0.1198,166944,652.1,140.6,True
+2026-10-23 12:18:55,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",2,0.1197,167038,652.5,171.9,True
+2026-10-23 12:18:55,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1217,164386,642.1,125.0,True
+2026-10-23 12:18:55,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0555,360678,1408.9,31.3,True
+2026-10-23 12:18:56,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",2,1.1086,18042,70.5,250.0,True
+2026-10-23 12:18:57,Delphi,Win32,20000,sorted, gaps,cold,"TFileStream, Seek + Read",3,0.9390,21299,83.2,171.9,True
+2026-10-23 12:18:58,Delphi,Win32,20000,sorted, gaps,cold,"ReadFile at offset",3,1.0073,19856,77.6,187.5,True
+2026-10-23 12:18:58,Delphi,Win32,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",3,0.1761,113543,443.5,125.0,True
+2026-10-23 12:19:00,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 1",3,1.4719,13588,53.1,437.5,True
+2026-10-23 12:19:00,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 8",3,0.2390,83676,326.9,140.6,True
+2026-10-23 12:19:00,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32",3,0.2077,96294,376.1,78.1,True
+2026-10-23 12:19:01,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128",3,0.1169,171032,668.1,109.4,True
+2026-10-23 12:19:01,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",3,0.1185,168721,659.1,109.4,True
+2026-10-23 12:19:01,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",3,0.1190,168079,656.6,109.4,True
+2026-10-23 12:19:01,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",3,0.1215,164554,642.8,203.1,True
+2026-10-23 12:19:01,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1216,164412,642.2,109.4,True
+2026-10-23 12:19:01,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0555,360176,1406.9,62.5,True
+2026-10-23 12:19:02,Delphi,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",3,1.1944,16744,65.4,281.3,True
+2026-10-23 12:19:02,Delphi,Win32,20000,sorted, gaps,warm,"TFileStream, Seek + Read",1,0.0517,386902,1511.3,62.5,True
+2026-10-23 12:19:02,Delphi,Win32,20000,sorted, gaps,warm,"ReadFile at offset",1,0.0448,446361,1743.6,31.3,True
+2026-10-23 12:19:02,Delphi,Win32,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",1,0.0329,608496,2376.9,171.9,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 1",1,0.1712,116805,456.3,250.0,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 8",1,0.0568,352409,1376.6,78.1,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32",1,0.0510,392396,1532.8,62.5,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128",1,0.0488,409682,1600.3,78.1,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",1,0.0347,576675,2252.6,62.5,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",1,0.0238,841174,3285.8,62.5,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",1,0.0521,383684,1498.8,62.5,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.0526,380408,1486.0,78.1,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0558,358276,1399.5,0.0,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",1,0.0521,383824,1499.3,78.1,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"TFileStream, Seek + Read",2,0.0520,384487,1501.9,46.9,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"ReadFile at offset",2,0.0459,436058,1703.4,31.3,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",2,0.0321,623885,2437.1,140.6,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 1",2,0.1560,128245,501.0,218.8,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 8",2,0.0549,363973,1421.8,93.8,True
+2026-10-23 12:19:03,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32",2,0.0502,398764,1557.7,46.9,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128",2,0.0500,400105,1562.9,46.9,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",2,0.0344,580779,2268.7,78.1,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",2,0.0242,825168,3223.3,78.1,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",2,0.0544,367981,1437.4,62.5,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.0542,369313,1442.6,62.5,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0503,397535,1552.9,93.8,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",2,0.0508,393637,1537.6,78.1,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"TFileStream, Seek + Read",3,0.0526,380408,1486.0,46.9,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"ReadFile at offset",3,0.0463,432326,1688.8,46.9,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",3,0.0371,539549,2107.6,140.6,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 1",3,0.1697,117876,460.5,203.1,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 8",3,0.0560,357017,1394.6,125.0,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32",3,0.0514,388832,1518.9,62.5,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128",3,0.0491,407305,1591.0,62.5,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",3,0.0348,574977,2246.0,78.1,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",3,0.0261,766771,2995.2,62.5,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",3,0.0521,384126,1500.5,62.5,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.0537,372375,1454.6,46.9,True
+2026-10-23 12:19:04,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0503,397493,1552.7,62.5,True
+2026-10-23 12:19:05,Delphi,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",3,0.0519,385215,1504.7,78.1,True
+2026-10-23 12:19:06,Delphi,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset",1,1.3325,15009,58.6,125.0,True
+2026-10-23 12:19:06,Delphi,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",1,0.1622,123277,481.5,93.8,True
+2026-10-23 12:19:07,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",1,1.2564,15919,62.2,328.1,True
+2026-10-23 12:19:08,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",1,0.1994,100283,391.7,171.9,True
+2026-10-23 12:19:08,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",1,0.1366,146415,571.9,140.6,True
+2026-10-23 12:19:08,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",1,0.1324,151014,589.9,109.4,True
+2026-10-23 12:19:08,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",1,0.0770,259849,1015.0,109.4,True
+2026-10-23 12:19:08,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",1,0.0434,460733,1799.7,62.5,True
+2026-10-23 12:19:08,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",1,0.1366,146453,572.1,93.8,True
+2026-10-23 12:19:08,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1361,147000,574.2,140.6,True
+2026-10-23 12:19:08,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0594,336873,1315.9,15.6,True
+2026-10-23 12:19:09,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",1,1.0225,19560,76.4,125.0,True
+2026-10-23 12:19:11,Delphi,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset",2,1.3349,14982,58.5,109.4,True
+2026-10-23 12:19:11,Delphi,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",2,0.1675,119423,466.5,218.8,True
+2026-10-23 12:19:12,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",2,1.2552,15934,62.2,375.0,True
+2026-10-23 12:19:12,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",2,0.1976,101197,395.3,187.5,True
+2026-10-23 12:19:12,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",2,0.1373,145636,568.9,140.6,True
+2026-10-23 12:19:13,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",2,0.1456,137347,536.5,125.0,True
+2026-10-23 12:19:13,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",2,0.0839,238437,931.4,109.4,True
+2026-10-23 12:19:13,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",2,0.0605,330792,1292.2,156.3,True
+2026-10-23 12:19:13,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",2,0.1505,132933,519.3,78.1,True
+2026-10-23 12:19:13,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1482,134939,527.1,109.4,True
+2026-10-23 12:19:13,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0563,355389,1388.2,0.0,True
+2026-10-23 12:19:14,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",2,1.0326,19369,75.7,140.6,True
+2026-10-23 12:19:15,Delphi,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset",3,1.2975,15414,60.2,93.8,True
+2026-10-23 12:19:16,Delphi,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",3,0.1679,119111,465.3,125.0,True
+2026-10-23 12:19:17,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",3,1.2600,15873,62.0,656.3,True
+2026-10-23 12:19:17,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",3,0.1941,103026,402.4,125.0,True
+2026-10-23 12:19:17,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",3,0.1380,144918,566.1,93.8,True
+2026-10-23 12:19:17,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",3,0.1326,150850,589.3,93.8,True
+2026-10-23 12:19:17,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",3,0.0771,259417,1013.3,125.0,True
+2026-10-23 12:19:17,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",3,0.0421,474659,1854.1,125.0,True
+2026-10-23 12:19:17,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",3,0.1348,148411,579.7,93.8,True
+2026-10-23 12:19:18,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1357,147379,575.7,109.4,True
+2026-10-23 12:19:18,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0572,349661,1365.9,31.3,True
+2026-10-23 12:19:19,Delphi,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",3,0.9976,20048,78.3,140.6,True
+2026-10-23 12.19.21,FPC,Win32,20000,random 4 KiB,cold,"TFileStream, Seek + Read",1,1.3489,14826,57.9,171.9,True
+2026-10-23 12.19.22,FPC,Win32,20000,random 4 KiB,cold,"ReadFile at offset",1,1.3565,14744,57.6,187.5,True
+2026-10-23 12.19.23,FPC,Win32,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",1,0.1781,112275,438.6,500.0,True
+2026-10-23 12.19.24,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 1",1,1.6707,11971,46.8,312.5,True
+2026-10-23 12.19.25,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 8",1,0.2760,72452,283.0,171.9,True
+2026-10-23 12.19.25,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32",1,0.2346,85236,333.0,140.6,True
+2026-10-23 12.19.25,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128",1,0.1433,139614,545.4,78.1,True
+2026-10-23 12.19.25,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",1,0.1438,139112,543.4,187.5,True
+2026-10-23 12.19.25,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",1,0.1398,143096,559.0,250.0,True
+2026-10-23 12.19.25,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",1,0.1416,141274,551.9,109.4,True
+2026-10-23 12.19.26,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1435,139336,544.3,203.1,True
+2026-10-23 12.19.27,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",1,1.3210,15141,59.1,203.1,True
+2026-10-23 12.19.28,FPC,Win32,20000,random 4 KiB,cold,"TFileStream, Seek + Read",2,1.2552,15933,62.2,265.6,True
+2026-10-23 12.19.29,FPC,Win32,20000,random 4 KiB,cold,"ReadFile at offset",2,1.2429,16092,62.9,171.9,True
+2026-10-23 12.19.30,FPC,Win32,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",2,0.1613,123957,484.2,250.0,True
+2026-10-23 12.19.31,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 1",2,1.7043,11735,45.8,312.5,True
+2026-10-23 12.19.32,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 8",2,0.2659,75215,293.8,265.6,True
+2026-10-23 12.19.32,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32",2,0.2446,81773,319.4,156.3,True
+2026-10-23 12.19.32,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128",2,0.1418,141049,551.0,171.9,True
+2026-10-23 12.19.32,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",2,0.1398,143083,558.9,187.5,True
+2026-10-23 12.19.32,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",2,0.1400,142823,557.9,312.5,True
+2026-10-23 12.19.32,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",2,0.1384,144543,564.6,140.6,True
+2026-10-23 12.19.33,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1382,144741,565.4,156.3,True
+2026-10-23 12.19.34,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",2,1.3631,14672,57.3,296.9,True
+2026-10-23 12.19.35,FPC,Win32,20000,random 4 KiB,cold,"TFileStream, Seek + Read",3,1.3519,14794,57.8,171.9,True
+2026-10-23 12.19.37,FPC,Win32,20000,random 4 KiB,cold,"ReadFile at offset",3,1.3498,14817,57.9,156.3,True
+2026-10-23 12.19.37,FPC,Win32,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",3,0.1766,113223,442.3,328.1,True
+2026-10-23 12.19.39,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 1",3,1.6926,11816,46.2,453.1,True
+2026-10-23 12.19.39,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 8",3,0.2761,72439,283.0,312.5,True
+2026-10-23 12.19.39,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32",3,0.2344,85324,333.3,125.0,True
+2026-10-23 12.19.39,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128",3,0.1418,141087,551.1,171.9,True
+2026-10-23 12.19.39,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 2 I/O threads",3,0.1402,142655,557.2,234.4,True
+2026-10-23 12.19.40,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O threads",3,0.1463,136697,534.0,187.5,True
+2026-10-23 12.19.40,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, overlap rule",3,0.1444,138533,541.1,156.3,True
+2026-10-23 12.19.40,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1433,139536,545.1,109.4,True
+2026-10-23 12.19.41,FPC,Win32,20000,random 4 KiB,cold,"Block reader, read-ahead 32, synchronous handle",3,1.3633,14671,57.3,218.8,True
+2026-10-23 12.19.41,FPC,Win32,20000,random 4 KiB,warm,"TFileStream, Seek + Read",1,0.0764,261817,1022.7,62.5,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"ReadFile at offset",1,0.0705,283735,1108.3,78.1,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",1,0.0444,450832,1761.1,187.5,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 1",1,0.2229,89726,350.5,343.8,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 8",1,0.0870,229965,898.3,156.3,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32",1,0.0779,256657,1002.6,78.1,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128",1,0.0775,258088,1008.2,93.8,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",1,0.0582,343559,1342.0,156.3,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",1,0.0465,429697,1678.5,187.5,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",1,0.0807,247898,968.3,78.1,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.0835,239590,935.9,78.1,True
+2026-10-23 12.19.42,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",1,0.0784,255260,997.1,93.8,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"TFileStream, Seek + Read",2,0.0765,261296,1020.7,78.1,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"ReadFile at offset",2,0.0717,279012,1089.9,78.1,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",2,0.0434,460301,1798.1,187.5,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 1",2,0.2319,86262,337.0,328.1,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 8",2,0.0887,225487,880.8,171.9,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32",2,0.0826,242072,945.6,78.1,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128",2,0.0809,247151,965.4,109.4,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",2,0.0579,345476,1349.5,93.8,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",2,0.0470,425456,1661.9,218.8,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",2,0.0815,245258,958.0,93.8,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.0819,244248,954.1,109.4,True
+2026-10-23 12.19.43,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",2,0.0849,235549,920.1,93.8,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"TFileStream, Seek + Read",3,0.0799,250342,977.9,78.1,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"ReadFile at offset",3,0.0716,279206,1090.6,78.1,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"ReadFile at offset, 8 threads",3,0.0464,431215,1684.4,125.0,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 1",3,0.2253,88786,346.8,343.8,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 8",3,0.0854,234144,914.6,156.3,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32",3,0.0780,256426,1001.7,109.4,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128",3,0.0776,257763,1006.9,93.8,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 2 I/O threads",3,0.0574,348139,1359.9,109.4,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O threads",3,0.0471,424350,1657.6,171.9,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, overlap rule",3,0.0820,243803,952.4,78.1,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.0799,250433,978.3,62.5,True
+2026-10-23 12.19.44,FPC,Win32,20000,random 4 KiB,warm,"Block reader, read-ahead 32, synchronous handle",3,0.0795,251497,982.4,140.6,True
+2026-10-23 12.19.46,FPC,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset",1,1.3853,14437,56.4,109.4,True
+2026-10-23 12.19.46,FPC,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",1,0.1669,119866,468.2,203.1,True
+2026-10-23 12.19.48,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",1,1.4633,13668,53.4,546.9,True
+2026-10-23 12.19.48,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",1,0.2057,97234,379.8,218.8,True
+2026-10-23 12.19.48,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",1,0.1612,124086,484.7,109.4,True
+2026-10-23 12.19.48,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",1,0.1582,126436,493.9,140.6,True
+2026-10-23 12.19.48,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",1,0.0923,216614,846.1,78.1,True
+2026-10-23 12.19.48,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",1,0.0499,401093,1566.8,125.0,True
+2026-10-23 12.19.48,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",1,0.1610,124230,485.3,109.4,True
+2026-10-23 12.19.48,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1611,124157,485.0,171.9,True
+2026-10-23 12.19.50,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",1,1.1841,16890,66.0,93.8,True
+2026-10-23 12.19.51,FPC,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset",2,1.2920,15480,60.5,125.0,True
+2026-10-23 12.19.51,FPC,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",2,0.1534,130347,509.2,140.6,True
+2026-10-23 12.19.53,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",2,1.4769,13542,52.9,375.0,True
+2026-10-23 12.19.53,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",2,0.1974,101340,395.9,218.8,True
+2026-10-23 12.19.53,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",2,0.1659,120545,470.9,125.0,True
+2026-10-23 12.19.53,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",2,0.1633,122464,478.4,140.6,True
+2026-10-23 12.19.53,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",2,0.0926,216073,844.0,171.9,True
+2026-10-23 12.19.53,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",2,0.0508,393836,1538.4,187.5,True
+2026-10-23 12.19.53,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",2,0.1655,120839,472.0,109.4,True
+2026-10-23 12.19.54,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1651,121119,473.1,125.0,True
+2026-10-23 12.19.55,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",2,1.1536,17337,67.7,140.6,True
+2026-10-23 12.19.56,FPC,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset",3,1.2114,16510,64.5,93.8,True
+2026-10-23 12.19.56,FPC,Win32,20000,random 4 KiB,unbuffered,"ReadFile at offset, 8 threads",3,0.1472,135902,530.9,296.9,True
+2026-10-23 12.19.58,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 1",3,1.4549,13747,53.7,421.9,True
+2026-10-23 12.19.58,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 8",3,0.2071,96553,377.2,156.3,True
+2026-10-23 12.19.58,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32",3,0.1605,124637,486.9,156.3,True
+2026-10-23 12.19.58,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128",3,0.1614,123917,484.1,109.4,True
+2026-10-23 12.19.58,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",3,0.0915,218593,853.9,203.1,True
+2026-10-23 12.19.58,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",3,0.0494,404628,1580.6,125.0,True
+2026-10-23 12.19.58,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, overlap rule",3,0.1617,123708,483.2,78.1,True
+2026-10-23 12.19.59,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1622,123281,481.6,93.8,True
+2026-10-23 12.20.00,FPC,Win32,20000,random 4 KiB,unbuffered,"Block reader, read-ahead 32, synchronous handle",3,1.1158,17925,70.0,93.8,True
+2026-10-23 12.20.01,FPC,Win32,20000,sorted, gaps,cold,"TFileStream, Seek + Read",1,1.0203,19602,76.6,203.1,True
+2026-10-23 12.20.02,FPC,Win32,20000,sorted, gaps,cold,"ReadFile at offset",1,1.0155,19695,76.9,109.4,True
+2026-10-23 12.20.02,FPC,Win32,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",1,0.1789,111768,436.6,296.9,True
+2026-10-23 12.20.03,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 1",1,1.4719,13588,53.1,296.9,True
+2026-10-23 12.20.04,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 8",1,0.2414,82850,323.6,234.4,True
+2026-10-23 12.20.04,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32",1,0.2063,96930,378.6,156.3,True
+2026-10-23 12.20.04,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128",1,0.1194,167450,654.1,125.0,True
+2026-10-23 12.20.04,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",1,0.1203,166254,649.4,203.1,True
+2026-10-23 12.20.04,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",1,0.1351,148023,578.2,171.9,True
+2026-10-23 12.20.04,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",1,0.1295,154392,603.1,109.4,True
+2026-10-23 12.20.05,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1236,161798,632.0,93.8,True
+2026-10-23 12.20.05,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0582,343715,1342.6,15.6,True
+2026-10-23 12.20.06,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",1,1.1873,16845,65.8,281.3,True
+2026-10-23 12.20.07,FPC,Win32,20000,sorted, gaps,cold,"TFileStream, Seek + Read",2,0.9748,20518,80.1,156.3,True
+2026-10-23 12.20.08,FPC,Win32,20000,sorted, gaps,cold,"ReadFile at offset",2,1.0329,19363,75.6,140.6,True
+2026-10-23 12.20.08,FPC,Win32,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",2,0.1776,112590,439.8,406.3,True
+2026-10-23 12.20.09,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 1",2,1.4586,13711,53.6,281.3,True
+2026-10-23 12.20.10,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 8",2,0.2411,82954,324.0,265.6,True
+2026-10-23 12.20.10,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32",2,0.2037,98172,383.5,171.9,True
+2026-10-23 12.20.10,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128",2,0.1172,170633,666.5,93.8,True
+2026-10-23 12.20.10,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",2,0.1186,168655,658.8,109.4,True
+2026-10-23 12.20.10,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",2,0.1190,168122,656.7,171.9,True
+2026-10-23 12.20.10,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",2,0.1178,169837,663.4,78.1,True
+2026-10-23 12.20.11,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1191,167925,656.0,156.3,True
+2026-10-23 12.20.11,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0559,357655,1397.1,93.8,True
+2026-10-23 12.20.12,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",2,1.2071,16569,64.7,171.9,True
+2026-10-23 12.20.13,FPC,Win32,20000,sorted, gaps,cold,"TFileStream, Seek + Read",3,1.1649,17170,67.1,250.0,True
+2026-10-23 12.20.14,FPC,Win32,20000,sorted, gaps,cold,"ReadFile at offset",3,1.1214,17835,69.7,203.1,True
+2026-10-23 12.20.14,FPC,Win32,20000,sorted, gaps,cold,"ReadFile at offset, 8 threads",3,0.1767,113156,442.0,125.0,True
+2026-10-23 12.20.16,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 1",3,1.4669,13634,53.3,234.4,True
+2026-10-23 12.20.16,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 8",3,0.2413,82868,323.7,234.4,True
+2026-10-23 12.20.16,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32",3,0.2066,96827,378.2,218.8,True
+2026-10-23 12.20.16,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128",3,0.1159,172561,674.1,125.0,True
+2026-10-23 12.20.16,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 2 I/O threads",3,0.1135,176184,688.2,203.1,True
+2026-10-23 12.20.17,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O threads",3,0.1174,170331,665.4,140.6,True
+2026-10-23 12.20.17,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, overlap rule",3,0.1176,170012,664.1,93.8,True
+2026-10-23 12.20.17,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1182,169264,661.2,156.3,True
+2026-10-23 12.20.17,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0584,342724,1338.8,0.0,True
+2026-10-23 12.20.18,FPC,Win32,20000,sorted, gaps,cold,"Block reader, read-ahead 32, synchronous handle",3,1.1967,16713,65.3,156.3,True
+2026-10-23 12.20.18,FPC,Win32,20000,sorted, gaps,warm,"TFileStream, Seek + Read",1,0.0538,371738,1452.1,46.9,True
+2026-10-23 12.20.18,FPC,Win32,20000,sorted, gaps,warm,"ReadFile at offset",1,0.0470,425108,1660.6,46.9,True
+2026-10-23 12.20.18,FPC,Win32,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",1,0.0332,602638,2354.1,156.3,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 1",1,0.1677,119245,465.8,265.6,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 8",1,0.0571,350122,1367.7,109.4,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32",1,0.0506,395227,1543.9,62.5,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128",1,0.0482,414983,1621.0,62.5,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",1,0.0356,561597,2193.7,78.1,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",1,0.0235,852711,3330.9,140.6,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",1,0.0518,386341,1509.1,78.1,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.0552,362372,1415.5,93.8,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0563,355328,1388.0,46.9,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",1,0.0528,378723,1479.4,78.1,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"TFileStream, Seek + Read",2,0.0534,374713,1463.7,46.9,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"ReadFile at offset",2,0.0475,420966,1644.4,31.3,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",2,0.0316,632503,2470.7,171.9,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 1",2,0.1731,115522,451.3,187.5,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 8",2,0.0552,362380,1415.5,109.4,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32",2,0.0509,392558,1533.4,62.5,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128",2,0.0489,409124,1598.1,46.9,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",2,0.0344,580643,2268.1,109.4,True
+2026-10-23 12.20.19,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",2,0.0242,825413,3224.3,62.5,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",2,0.0514,388907,1519.2,62.5,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.0517,387114,1512.2,46.9,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0501,399334,1559.9,46.9,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",2,0.0519,385002,1503.9,62.5,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"TFileStream, Seek + Read",3,0.0531,376882,1472.2,62.5,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"ReadFile at offset",3,0.0492,406345,1587.3,46.9,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"ReadFile at offset, 8 threads",3,0.0302,663255,2590.8,109.4,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 1",3,0.1700,117674,459.7,296.9,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 8",3,0.0553,361372,1411.6,125.0,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32",3,0.0513,389727,1522.4,78.1,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128",3,0.0500,400277,1563.6,62.5,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 2 I/O threads",3,0.0354,564694,2205.8,62.5,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O threads",3,0.0235,849737,3319.3,156.3,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, overlap rule",3,0.0513,389970,1523.3,46.9,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.0522,382870,1495.6,78.1,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0499,400610,1564.9,46.9,True
+2026-10-23 12.20.20,FPC,Win32,20000,sorted, gaps,warm,"Block reader, read-ahead 32, synchronous handle",3,0.0521,383959,1499.8,78.1,True
+2026-10-23 12.20.22,FPC,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset",1,1.3618,14686,57.4,171.9,True
+2026-10-23 12.20.22,FPC,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",1,0.1726,115867,452.6,109.4,True
+2026-10-23 12.20.23,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",1,1.2618,15850,61.9,265.6,True
+2026-10-23 12.20.23,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",1,0.2052,97450,380.7,203.1,True
+2026-10-23 12.20.24,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",1,0.1375,145423,568.1,93.8,True
+2026-10-23 12.20.24,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",1,0.1324,151002,589.9,93.8,True
+2026-10-23 12.20.24,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",1,0.0768,260281,1016.7,140.6,True
+2026-10-23 12.20.24,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",1,0.0418,478527,1869.2,171.9,True
+2026-10-23 12.20.24,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",1,0.1356,147516,576.2,93.8,True
+2026-10-23 12.20.24,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",1,0.1354,147694,576.9,78.1,True
+2026-10-23 12.20.24,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",1,0.0599,333830,1304.0,31.3,True
+2026-10-23 12.20.25,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",1,0.9829,20348,79.5,62.5,True
+2026-10-23 12.20.26,FPC,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset",2,1.2690,15761,61.6,62.5,True
+2026-10-23 12.20.27,FPC,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",2,0.1484,134800,526.6,171.9,True
+2026-10-23 12.20.28,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",2,1.2847,15568,60.8,406.3,True
+2026-10-23 12.20.28,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",2,0.1901,105233,411.1,203.1,True
+2026-10-23 12.20.28,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",2,0.1376,145354,567.8,109.4,True
+2026-10-23 12.20.28,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",2,0.1351,148085,578.5,109.4,True
+2026-10-23 12.20.28,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",2,0.0797,251047,980.7,109.4,True
+2026-10-23 12.20.28,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",2,0.0444,450186,1758.5,140.6,True
+2026-10-23 12.20.29,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",2,0.1374,145604,568.8,62.5,True
+2026-10-23 12.20.29,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",2,0.1384,144549,564.6,93.8,True
+2026-10-23 12.20.29,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",2,0.0551,363189,1418.7,46.9,True
+2026-10-23 12.20.30,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",2,0.9579,20879,81.6,140.6,True
+2026-10-23 12.20.31,FPC,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset",3,1.2064,16578,64.8,187.5,True
+2026-10-23 12.20.31,FPC,Win32,20000,sorted, gaps,unbuffered,"ReadFile at offset, 8 threads",3,0.1466,136383,532.7,125.0,True
+2026-10-23 12.20.32,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 1",3,1.2884,15524,60.6,390.6,True
+2026-10-23 12.20.33,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 8",3,0.2032,98440,384.5,187.5,True
+2026-10-23 12.20.33,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32",3,0.1364,146639,572.8,78.1,True
+2026-10-23 12.20.33,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128",3,0.1335,149832,585.3,109.4,True
+2026-10-23 12.20.33,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 2 I/O threads",3,0.0803,249098,973.0,93.8,True
+2026-10-23 12.20.33,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O threads",3,0.0420,475948,1859.2,187.5,True
+2026-10-23 12.20.33,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, overlap rule",3,0.1365,146555,572.5,78.1,True
+2026-10-23 12.20.33,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 128, 4 I/O thr., overlap rule",3,0.1371,145928,570.0,78.1,True
+2026-10-23 12.20.33,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, MaxGap 32 KiB",3,0.0595,335903,1312.1,0.0,True
+2026-10-23 12.20.34,FPC,Win32,20000,sorted, gaps,unbuffered,"Block reader, read-ahead 32, synchronous handle",3,0.9930,20140,78.7,78.1,True

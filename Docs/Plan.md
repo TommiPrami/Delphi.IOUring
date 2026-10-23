@@ -245,6 +245,13 @@ Source/
 
   **Done 2026-10-23** – Delphi 211 tests and FPC 197 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 16 – Overlap handling (decision first, Design §11)**: decide A only vs B opt-in. If B: in-flight range table per file on the I/O thread; write-after-read/write ordering, read-after-write ordering or serve-from-buffer, attach duplicate reads. Tests for each case in the Design §11 table.
+  - [x] Decided (Design §11, decision 15): B as an option of the engine, `orKeepOrder`. For one file handle, requests that touch the same bytes take effect in the order they were started; reads never wait for reads; a flush waits for the earlier writes. The core ring keeps no rules (A).
+  - [x] Built (Design §10.13): every request of a file handle goes to one I/O thread (its own queue); that thread keeps the file's unfinished requests in start order (a hash table of handles, a list linked through the request slots); a conflicting request is held back and starts when the earlier ones have completed. Works for any sizes and partial overlaps. Left for later: answering a read from a write's buffer, joining duplicate reads.
+  - [x] Tests `Tests.EngineOverlap` / `Tests.FPC.EngineOverlap` (13 each): the order cases on a file, exact cases with pipes (held back, not held back, a chain in order, flush after write, `Destroy`), routing, and two model tests (random reads and writes against an in-memory copy). Checked by switching the rule off: 9 of 13 fail then.
+  - [x] Cost (probe): 20 % with many overlaps (64 % of the requests held back), about 3 % with few. Blocks benchmark (reads only, with the rule on 1 and 4 I/O threads): 0–6.5 %, and one file uses one I/O thread ([Benchmarks.md](Benchmarks.md#overlap-rule-phase-16)).
+  - [x] Found on the way: a Phase 15 test failed now and then in FPC Win64 `-O3` (timing, not the engine); its backlog now uses unbuffered reads.
+
+  **Done 2026-10-23** – Delphi 224 tests and FPC 210 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 17 – `TSequentialWriteOnlyFileStream`** (write-behind; can use the engine or its own ring).
 
 ---
@@ -259,8 +266,7 @@ Source/
 
 ## Immediate next step
 
-Phases 14 and 15 are done. Next: **Phase 16 – overlap handling**, decision
-first (Design §11): A only (the user keeps overlapping requests apart) or B
-as an opt-in (a table of the ranges in flight per file). If B, the requests
-of such a file must all go to one I/O thread, which Phase 15 left out on
-purpose. Or **Phase 17 – the write stream**, if writing is needed sooner.
+Phases 14, 15 and 16 are done. Next: **Phase 17 – the write stream**
+(`TSequentialWriteOnlyFileStream`, writing in the background), the last
+phase of Milestone 3. It can use the engine with `orKeepOrder`, so that a
+program may read back what it has just written.

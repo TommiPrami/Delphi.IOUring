@@ -26,7 +26,8 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Request queue for the engine (`Delphi.IOUring.RequestQueue`: lock-free, producers → I/O thread) | done, tested, benchmarked against a lock |
 | I/O engine `TIORingEngine` (`Delphi.IOUring.Engine`: many threads, one or more I/O threads, many requests in flight) | done, tested, benchmarked through the block reader |
 | Block reader `TIORingBlockReader` (`Delphi.IOUring.BlockReader`: blocks known in advance, read ahead, neighbours merged, handed out in order) | done, tested, benchmarked |
-| Overlap rules, write stream | planned |
+| Overlap rule of the engine (`orKeepOrder`: per file handle, requests that touch the same bytes take effect in start order) | done, tested, measured |
+| Write stream | planned |
 | Linux `io_uring` through Free Pascal | planned |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
@@ -118,6 +119,16 @@ For many small requests of cached data, or unbuffered requests, give the
 engine more I/O threads: `TIORingEngine.Create(1024, 256, 4)`. With 4 I/O
 threads it carried out up to 3.2× as many 4 KiB reads per second
 ([Benchmarks](Docs/Benchmarks.md#several-io-threads-phase-15)).
+
+Requests in flight at the same time run in any order – Windows gives none.
+If requests of a file may touch the same bytes while they are in flight
+(for example a write and then a read of the same block, without waiting in
+between), create the engine with the overlap rule:
+`TIORingEngine.Create(1024, 256, 1, orKeepOrder)`. For each file handle,
+such requests then take effect in the order they were started (a later one
+waits for the earlier ones); reads never wait for reads. It cost about 3 %
+with few overlaps, and one file then uses one I/O thread
+([Design §11](Docs/Design.md)).
 
 ### Blocks known in advance
 

@@ -8,8 +8,9 @@ benchmarks ([Benchmarks.md](Benchmarks.md)). Milestone 3 started: the
 atomics unit (Phase 10, notes in §10.6), the request pool (Phase 11, notes
 in §10.7), the request queue (Phase 12, notes in §10.8), the engine with one
 I/O thread (Phase 13, notes in §10.9), the block reader (Phase 14, notes in
-§10.10) and several I/O threads (Phase 15, measurements in §10.11, notes in
-§10.12). Things marked **[DECIDE]**
+§10.10), several I/O threads (Phase 15, measurements in §10.11, notes in
+§10.12) and the overlap rule (Phase 16, decisions in §11, notes in §10.13).
+Things marked **[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
 **[VERIFIED]** with the answer once a test proves them. Decisions already made
@@ -283,7 +284,7 @@ Unit responsibilities:
 | `Delphi.IOUring.Atomics` *(new)* | `TAtomic`: one place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5, §10.6) | RTL only |
 | `Delphi.IOUring.RequestPool` *(new)* | `TIORingRequestPool` (request slots, states, handles, waiting) and `TIORingFreeList` (lock-free stack) (§10.3, §10.7) | `Delphi.IOUring`, Atomics |
 | `Delphi.IOUring.RequestQueue` *(new)* | `TIORingRequestQueue`: bounded lock-free queue from the producers to an I/O thread (§10.5, §10.8) | `Delphi.IOUring`, Atomics |
-| `Delphi.IOUring.Engine` *(new)* | `TIORingEngine`: one I/O thread with its own ring; `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`, callbacks, batches (§10.4, §10.9); later more threads and the overlap rules (§11) | `Delphi.IOUring`, Atomics, RequestPool, RequestQueue |
+| `Delphi.IOUring.Engine` *(new)* | `TIORingEngine`: one or more I/O threads, each with its own ring; `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`, callbacks, batches (§10.4, §10.9, §10.12); the overlap rule `orKeepOrder` as an option (§11, §10.13) | `Delphi.IOUring`, Atomics, RequestPool, RequestQueue |
 | `Delphi.IOUring.BlockReader` *(new)* | `TIORingBlockReader`: blocks known in advance (a provider or a list), read through the engine with read-ahead and merging, delivered in order (§10.4, §10.10) | `Delphi.IOUring`, Engine |
 
 The "all OS-specific code lives in the `Backend.<OS>` units" rule still holds:
@@ -1750,9 +1751,101 @@ gains nothing. 2 I/O threads always helped in all four builds; 4 helped more
 in most runs. The CPU time grows a little (109 → 156 ms for 20 000 cached
 blocks). The default stays 1 I/O thread.
 
+**Later found:** the test "a backlog is shared" failed now and then in the FPC
+Win64 `-O3` build (3 of 25 full runs): with 2 000 *cached* reads, one I/O
+thread sometimes finished them all before a woken sibling got the CPU. Not a
+fault of the engine – the test's backlog now uses unbuffered reads, which
+take far longer than a wake-up (0 of 25 since).
+
+### 10.13 Overlap rule – implementation notes (Phase 16)
+
+Built as decided in §11 ("Phase 16 decisions"), in `Delphi.IOUring.Engine`.
+
+**Routing.** With `orKeepOrder`, `StartRequest` puts a request into the own
+queue of the I/O thread `(handle shr 2) mod IOThreadCount` (handles are
+multiples of 4) and wakes exactly that thread if it sleeps (`TryWake`; the
+same full-barrier handshake as before, now per thread). The shared queue is
+not used. `EndBatch` wakes each sleeping I/O thread whose queue has
+requests.
+
+**Bookkeeping, on the I/O thread only.** A small hash table (buckets: a power
+of 2; at most one entry per unfinished request) maps a file handle to its
+entry: the oldest and newest unfinished request and the number held back.
+The requests of a file form a doubly linked list in start order, linked
+through their own slots (`FilePrev`, `FileNext` in the payload) – no
+allocation per request.
+
+- **A new request** is compared with every unfinished request of its file
+  (all of them started earlier). `MustWaitFor`: a read waits for an earlier
+  write of overlapping bytes; a write for an earlier read or write of
+  overlapping bytes; a flush for any earlier write. It is appended to the
+  list either way – held back, or ready to start.
+- **When a request finishes**, it leaves its file's list *before* it is
+  marked Completed (after that, its owner may free the slot at once). If
+  the file has held-back requests, they are checked again in start order: a
+  request starts when nothing earlier that is still unfinished (started or
+  held back) makes it wait. A file entry with an empty list is freed.
+- **Ready to start, but the ring is full:** the old one-place "deferred"
+  slot became a small first-in-first-out list (`FReady`, MaxRequests
+  places), which also takes the requests freed from being held back. Each
+  round starts with it, in order.
+- **Destroy:** the I/O thread stops releasing held-back requests, cancels
+  the ready ones, the held-back ones and the queued ones without starting
+  them, and then the ones in its ring as before.
+
+**Cost** (probe, Delphi Win64 on the P-cores, one producer, 32 requests in
+flight, random reads and writes of 1–8 KiB, median of 5):
+
+| Region of the file | Held back | Rule off | `orKeepOrder` |
+| --- | ---: | ---: | ---: |
+| 64 KiB (many overlaps) | 64 % | 495 | 399 |
+| 64 MiB (few overlaps) | 0.2 % | 259 | 251 |
+
+(thousand requests per second). With many overlaps the rule costs 20 % –
+and without it the data is wrong. With few overlaps it costs about 3 %. The
+list scan stays: no need for the 64 KiB stripes yet.
+
+**Tests:** `Tests.EngineOverlap` / `Tests.FPC.EngineOverlap`, 13 each:
+
+- **Order on a file**, 200 rounds each, started without waiting in between:
+  write then read (the read sees the write), write then write (the later
+  wins), read then write (the read sees the old data).
+- **Exact cases with pipes** (a pending pipe read): a write of the same
+  bytes is held back until the read completes; reads do not wait for reads;
+  other bytes do not wait; a chain read → write → read → write starts and
+  completes in exactly that order; a flush waits for an earlier pending
+  write (an 8 KiB pipe write: more than the pipe's buffer); `Destroy`
+  cancels held-back requests; rule off: nothing is held back.
+- **Routing:** all requests of a handle go to one of 4 I/O threads.
+- **Against a model:** 4 000 random reads and writes of 1–8 KiB in 64 KiB,
+  32 in flight, started in batches of 24 (so that two I/O threads work at
+  once without the rule); every read must return what an in-memory copy,
+  updated in start order, held when the read was started. Once with one
+  producer, once with 4 producers on one handle (each its own part).
+
+**The tests were checked against the engine without the rule** (every engine
+in the unit switched to `orNone`): 9 of 13 failed – both models (595 and
+2 027 wrong reads), write-then-write, read-then-write, and the exact cases.
+Without the batches, the one-producer model had not found the disorder: one
+producer with a light load stays on one I/O thread, and Windows happened to
+carry out its cached requests in submit order. (Write-then-read did not fail
+without the rule either, for the same reason; it stays as a check of the
+promise.)
+
+All tests pass with Delphi Debug and Release and FPC with and without `-O3`,
+Win32 and Win64; the engine and overlap tests passed 30 repeated runs
+(Delphi Win64 Release), the whole FPC suite 25 (Win64, `-O3`).
+
+**Benchmark** (Benchmarks.md, "Overlap rule"): with reads alone – nothing
+overlaps, only the bookkeeping – the rule costs 0–6.5 % with one I/O
+thread, the most with cached data. With 4 I/O threads, one file loses the
+gain of more threads (unbuffered: 396 → 128 thousand reads/s), as decided.
+If the read cost matters later: a file could count its unfinished writes,
+and a read could skip the scan when there are none.
+
 ---
 
-## 11. Overlapping reads and writes (later) – options
+## 11. Overlapping reads and writes – options and the decision (Phase 16)
 
 The OS gives **no ordering** between requests that are in flight at the same
 time (§2.1). If two in-flight requests touch the same file bytes:
@@ -1788,8 +1881,46 @@ Options, from cheapest to most capable:
   goes through it. Most powerful, but that is a database buffer pool – very
   likely out of scope.
 
-**[DECIDE later]**: A is fixed for the core. Proposal for the engine: B as an
-opt-in, C not planned.
+**Decided** (Phase 16, 2026-10-23): A is fixed for the core ring. The engine
+gets B as an option, C is not planned.
+
+**Phase 16 decisions** (before coding) – the promise and how it is kept:
+
+- **The promise (rule on):** for one file handle, requests that touch the
+  same bytes take effect in the order they were started; requests that do
+  not, run in parallel, in any order. Reads never wait for reads. "Started"
+  = the `ReadAsync`/`WriteAsync`/`FlushAsync` call: for one thread its
+  program order; across threads, the call that returned first is first.
+- **Conflicts:** write–write, write–read and read–write on overlapping byte
+  ranges (requests of 0 bytes touch nothing). A flush waits for the earlier
+  unfinished writes of its handle; nothing waits for a flush.
+- **How:** a request that conflicts with an earlier unfinished one (in the
+  ring, or itself held back) is **held back**. When a request completes, the
+  held-back requests of its file are checked again, in start order; each one
+  starts as soon as nothing earlier conflicts with it any more. Works for any
+  sizes and partial overlaps, because no data is merged. Answering a read
+  from a write's buffer (only when one write covers the whole read) and
+  joining duplicate reads are left for later, if a benchmark asks for them.
+- **An option of the engine:** `TIORingEngine.Create(…, AIOThreads,
+  AOverlapRule = orNone)`; `orKeepOrder` turns the rule on. Off: exactly as
+  before, no cost. A program can have one engine of each kind.
+- **Routing, rule on:** every request of a file handle goes to one I/O
+  thread, chosen from the handle, into that thread's own queue (not the
+  shared one). That thread alone sees all requests of the file in start
+  order and keeps the bookkeeping – no locks. Different files still use
+  different I/O threads; one file uses only one.
+- **Per handle, not per file:** two handles to the same file are not
+  recognised as the same file. (Later perhaps: the file's ID.)
+- **Bookkeeping:** each I/O thread has a small hash table from file handle to
+  the file's unfinished requests, a list in start order (linked through the
+  requests' own slots). A new request scans that list. Simple first; if the
+  benchmark shows the scan matters, a hash of 64 KiB file stripes.
+- **Destroy** cancels held-back requests like queued ones.
+- `Stats.HeldBack` counts the requests that had to wait.
+- **Tests:** the cases of the table above, made exact with pipes (a pending
+  pipe read holds back a write of the same handle); a model test – random
+  reads and writes of random sizes, compared with an in-memory copy of the
+  file updated in start order; the cost, rule on against off.
 
 ---
 
@@ -1903,9 +2034,10 @@ tested.
 
 ## 14. Open questions
 
-1. **[DECIDE later]** Overlap handling in the engine (§11): B opt-in?
-2. **[DECIDE later]** Linux backend: raw syscalls or liburing (§2.2)?
-3. **[DECIDE later]** Neutral ref records vs OS-layout records (§5.1).
+1. **[DECIDE later]** Linux backend: raw syscalls or liburing (§2.2)?
+2. **[DECIDE later]** Neutral ref records vs OS-layout records (§5.1).
+
+(Overlap handling in the engine: decided in Phase 16 – §11 and decision 15.)
 
 ---
 
@@ -1927,3 +2059,4 @@ tested.
 | 12 | 2026-10-22 | Lighter replacements for RTL containers: **idea only**, not planned until profiling shows a need (§4.2). |
 | 13 | 2026-10-22 | Free Pascal tests are **separate FPCUnit test units** (`Source/UnitTests/FPC`), not a shared source with the DUnitX tests. |
 | 14 | 2026-10-22 | In FPC the IoRing functions are **looked up with `GetProcAddress` on first use** (no `delayed` in FPC 3.2.2); a missing function returns `E_NOTIMPL`. |
+| 15 | 2026-10-23 | **Overlap rules in the engine: an option** (`orKeepOrder`, §11). For one file handle, requests that touch the same bytes take effect in start order; conflicting later requests are held back, and the requests of a handle are routed to one I/O thread. The core ring keeps no rules (A). |

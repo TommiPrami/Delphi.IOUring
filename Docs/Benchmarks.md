@@ -4,8 +4,9 @@ Measured 2026-10-22 (Plan, Phase 5) with `Source/Benchmarks/Delphi.IOUring.Bench
 Release builds, Delphi 13. Raw data (every single run): [BenchmarkResults/](BenchmarkResults/).
 The engine's data structures (Phase 11 and later) have a benchmark of their
 own: [Engine structures](#engine-structures-phase-11), and so has the engine
-with the block reader: [Blocks known in advance](#blocks-known-in-advance-phase-14)
-and [Several I/O threads](#several-io-threads-phase-15).
+with the block reader: [Blocks known in advance](#blocks-known-in-advance-phase-14),
+[Several I/O threads](#several-io-threads-phase-15) and
+[Overlap rule](#overlap-rule-phase-16).
 
 ## Short version
 
@@ -55,6 +56,10 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
   as many unbuffered 4 KiB blocks** as with one, and with cached data it is
   now **1.3–1.6× faster than `ReadFile`**. Data from the disk through the
   file cache gains nothing.
+- **Overlap rule (Phase 16):** keeping the order of overlapping requests
+  costs about 3 % when few requests overlap, 20 % when two thirds of them
+  have to wait, and up to 6.5 % for reads alone. With the rule, one file uses
+  one I/O thread.
 
 ## Machine
 
@@ -538,6 +543,50 @@ What the numbers say:
 - **The default stays 1 I/O thread**, because it costs nothing extra and is
   enough for data from the disk through the cache. For many small reads of
   cached data, or unbuffered reads, use 2–4 and measure.
+
+## Overlap rule (Phase 16)
+
+What the overlap rule `orKeepOrder` costs (Design §11, §10.13). Measured
+2026-10-23, same machine.
+
+**Reads only** (the blocks benchmark: nothing overlaps, nothing is held back –
+this is the bookkeeping alone). Raw data:
+[2026-10-23-blocks-overlap-rule.csv](BenchmarkResults/2026-10-23-blocks-overlap-rule.csv).
+Block reader with read-ahead 128, thousand blocks per second, Delphi Win64:
+
+| Case | Rule off, 1 I/O thread | Rule on, 1 I/O thread | Rule off, 4 I/O threads | Rule on, 4 I/O threads |
+| --- | ---: | ---: | ---: | ---: |
+| random, cold | 142.2 | 138.8 | 143.2 | 139.9 |
+| random, warm | 263.7 | 253.9 | 433.1 | 249.0 |
+| random, unbuffered | 128.9 | 128.2 | 395.6 | 128.1 |
+| sorted, cold | 169.8 | 165.9 | 165.9 | 166.8 |
+| sorted, warm | 421.2 | 396.7 | 850.4 | 376.8 |
+| sorted, unbuffered | 150.0 | 147.9 | 476.4 | 147.0 |
+
+- **One I/O thread:** the rule costs 0–6.5 % in all four builds, the most
+  with cached data (4–6.5 %), where the I/O thread itself is the limit: each
+  new read is compared with the up to 128 unfinished requests of its file.
+- **Several I/O threads:** with the rule, all requests of a file go to one
+  I/O thread, so one file gets nothing from more I/O threads (random,
+  unbuffered: 396 → 128). Different files still use different I/O threads.
+
+**Reads and writes** (probe, Delphi Win64 on the P-cores; one producer, 32
+requests in flight, random reads and writes of 1–8 KiB, half each, median of
+5; thousand requests per second):
+
+| Region of the file | Held back | Rule off | Rule on |
+| --- | ---: | ---: | ---: |
+| 64 KiB (many overlaps) | 64 % | 495 | 399 |
+| 64 MiB (few overlaps) | 0.2 % | 259 | 251 |
+
+With many overlaps the rule costs 20 % – and without it, the data is wrong
+(the model tests found hundreds of wrong reads without the rule). With few
+overlaps it costs about 3 %.
+
+**So:** use the rule when requests of a file can overlap while in flight;
+for read-only work, or when the program keeps overlapping requests apart
+itself, leave it off – it costs up to 6.5 %, and one file then uses one I/O
+thread.
 
 ## Known limits of these measurements
 

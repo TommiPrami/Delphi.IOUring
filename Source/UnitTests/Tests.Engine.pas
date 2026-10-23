@@ -720,14 +720,21 @@ procedure TIORingEngineTests.IOThreads_ABacklogIsShared;
 const
   READS = 2000;
   READ_SIZE = 4096;
+  BLOCKS_IN_FILE = PATTERN_FILE_SIZE div READ_SIZE;
 var
-  LBuffers: TBytes;
+  LFile: THandle;
+  LBuffers: PByte;
   LHandles: TArray<TIORingRequestHandle>;
   LCompletions: TArray<TIORingCompletion>;
   LIndex: Integer;
 begin
+  // Unbuffered reads: each costs the I/O thread several µs inside the submit
+  // call, plus the disk's time. With cached reads one I/O thread sometimes
+  // finished all of them before a woken sibling got the CPU (FPC, 3 of 25
+  // runs), and the test failed for no fault of the engine.
+  LFile := FResources.OpenFile(FPatternFileName, FILE_FLAG_OVERLAPPED or FILE_FLAG_NO_BUFFERING);
+  LBuffers := FResources.AllocPages(READS * READ_SIZE);
   FEngine := TIORingEngine.Create(READS, 64, 4);
-  SetLength(LBuffers, READS * READ_SIZE);
   SetLength(LHandles, READS);
   SetLength(LCompletions, READS);
   Sleep(20);    // all I/O threads asleep
@@ -736,8 +743,8 @@ begin
   FEngine.BeginBatch;
   try
     for LIndex := 0 to READS - 1 do
-      LHandles[LIndex] := FEngine.ReadAsync(FFile, LBuffers[LIndex * READ_SIZE], READ_SIZE,
-        UInt64(LIndex) * 2039);
+      LHandles[LIndex] := FEngine.ReadAsync(LFile, LBuffers[LIndex * READ_SIZE], READ_SIZE,
+        UInt64(LIndex mod BLOCKS_IN_FILE) * READ_SIZE);
   finally
     FEngine.EndBatch;
   end;
@@ -745,7 +752,7 @@ begin
   for LIndex := 0 to READS - 1 do
   begin
     Assert.IsTrue(LCompletions[LIndex].Succeeded, LCompletions[LIndex].ErrorMessage);
-    CheckData(UInt64(LIndex) * 2039, @LBuffers[LIndex * READ_SIZE], READ_SIZE);
+    CheckData(UInt64(LIndex mod BLOCKS_IN_FILE) * READ_SIZE, @LBuffers[LIndex * READ_SIZE], READ_SIZE);
   end;
   Assert.AreEqual<UInt64>(READS, FEngine.Stats.Requests, 'Requests of all I/O threads');
   Assert.IsTrue(BusyIOThreads >= 2, Format('%d I/O threads took requests', [BusyIOThreads]));

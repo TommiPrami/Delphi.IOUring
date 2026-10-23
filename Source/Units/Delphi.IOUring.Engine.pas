@@ -43,6 +43,17 @@
 // IORING_ENGINE_SHARE_SIZE requests per round and wakes a sleeping sibling if
 // more are waiting.
 //
+// Requests in flight at the same time have no order (the OS gives none). With
+// the overlap rule orKeepOrder (Docs/Design.md §11), the engine keeps one for
+// each file handle: requests that touch the same bytes (write-write,
+// write-read, read-write) take effect in the order they were started; a later
+// one is held back until the earlier ones have completed. A flush waits for
+// the earlier writes. Reads never wait for reads, and requests that touch
+// other bytes run in parallel. For this, every request of a file handle goes
+// to the same I/O thread (chosen from the handle), so one file uses only one
+// I/O thread. The rule knows file handles, not files: two handles to the same
+// file are two "files" for it.
+//
 // Open files with FILE_FLAG_OVERLAPPED (TIORingPlatform.OpenFileForRead does):
 // a handle opened without it works, but Windows then carries out its I/O one
 // request at a time - no parallel reads (measured: Docs/Benchmarks.md,
@@ -94,6 +105,13 @@ type
   // that users of the engine need only this unit and Delphi.IOUring
   TIORingRequestHandle = Delphi.IOUring.RequestPool.TIORingRequestHandle;
 
+  // What the engine does with requests in flight at the same time that touch
+  // the same bytes of a file (Docs/Design.md §11)
+  TIORingOverlapRule = (
+    orNone,          // nothing: they run in any order (the user keeps them apart)
+    orKeepOrder      // per file handle, they take effect in the order they were started
+  );
+
   // Called on the I/O thread that completed the request, for a request
   // started with a callback; ACompletion.UserData is the caller's value. Keep
   // it short (the I/O thread does nothing else meanwhile), and do not wait for
@@ -109,6 +127,7 @@ type
     Submits: UInt64;           // SubmitIoRing calls
     Sleeps: UInt64;            // times an I/O thread went to sleep
     CallbackErrors: UInt64;    // exceptions raised by callbacks (caught)
+    HeldBack: UInt64;          // orKeepOrder: requests that waited for an earlier one
   end;
 
   TIORingEngine = class
@@ -119,6 +138,7 @@ type
     FIOThreads: array of TThread;
     FStarted: Boolean;
     FMaxRequests: Cardinal;
+    FOverlapRule: TIORingOverlapRule;
     // Words that several threads write, each on a cache line of its own
     // (the I/O threads' sleeping flags too)
     FSharedMemory: Pointer;
@@ -141,11 +161,12 @@ type
   public
     // AMaxRequests: requests that can be started and not yet waited for (or
     // whose callback has not run); ASubmissionQueueSize: the submission queue
-    // of each I/O thread's ring; AIOThreads: 1..IORING_ENGINE_MAX_IO_THREADS.
+    // of each I/O thread's ring; AIOThreads: 1..IORING_ENGINE_MAX_IO_THREADS;
+    // AOverlapRule: see TIORingOverlapRule and the unit's comment.
     // Raises EIORingNotSupported without IoRing.
     constructor Create(const AMaxRequests: Cardinal = IORING_ENGINE_DEFAULT_MAX_REQUESTS;
       const ASubmissionQueueSize: Cardinal = IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE;
-      const AIOThreads: Integer = 1);
+      const AIOThreads: Integer = 1; const AOverlapRule: TIORingOverlapRule = orNone);
     // Accepts no new requests, cancels the requests not finished yet and waits
     // until each has completed. Threads blocked in Wait wake up (the result is
     // "cancelled"); calling the engine after Destroy has returned is an error.
@@ -192,6 +213,7 @@ type
 
     property MaxRequests: Cardinal read FMaxRequests;
     property IOThreadCount: Integer read GetIOThreadCount;
+    property OverlapRule: TIORingOverlapRule read FOverlapRule;
   end;
 
 implementation
@@ -218,8 +240,23 @@ type
     OnComplete: TIORingCompletionEvent;
     NativeResult: Integer;
     BytesTransferred: NativeUInt;
+    // orKeepOrder: the request's place in its file's list of unfinished
+    // requests (start order; handle values, 0 = none)
+    FileIndex: Integer;            // the file in its I/O thread's table (-1: not in a list)
+    FilePrev: TIORingUserData;
+    FileNext: TIORingUserData;
+    HeldBack: Boolean;             // waits for an earlier request that touches the same bytes
   end;
   PEngineRequest = ^TEngineRequest;
+
+  // orKeepOrder: a file handle with unfinished requests
+  TOverlapFile = record
+    Handle: THandle;
+    Head: TIORingUserData;         // the oldest unfinished request; 0: entry not in use
+    Tail: TIORingUserData;         // the newest
+    HeldCount: Integer;            // of them held back
+    Next: Integer;                 // next entry in the same bucket, or in the free list
+  end;
 
   // One I/O thread with its own ring
   TIORingIOThread = class(TThread)
@@ -229,16 +266,36 @@ type
     FRing: TIORing;
     FWakeEvent: THandle;          // auto-reset: "new requests" (or Destroy)
     FSleeping: PInteger;          // 1: sleeps (or is about to); on its own cache line
+    // orKeepOrder: the requests of the file handles routed to this thread
+    FQueue: TIORingRequestQueue;
     // Written by this thread only (FStats is also read by others)
     FStats: TIORingEngineStats;
     FInFlight: array of TIORingRequestHandle;    // requests in the ring
     FInFlightCount: Integer;
-    FDeferred: TIORingRequestHandle;            // taken from the queue, did not fit into the ring yet
+    // Requests that may start but did not fit into the ring yet, or that are
+    // no longer held back; in start order (a ring buffer)
+    FReady: array of TIORingRequestHandle;
+    FReadyHead: Integer;
+    FReadyCount: Integer;
+    // orKeepOrder: file handles with unfinished requests (a hash table)
+    FFiles: array of TOverlapFile;
+    FFileBuckets: array of Integer;
+    FFileMask: NativeUInt;
+    FFreeFile: Integer;
+    FCancelling: Boolean;                        // Destroy: held-back requests are not started any more
 
     procedure CountStat(var ACounter: UInt64);
     procedure Run;
+    procedure PushReady(const AHandle: TIORingRequestHandle);
     function TakeNewRequests: Boolean;
+    function TakeFromQueue(out AHandle: TIORingRequestHandle): Boolean;
     function PrepareRequest(const AHandle: TIORingRequestHandle): Boolean;
+    // orKeepOrder
+    function FindOrAddFile(const AFile: THandle): Integer;
+    procedure RemoveFile(const AIndex: Integer);
+    function AdmitRequest(const AHandle: TIORingRequestHandle): Boolean;
+    procedure FileRequestDone(const ARequest: PEngineRequest);
+    procedure ReleaseHeldRequests(const AFileIndex: Integer);
     function ReapCompletions: Boolean;
     procedure FinishRequest(const AHandle: TIORingRequestHandle; const ANativeResult: Integer;
       const ABytesTransferred: NativeUInt);
@@ -268,6 +325,37 @@ begin
   Result := TIORingIOThread(AThread);
 end;
 
+// Do two requests touch the same bytes (0 bytes touch nothing)?
+function RangesOverlap(const AFirst, ASecond: PEngineRequest): Boolean;
+begin
+  if (AFirst^.Count = 0) or (ASecond^.Count = 0) then
+    Result := False
+  else if AFirst^.Offset <= ASecond^.Offset then
+    Result := ASecond^.Offset - AFirst^.Offset < AFirst^.Count
+  else
+    Result := AFirst^.Offset - ASecond^.Offset < ASecond^.Count;
+end;
+
+// Must ALater wait for AEarlier (orKeepOrder)? Writes and reads of the same
+// bytes, in any order but read-read; a flush waits for earlier writes.
+function MustWaitFor(const AEarlier, ALater: PEngineRequest): Boolean;
+begin
+  case ALater^.Operation of
+    ioRead:
+      Result := (AEarlier^.Operation = ioWrite) and RangesOverlap(AEarlier, ALater);
+    ioWrite:
+      Result := (AEarlier^.Operation in [ioRead, ioWrite]) and RangesOverlap(AEarlier, ALater);
+  else
+    Result := AEarlier^.Operation = ioWrite;    // a flush
+  end;
+end;
+
+// The I/O thread of a file handle (orKeepOrder). Handles are multiples of 4.
+function IOThreadIndexOf(const AFile: THandle; const AIOThreadCount: Integer): Integer; inline;
+begin
+  Result := Integer((NativeUInt(AFile) shr 2) mod NativeUInt(AIOThreadCount));
+end;
+
 { TIORingIOThread - life cycle }
 
 constructor TIORingIOThread.Create(const AEngine: TIORingEngine; const AIndex: Integer; const ASleeping: PInteger);
@@ -287,8 +375,32 @@ begin
 end;
 
 procedure TIORingIOThread.Prepare(const ASubmissionQueueSize: Cardinal);
+var
+  LIndex: Integer;
+  LBuckets: Integer;
 begin
   SetLength(FInFlight, FEngine.FMaxRequests);
+  SetLength(FReady, FEngine.FMaxRequests);
+  if FEngine.FOverlapRule = orKeepOrder then
+  begin
+    FQueue.Open(FEngine.FMaxRequests);
+    // At most one file per unfinished request; buckets: a power of 2
+    SetLength(FFiles, FEngine.FMaxRequests);
+    for LIndex := 0 to High(FFiles) do
+    begin
+      FFiles[LIndex].Head := 0;
+      FFiles[LIndex].Next := LIndex + 1;
+    end;
+    FFiles[High(FFiles)].Next := -1;
+    FFreeFile := 0;
+    LBuckets := 16;
+    while LBuckets < Length(FFiles) do
+      LBuckets := LBuckets * 2;
+    SetLength(FFileBuckets, LBuckets);
+    for LIndex := 0 to High(FFileBuckets) do
+      FFileBuckets[LIndex] := -1;
+    FFileMask := NativeUInt(LBuckets - 1);
+  end;
   FRing.Open(ASubmissionQueueSize);
   FWakeEvent := CreateEvent(nil, False, False, nil);   // auto-reset
   if FWakeEvent = 0 then
@@ -323,6 +435,7 @@ begin
   Result.Submits := TAtomic.LoadAcquire(FStats.Submits);
   Result.Sleeps := TAtomic.LoadAcquire(FStats.Sleeps);
   Result.CallbackErrors := TAtomic.LoadAcquire(FStats.CallbackErrors);
+  Result.HeldBack := TAtomic.LoadAcquire(FStats.HeldBack);
 end;
 
 { TIORingIOThread - the loop }
@@ -357,43 +470,69 @@ begin
   until False;
 end;
 
+procedure TIORingIOThread.PushReady(const AHandle: TIORingRequestHandle);
+begin
+  // A request is in FReady at most once, and FReady holds MaxRequests
+  FReady[(FReadyHead + FReadyCount) mod Length(FReady)] := AHandle;
+  Inc(FReadyCount);
+end;
+
+function TIORingIOThread.TakeFromQueue(out AHandle: TIORingRequestHandle): Boolean;
+var
+  LValue: NativeUInt;
+begin
+  if FEngine.FOverlapRule = orKeepOrder then
+    Result := FQueue.TryDequeue(LValue)          // the file handles routed here
+  else
+    Result := FEngine.FQueue.TryDequeue(LValue);
+  if Result then
+  begin
+    AHandle.Value := LValue;
+    CountStat(FStats.Requests);
+    FEngine.FPool.TryChangeState(AHandle, rsQueued, rsSubmitted);
+  end
+  else
+    AHandle.Value := 0;
+end;
+
 function TIORingIOThread.TakeNewRequests: Boolean;
 var
   LHandle: TIORingRequestHandle;
-  LValue: NativeUInt;
   LTaken: Integer;
 begin
   Result := False;
+  // 1. The requests that may start, in start order, while the ring has room
+  while FReadyCount > 0 do
+  begin
+    if not PrepareRequest(FReady[FReadyHead]) then
+      Exit;    // the ring is full: next round
+    FReadyHead := (FReadyHead + 1) mod Length(FReady);
+    Dec(FReadyCount);
+    Result := True;
+  end;
+
+  // 2. New requests
   LTaken := 0;
   repeat
-    if not FDeferred.IsEmpty then
+    // With siblings that share the queue: a share per round, the rest is theirs
+    if (LTaken >= IORING_ENGINE_SHARE_SIZE) and (FEngine.FOverlapRule = orNone) and
+      (Length(FEngine.FIOThreads) > 1) then
     begin
-      LHandle := FDeferred;
-      FDeferred.Value := 0;
-    end
-    else
-    begin
-      // With siblings: a share per round, the rest is theirs
-      if (LTaken >= IORING_ENGINE_SHARE_SIZE) and (Length(FEngine.FIOThreads) > 1) then
-      begin
-        if FEngine.FQueue.Count > 0 then
-          FEngine.WakeSleepingIOThread(FIndex);
-        Exit;
-      end;
-      if not FEngine.FQueue.TryDequeue(LValue) then
-        Exit;
-      Inc(LTaken);
-      LHandle.Value := LValue;
-      CountStat(FStats.Requests);
-      FEngine.FPool.TryChangeState(LHandle, rsQueued, rsSubmitted);
-    end;
-
-    if not PrepareRequest(LHandle) then
-    begin
-      FDeferred := LHandle;    // the ring is full: next round
+      if FEngine.FQueue.Count > 0 then
+        FEngine.WakeSleepingIOThread(FIndex);
       Exit;
     end;
+    if not TakeFromQueue(LHandle) then
+      Exit;
+    Inc(LTaken);
     Result := True;
+    if (FEngine.FOverlapRule = orKeepOrder) and not AdmitRequest(LHandle) then
+      Continue;    // held back: it starts when the earlier requests it waits for have completed
+    if not PrepareRequest(LHandle) then
+    begin
+      PushReady(LHandle);    // the ring is full: next round
+      Exit;
+    end;
   until False;
 end;
 
@@ -480,6 +619,162 @@ begin
   LRequest^.InFlightIndex := -1;
 end;
 
+{ TIORingIOThread - the overlap rule (orKeepOrder) }
+
+function TIORingIOThread.FindOrAddFile(const AFile: THandle): Integer;
+var
+  LBucket: NativeUInt;
+begin
+  LBucket := (NativeUInt(AFile) shr 2) and FFileMask;
+  Result := FFileBuckets[LBucket];
+  while Result >= 0 do
+  begin
+    if FFiles[Result].Handle = AFile then
+      Exit;
+    Result := FFiles[Result].Next;
+  end;
+  // New: one entry per file with unfinished requests, so one is free
+  Result := FFreeFile;
+  FFreeFile := FFiles[Result].Next;
+  FFiles[Result].Handle := AFile;
+  FFiles[Result].Head := 0;
+  FFiles[Result].Tail := 0;
+  FFiles[Result].HeldCount := 0;
+  FFiles[Result].Next := FFileBuckets[LBucket];
+  FFileBuckets[LBucket] := Result;
+end;
+
+procedure TIORingIOThread.RemoveFile(const AIndex: Integer);
+var
+  LBucket: NativeUInt;
+  LPrevious: Integer;
+  LEntry: Integer;
+begin
+  LBucket := (NativeUInt(FFiles[AIndex].Handle) shr 2) and FFileMask;
+  LPrevious := -1;
+  LEntry := FFileBuckets[LBucket];
+  while LEntry <> AIndex do
+  begin
+    LPrevious := LEntry;
+    LEntry := FFiles[LEntry].Next;
+  end;
+  if LPrevious < 0 then
+    FFileBuckets[LBucket] := FFiles[AIndex].Next
+  else
+    FFiles[LPrevious].Next := FFiles[AIndex].Next;
+  FFiles[AIndex].Head := 0;
+  FFiles[AIndex].Next := FFreeFile;
+  FFreeFile := AIndex;
+end;
+
+function TIORingIOThread.AdmitRequest(const AHandle: TIORingRequestHandle): Boolean;
+var
+  LRequest: PEngineRequest;
+  LOther: PEngineRequest;
+  LFile: Integer;
+  LValue: TIORingUserData;
+begin
+  // Every request of the file that is not finished yet was started earlier:
+  // the new one waits if it must wait for any of them
+  LRequest := FEngine.FPool.Payload(AHandle);
+  LFile := FindOrAddFile(LRequest^.FileHandle);
+  Result := True;
+  LValue := FFiles[LFile].Head;
+  while LValue <> 0 do
+  begin
+    LOther := FEngine.FPool.Payload(TIORingRequestHandle.FromUserData(LValue));
+    if MustWaitFor(LOther, LRequest) then
+    begin
+      Result := False;
+      Break;
+    end;
+    LValue := LOther^.FileNext;
+  end;
+
+  // At the end of the file's list
+  LRequest^.FileIndex := LFile;
+  LRequest^.FilePrev := FFiles[LFile].Tail;
+  LRequest^.FileNext := 0;
+  if FFiles[LFile].Tail <> 0 then
+    PEngineRequest(FEngine.FPool.Payload(TIORingRequestHandle.FromUserData(FFiles[LFile].Tail)))^.FileNext :=
+      AHandle.Value
+  else
+    FFiles[LFile].Head := AHandle.Value;
+  FFiles[LFile].Tail := AHandle.Value;
+  LRequest^.HeldBack := not Result;
+  if not Result then
+  begin
+    Inc(FFiles[LFile].HeldCount);
+    CountStat(FStats.HeldBack);
+  end;
+end;
+
+procedure TIORingIOThread.FileRequestDone(const ARequest: PEngineRequest);
+var
+  LFile: Integer;
+begin
+  LFile := ARequest^.FileIndex;
+  ARequest^.FileIndex := -1;
+  if ARequest^.HeldBack then
+    Dec(FFiles[LFile].HeldCount);    // cancelled while held back
+  if ARequest^.FilePrev <> 0 then
+    PEngineRequest(FEngine.FPool.Payload(TIORingRequestHandle.FromUserData(ARequest^.FilePrev)))^.FileNext :=
+      ARequest^.FileNext
+  else
+    FFiles[LFile].Head := ARequest^.FileNext;
+  if ARequest^.FileNext <> 0 then
+    PEngineRequest(FEngine.FPool.Payload(TIORingRequestHandle.FromUserData(ARequest^.FileNext)))^.FilePrev :=
+      ARequest^.FilePrev
+  else
+    FFiles[LFile].Tail := ARequest^.FilePrev;
+
+  if FFiles[LFile].Head = 0 then
+    RemoveFile(LFile)
+  else if (FFiles[LFile].HeldCount > 0) and not FCancelling then
+    ReleaseHeldRequests(LFile);
+end;
+
+procedure TIORingIOThread.ReleaseHeldRequests(const AFileIndex: Integer);
+var
+  LValue: TIORingUserData;
+  LRequest: PEngineRequest;
+  LEarlier: TIORingUserData;
+  LOther: PEngineRequest;
+  LMustWait: Boolean;
+begin
+  // In start order: a held-back request may start when nothing earlier that
+  // is still unfinished (started or held back itself) makes it wait
+  LValue := FFiles[AFileIndex].Head;
+  while LValue <> 0 do
+  begin
+    LRequest := FEngine.FPool.Payload(TIORingRequestHandle.FromUserData(LValue));
+    if LRequest^.HeldBack then
+    begin
+      LMustWait := False;
+      LEarlier := FFiles[AFileIndex].Head;
+      while LEarlier <> LValue do
+      begin
+        LOther := FEngine.FPool.Payload(TIORingRequestHandle.FromUserData(LEarlier));
+        if MustWaitFor(LOther, LRequest) then
+        begin
+          LMustWait := True;
+          Break;
+        end;
+        LEarlier := LOther^.FileNext;
+      end;
+      if not LMustWait then
+      begin
+        LRequest^.HeldBack := False;
+        Dec(FFiles[AFileIndex].HeldCount);
+        PushReady(TIORingRequestHandle.FromUserData(LValue));
+        if FFiles[AFileIndex].HeldCount = 0 then
+          Exit;
+      end;
+    end;
+    LValue := LRequest^.FileNext;
+  end;
+end;
+
 procedure TIORingIOThread.FinishRequest(const AHandle: TIORingRequestHandle; const ANativeResult: Integer;
   const ABytesTransferred: NativeUInt);
 var
@@ -488,6 +783,10 @@ var
   LCompletion: TIORingCompletion;
 begin
   LRequest := FEngine.FPool.Payload(AHandle);
+  // Out of its file's list first: once it is Completed, its owner may free
+  // the slot at once
+  if LRequest^.FileIndex >= 0 then
+    FileRequestDone(LRequest);
   LRequest^.NativeResult := ANativeResult;
   LRequest^.BytesTransferred := ABytesTransferred;
   CountStat(FStats.Completed);
@@ -526,14 +825,20 @@ begin
   // use full barriers, so at least one of the two sees the other.)
   TAtomic.Exchange(FSleeping^, 1);
   TAtomic.Increment(FEngine.FSleepingCount^);
+  // (Requests in FReady after a quiet round mean: this ring is full, only a
+  // completion helps it.)
   LStayAwake := TAtomic.LoadAcquire(FEngine.FShutdown) <> 0;
-  if not LStayAwake and (FEngine.FQueue.Count > 0) then
+  if LStayAwake then
+    // Destroy
+  else if FEngine.FOverlapRule = orKeepOrder then
+    // Only this thread takes the requests of its queue
+    LStayAwake := (FQueue.Count > 0) and (FReadyCount = 0)
+  else if FEngine.FQueue.Count > 0 then
   begin
-    if FDeferred.IsEmpty then
+    if FReadyCount = 0 then
       LStayAwake := True
     else
-      // This ring is full, only a completion helps it: a sibling may take
-      // the waiting requests meanwhile
+      // A sibling may take the waiting requests meanwhile
       FEngine.WakeSleepingIOThread(FIndex);
   end;
   if not LStayAwake then
@@ -551,26 +856,33 @@ end;
 
 procedure TIORingIOThread.CancelEverything;
 var
-  LValue: NativeUInt;
+  LValue: TIORingUserData;
   LHandle: TIORingRequestHandle;
   LTargets: array of TIORingRequestHandle;
   LIndex: Integer;
   LPrepared: Boolean;
 begin
-  // 1. Requests not in a ring yet: cancelled without starting them (the
-  //    other I/O threads empty the queue too)
-  if not FDeferred.IsEmpty then
+  // 1. Requests not in a ring yet: cancelled without starting them - those
+  //    that may start, those held back (none of them starts any more), and
+  //    the queued ones (the other I/O threads empty the shared queue too)
+  FCancelling := True;
+  while FReadyCount > 0 do
   begin
-    FinishRequest(FDeferred, IORING_RESULT_CANCELLED, 0);
-    FDeferred.Value := 0;
-  end;
-  while FEngine.FQueue.TryDequeue(LValue) do
-  begin
-    LHandle.Value := LValue;
-    CountStat(FStats.Requests);
-    FEngine.FPool.TryChangeState(LHandle, rsQueued, rsSubmitted);
+    LHandle := FReady[FReadyHead];
+    FReadyHead := (FReadyHead + 1) mod Length(FReady);
+    Dec(FReadyCount);
     FinishRequest(LHandle, IORING_RESULT_CANCELLED, 0);
   end;
+  for LIndex := 0 to High(FFiles) do
+    while (FFiles[LIndex].Head <> 0) and (FFiles[LIndex].HeldCount > 0) do
+    begin
+      LValue := FFiles[LIndex].Head;
+      while not PEngineRequest(FEngine.FPool.Payload(TIORingRequestHandle.FromUserData(LValue)))^.HeldBack do
+        LValue := PEngineRequest(FEngine.FPool.Payload(TIORingRequestHandle.FromUserData(LValue)))^.FileNext;
+      FinishRequest(TIORingRequestHandle.FromUserData(LValue), IORING_RESULT_CANCELLED, 0);
+    end;
+  while TakeFromQueue(LHandle) do
+    FinishRequest(LHandle, IORING_RESULT_CANCELLED, 0);
 
   // 2. Requests in this ring: ask the ring to cancel each one. (One that
   //    completes meanwhile makes its cancel fail - harmless; no new request
@@ -615,7 +927,7 @@ end;
 { TIORingEngine - life cycle }
 
 constructor TIORingEngine.Create(const AMaxRequests: Cardinal; const ASubmissionQueueSize: Cardinal;
-  const AIOThreads: Integer);
+  const AIOThreads: Integer; const AOverlapRule: TIORingOverlapRule);
 var
   LShared: PByte;
   LIndex: Integer;
@@ -626,6 +938,7 @@ begin
     raise EIORingError.CreateFmt('The engine needs 1..%d I/O threads, not %d', [IORING_ENGINE_MAX_IO_THREADS,
       AIOThreads]);
   FMaxRequests := AMaxRequests;
+  FOverlapRule := AOverlapRule;
   LShared := IORingAllocCacheAligned((SHARED_LINES + AIOThreads) * IORING_CACHE_LINE_SIZE, FSharedMemory);
   FStopping := Pointer(LShared);
   FStartCalls := Pointer(LShared + IORING_CACHE_LINE_SIZE);
@@ -736,6 +1049,7 @@ function TIORingEngine.StartRequest(const AOperation: TIORingOp; const AFile: TH
 var
   LHandle: TIORingRequestHandle;
   LRequest: PEngineRequest;
+  LOwner: TIORingIOThread;
 begin
   // Counted, so that Destroy can wait until no thread is half-way here
   TAtomic.Increment(FStartCalls^);
@@ -755,12 +1069,30 @@ begin
     LRequest^.OnComplete := AOnComplete;
     LRequest^.NativeResult := 0;
     LRequest^.BytesTransferred := 0;
+    LRequest^.FileIndex := -1;
+    LRequest^.FilePrev := 0;
+    LRequest^.FileNext := 0;
+    LRequest^.HeldBack := False;
     // Queued before it is in the queue: an I/O thread may take it at once
     FPool.TryChangeState(LHandle, rsDefined, rsQueued);
-    if not FQueue.TryEnqueue(LHandle.Value) then
-      raise EIORingError.Create('Internal error: the request queue is full');
-    if (GBatchDepth = 0) or (GBatchEngine <> Self) then
-      WakeIOThread;
+    if FOverlapRule = orKeepOrder then
+    begin
+      // To the I/O thread of the file handle: it alone keeps the order. The
+      // enqueue is a full barrier, and that thread says "sleeping" before it
+      // looks at its queue once more: one of the two sees the other.
+      LOwner := IOThread(FIOThreads[IOThreadIndexOf(AFile, Length(FIOThreads))]);
+      if not LOwner.FQueue.TryEnqueue(LHandle.Value) then
+        raise EIORingError.Create('Internal error: the request queue is full');
+      if (GBatchDepth = 0) or (GBatchEngine <> Self) then
+        LOwner.TryWake;
+    end
+    else
+    begin
+      if not FQueue.TryEnqueue(LHandle.Value) then
+        raise EIORingError.Create('Internal error: the request queue is full');
+      if (GBatchDepth = 0) or (GBatchEngine <> Self) then
+        WakeIOThread;
+    end;
     // With a callback the request ends by itself, maybe already now
     if Assigned(AOnComplete) then
       Result.Value := 0
@@ -830,6 +1162,8 @@ begin
 end;
 
 procedure TIORingEngine.EndBatch;
+var
+  LIndex: Integer;
 begin
   if (GBatchDepth = 0) or (GBatchEngine <> Self) then
     raise EIORingError.Create('EndBatch without BeginBatch');
@@ -837,7 +1171,15 @@ begin
   if GBatchDepth = 0 then
   begin
     GBatchEngine := nil;
-    WakeIOThread;
+    if FOverlapRule = orKeepOrder then
+    begin
+      // The batch may have gone to several I/O threads
+      for LIndex := 0 to High(FIOThreads) do
+        if IOThread(FIOThreads[LIndex]).FQueue.Count > 0 then
+          IOThread(FIOThreads[LIndex]).TryWake;
+    end
+    else
+      WakeIOThread;
   end;
 end;
 
@@ -908,6 +1250,7 @@ begin
     Inc(Result.Submits, LOne.Submits);
     Inc(Result.Sleeps, LOne.Sleeps);
     Inc(Result.CallbackErrors, LOne.CallbackErrors);
+    Inc(Result.HeldBack, LOne.HeldBack);
   end;
 end;
 

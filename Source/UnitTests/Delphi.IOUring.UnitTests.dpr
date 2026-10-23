@@ -39,7 +39,8 @@ uses
   Tests.RequestPool in 'Tests.RequestPool.pas',
   Tests.RequestQueue in 'Tests.RequestQueue.pas',
   Tests.Engine in 'Tests.Engine.pas',
-  Tests.BlockReader in 'Tests.BlockReader.pas';
+  Tests.BlockReader in 'Tests.BlockReader.pas',
+  Tests.EngineOverlap in 'Tests.EngineOverlap.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

@@ -18,7 +18,9 @@
                            on an overlapped handle; once more on a synchronous
                            handle, to show that Windows then reads one at a time;
                            read-ahead 128 also with an engine of 2 and of 4 I/O
-                           threads (Phase 15)
+                           threads (Phase 15), and with the overlap rule
+                           orKeepOrder on 1 and 4 I/O threads (Phase 16: its
+                           cost; one file then uses one I/O thread)
   Cache: cold (the file is purged from the cache before every run), warm, and
   unbuffered (FILE_FLAG_NO_BUFFERING: every read goes to the disk; not for
   TFileStream, whose buffers are not aligned).
@@ -80,7 +82,7 @@ type
   TListKind = (lkRandom, lkSortedGaps);
   TCacheState = (csCold, csWarm, csUnbuffered);
   TContender = (cnFileStream, cnReadFile, cnReadFileThreads, cnReader1, cnReader8, cnReader32, cnReader128,
-    cnReader128IO2, cnReader128IO4, cnReader32Gap, cnReader32Sync);
+    cnReader128IO2, cnReader128IO4, cnReader128Keep, cnReader128IO4Keep, cnReader32Gap, cnReader32Sync);
 
 const
   LIST_NAMES: array[TListKind] of string = ('random 4 KiB', 'sorted, gaps');
@@ -95,11 +97,16 @@ const
     'Block reader, read-ahead 128',
     'Block reader, read-ahead 128, 2 I/O threads',
     'Block reader, read-ahead 128, 4 I/O threads',
+    'Block reader, read-ahead 128, overlap rule',
+    'Block reader, read-ahead 128, 4 I/O thr., overlap rule',
     'Block reader, read-ahead 32, MaxGap 32 KiB',
     'Block reader, read-ahead 32, synchronous handle');
-  READ_AHEAD: array[TContender] of Cardinal = (0, 0, 0, 1, 8, 32, 128, 128, 128, 32, 32);
-  // I/O threads of the engine a block reader uses
-  IO_THREADS: array[TContender] of Integer = (0, 0, 0, 1, 1, 1, 1, 2, 4, 1, 1);
+  READ_AHEAD: array[TContender] of Cardinal = (0, 0, 0, 1, 8, 32, 128, 128, 128, 128, 128, 32, 32);
+  // The engine a block reader uses: its I/O threads, and whether it keeps the
+  // order of overlapping requests (orKeepOrder; one file then uses one I/O thread)
+  IO_THREADS: array[TContender] of Integer = (0, 0, 0, 1, 1, 1, 1, 2, 4, 1, 4, 1, 1);
+  KEEP_ORDER: array[TContender] of Boolean = (False, False, False, False, False, False, False, False, False,
+    True, True, False, False);
 
 type
   TRunResult = record
@@ -139,6 +146,9 @@ var
   GEngine: TIORingEngine;
   GEngine2: TIORingEngine;
   GEngine4: TIORingEngine;
+  // With the overlap rule, 1 and 4 I/O threads
+  GEngineKeep: TIORingEngine;
+  GEngine4Keep: TIORingEngine;
 
 // Small random numbers (fixed seed: the same lists every time)
 function NextRandom(var AState: Cardinal): Cardinal;
@@ -344,12 +354,20 @@ end;
 
 function EngineFor(const AContender: TContender): TIORingEngine;
 begin
-  case IO_THREADS[AContender] of
-    2: Result := GEngine2;
-    4: Result := GEngine4;
+  if KEEP_ORDER[AContender] then
+  begin
+    if IO_THREADS[AContender] = 4 then
+      Result := GEngine4Keep
+    else
+      Result := GEngineKeep;
+  end
   else
-    Result := GEngine;
-  end;
+    case IO_THREADS[AContender] of
+      2: Result := GEngine2;
+      4: Result := GEngine4;
+    else
+      Result := GEngine;
+    end;
 end;
 
 function RunContender(const AContender: TContender; const AFileName: string; const ABlocks: TBlockList;
@@ -533,6 +551,10 @@ begin
   GEngine := TIORingEngine.Create;
   GEngine2 := TIORingEngine.Create(IORING_ENGINE_DEFAULT_MAX_REQUESTS, IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE, 2);
   GEngine4 := TIORingEngine.Create(IORING_ENGINE_DEFAULT_MAX_REQUESTS, IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE, 4);
+  GEngineKeep := TIORingEngine.Create(IORING_ENGINE_DEFAULT_MAX_REQUESTS, IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE,
+    1, orKeepOrder);
+  GEngine4Keep := TIORingEngine.Create(IORING_ENGINE_DEFAULT_MAX_REQUESTS, IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE,
+    4, orKeepOrder);
   try
     for LKind := Low(TListKind) to High(TListKind) do
     begin
@@ -541,7 +563,7 @@ begin
       begin
         Writeln;
         Writeln(Format('%s, %s cache', [LIST_NAMES[LKind], CACHE_NAMES[LCache]]));
-        Writeln(Format('  %-46s %11s %9s %9s', ['Contender', 'K blocks/s', 'MiB/s', 'CPU ms'], GInvariant));
+        Writeln(Format('  %-54s %11s %9s %9s', ['Contender', 'K blocks/s', 'MiB/s', 'CPU ms'], GInvariant));
         if LCache = csWarm then
           RunContender(cnReadFile, LFileName, LBlocks, csWarm);    // bring the blocks into the cache
         LHaveExpected := False;
@@ -580,12 +602,14 @@ begin
             LMark := ''
           else
             LMark := '  CHECKSUM!';
-          Writeln(Format('  %-46s %11.1f %9.1f %9.0f%s', [CONTENDER_NAMES[LContender], GBlockCount / LMedian / 1000,
+          Writeln(Format('  %-54s %11.1f %9.1f %9.0f%s', [CONTENDER_NAMES[LContender], GBlockCount / LMedian / 1000,
             GBlockCount * BLOCK_SIZE / LMedian / MiB, Median(LCpu[LContender]), LMark], GInvariant));
         end;
       end;
     end;
   finally
+    GEngine4Keep.Free;
+    GEngineKeep.Free;
     GEngine4.Free;
     GEngine2.Free;
     GEngine.Free;

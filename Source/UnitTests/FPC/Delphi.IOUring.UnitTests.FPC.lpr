@@ -31,7 +31,8 @@ uses
   Tests.FPC.RequestPool,
   Tests.FPC.RequestQueue,
   Tests.FPC.Engine,
-  Tests.FPC.BlockReader;
+  Tests.FPC.BlockReader,
+  Tests.FPC.EngineOverlap;
 
 type
   // TComponent: interface without reference counting, as TTestResult expects

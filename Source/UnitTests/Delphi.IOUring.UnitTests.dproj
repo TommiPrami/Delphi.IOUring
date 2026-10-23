@@ -97,6 +97,7 @@
         <DCCReference Include="Tests.RequestQueue.pas"/>
         <DCCReference Include="Tests.Engine.pas"/>
         <DCCReference Include="Tests.BlockReader.pas"/>
+        <DCCReference Include="Tests.EngineOverlap.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
