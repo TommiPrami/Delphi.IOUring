@@ -1,4 +1,4 @@
-max_backoff,timestamp,compiler,platform,structure,variant,scenario,threads,run,pairs_per_s,cpu_ms
+﻿max_backoff,timestamp,compiler,platform,structure,variant,scenario,threads,run,pairs_per_s,cpu_ms
 0,2026-10-22 14:41:20,Delphi,Win64,free list,lock-free,tight,1,1,61918546,62.5
 0,2026-10-22 14:41:20,Delphi,Win64,free list,SRW lock,tight,1,1,43416440,62.5
 0,2026-10-22 14:41:20,Delphi,Win64,free list,lock-free,tight,1,2,62223882,62.5

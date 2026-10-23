@@ -1,4 +1,4 @@
-timestamp,compiler,platform,structure,variant,scenario,threads,run,ops_per_s,cpu_ms
+﻿timestamp,compiler,platform,structure,variant,scenario,threads,run,ops_per_s,cpu_ms
 2026-10-22 15:57:28,Delphi,Win64,queue,lock-free,tight,1,1,86374433,93.8
 2026-10-22 15:57:28,Delphi,Win64,queue,SRW lock,tight,1,1,22931835,343.8
 2026-10-22 15:57:28,Delphi,Win64,queue,lock-free,tight,1,2,90501833,93.8

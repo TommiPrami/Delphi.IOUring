@@ -1,4 +1,4 @@
-timestamp,platform,size_gib,scenario,cache,contender,run,seconds,mib_per_s,user_ms,kernel_ms,stalls,checksum_ok
+﻿timestamp,platform,size_gib,scenario,cache,contender,run,seconds,mib_per_s,user_ms,kernel_ms,stalls,checksum_ok
 2026-10-22 11:39:02,Win64,1,read-through,cold,"TFileStream 64 KiB reads",1,0.5861,1747.1,0.0,46.9,0,True
 2026-10-22 11:39:02,Win64,1,read-through,cold,"TFileStream 1 MiB reads",1,0.4009,2554.5,15.6,93.8,0,True
 2026-10-22 11:39:02,Win64,1,read-through,cold,"TBufferedFileStream 1 MiB buffer, 64 KiB reads",1,0.4021,2546.3,93.8,156.3,0,True
