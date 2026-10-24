@@ -2856,6 +2856,76 @@ Found while looking (2026-10-23):
   25 Linux API tests and the 7 file-helper tests). Delphi has one test more:
   `ReadOverloads_Work`.
 
+### 12.5 Tests in CI – GitHub Actions (Phase 23)
+
+Today every test runs on one machine: Windows 11 and WSL2. Two things were
+never run anywhere: the AArch64 code (§5.7, §6.4: no ARM machine, no cross
+compiler here) and Linux outside WSL2 (where "cold" is not the disk,
+§10.14). The repository is public on GitHub, so its hosted runners are free.
+
+**Facts found before Phase 23** (GitHub's documentation and image release
+notes, 2026-10-24):
+
+- Free and without limit for public repositories, each 4 processors,
+  16 GB memory, 14 GB SSD: `ubuntu-24.04` (x64), `ubuntu-24.04-arm`
+  (ARM64; GitHub maintains the image), `windows-2025` (= `windows-latest`,
+  Windows Server 2025 x64, build 26100 – the code base of Windows 11 24H2),
+  `windows-11-arm`. `ubuntu-26.04-arm` is in public preview.
+- PowerShell 7 is installed on the Linux images, x64 and ARM64, so
+  `Build-FPC.ps1` can run there.
+- Free Pascal: Ubuntu 24.04's `fpc` package is 3.2.2 for x64 and ARM64. On
+  Windows, freepascal.org has one installer with both compilers,
+  `fpc-3.2.2.win32.and.win64.exe` (i386 native, x86_64 cross). The usual
+  GitHub action for Lazarus (`gcarreno/setup-lazarus`) is no longer
+  maintained.
+- **Not known yet:** whether io_uring is switched on in the Linux runners
+  (`kernel.io_uring_disabled`, the kernel version), and whether Windows
+  Server 2025 has IoRing version 4. No documentation says. The first run
+  tells: the test program prints `IORingCapabilities.ToString` first (the
+  reason too, when the ring is not available).
+- Delphi cannot run there (the compiler needs an installed, licensed IDE).
+- Workflows run when you push. Their results can be read on the
+  repository's Actions page.
+
+**Phase 23 proposal:**
+
+- **[DECIDE] 1. What runs where.** Proposed:
+  - `ubuntu-24.04` (x64) and `ubuntu-24.04-arm` (ARM64): the Free Pascal
+    tests, debug build and `-O3`. On ARM also the layout generator
+    (`Generate-PosixApiLayout.sh`, gcc there): its output must equal the
+    committed `.inc`, so the C header's layout is checked on AArch64 too.
+  - `windows-2025`: the Free Pascal tests, Win32 and Win64, debug and
+    `-O3` – if the runner has IoRing version 4; if not, build only, and the
+    reason in the log.
+  - On every runner the four benchmarks are built. They run only when
+    started by hand (`workflow_dispatch`, with the sizes as input): about
+    10 minutes, and a shared cloud disk – not for every push. Their output
+    is kept as an artifact of the run.
+  - When: on every push to `main` and on pull requests.
+- **[DECIDE] 2. One build script.** Proposed: `Build-FPC.ps1` builds
+  natively on Linux (on a Linux host `-Platform Linux64` calls `fpc`
+  directly instead of WSL) and gets `-Platform LinuxArm64`; the RTL unit
+  folder is found from the host instead of a fixed path. The same commands
+  then work on your machine and in CI. Other choice: a separate shell
+  script for Linux.
+- **[DECIDE] 3. The test program reports the system first.** Proposed: the
+  Free Pascal test program prints `IORingCapabilities.ToString` after its
+  first line – in CI the log then says what each runner has (and on your
+  machine too). Where the ring is not available, the tests fail as now
+  (the library has nothing to do without the ring); the reason is in the
+  log.
+- Timing checks (for example "freed in under 500 ms", "slept at most 2
+  times") may fail on a busy 4-processor runner. They stay as they are; if
+  one fails in CI, it gets a looser limit then – not before.
+- Steps: `Build-FPC.ps1` on Linux; the report in the test program;
+  `.github/workflows/ci.yml`; you push, I read the first run and fix what
+  fails (AArch64 is the most likely place); a CI badge and a "Tested on"
+  list in the README.
+
+**Phase 23 decisions (decided 2026-10-24):** all three as proposed – the
+runners and jobs of 1, `Build-FPC.ps1` for Linux too (2), and the
+capabilities report at the top of the test program's output (3).
+
 ---
 
 ## 13. Ideas parked for later
@@ -2867,7 +2937,8 @@ Found while looking (2026-10-23):
   zero-copy send (they need the CQE flags in the completion and a count
   that knows `IORING_CQE_F_MORE`); SQPOLL in `TLinuxIORing`, if a benchmark
   ever shows a gain.
-- Read directly into the caller's buffer for big aligned reads (§7.7).
+- Read directly into the caller's buffer for big aligned reads (§7, point
+  7). Planned: Phase 26.
 
 ---
 

@@ -9,10 +9,12 @@
   tests run on Windows only.
 
   Build and run:  Source\Build-FPC.ps1 -Project Tests -Platform Win32 -Run
-                  (Win64, or Linux64: built and run in WSL)
-  Runs all tests, prints every test and failure, and exits with 1 if anything
-  failed (a small runner of its own, so the exit code does not depend on the
-  FPCUnit console runner's version).
+                  (Win64, or Linux64: built and run in WSL; on a Linux
+                  machine: pwsh Source/Build-FPC.ps1 -Project Tests -Run)
+  Prints what the system offers (IORingCapabilities), runs all tests, prints
+  every test and failure, and exits with 1 if anything failed (a small runner
+  of its own, so the exit code does not depend on the FPCUnit console
+  runner's version).
 }
 
 {$I Delphi.IOUring.inc}
@@ -28,6 +30,7 @@ uses
 {$ENDIF}
   fpcunit,
   testregistry,
+  Delphi.IOUring,
   Tests.Support,
 {$IFDEF MSWINDOWS}
   Tests.Backend.Windows.API.Layout,
@@ -114,6 +117,10 @@ var
 begin
   Writeln('Delphi.IOUring tests (Free Pascal ', {$I %FPCVERSION%}, ', ', {$I %FPCTARGETCPU%}, '-',
     {$I %FPCTARGETOS%}, {$IFDEF UNIX}', kernel ', KernelRelease, {$ENDIF}')');
+  Writeln;
+  // What this system offers (in CI: what each runner has; the reason, if the
+  // ring is not available)
+  Writeln(IORingCapabilities.ToString);
   Writeln;
 
   LResult := TTestResult.Create;

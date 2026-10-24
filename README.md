@@ -1,7 +1,9 @@
 ﻿# Delphi.IOUring
 
+[![CI](https://github.com/TommiPrami/Delphi.IOUring/actions/workflows/ci.yml/badge.svg)](https://github.com/TommiPrami/Delphi.IOUring/actions/workflows/ci.yml)
+
 Fast file I/O for Delphi with the operating system's I/O rings: **IoRing** on
-Windows (and later `io_uring` on Linux through Free Pascal).
+Windows, and `io_uring` on Linux through Free Pascal.
 
 The first ready part is a **read-only, sequential file stream with read-ahead**:
 while your code works on one block, the next blocks are already being read.
@@ -47,6 +49,17 @@ See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
   **Linux 5.11 or newer**, x86-64 (AArch64 is written for but not tested),
   with io_uring not switched off. Otherwise `IORingAvailable` returns False.
   Programs need `cthreads` as the first unit (the engine uses threads).
+
+### Tested on
+
+| Where | What |
+| --- | --- |
+| Windows 11 (build 26300), locally | Delphi 13 and Free Pascal 3.2.2, Win32 and Win64, debug and optimized; Free Pascal 3.3.1 (trunk), Win64 |
+| WSL2, Ubuntu 24.04 and 26.04 (kernel 6.18), locally | Free Pascal 3.2.2, x86-64, debug and `-O3` |
+| GitHub Actions, on every push ([CI](.github/workflows/ci.yml)) | Free Pascal 3.2.2 on Linux x86-64 and Linux ARM64 (Ubuntu 24.04), and on Windows Server 2025 (Win32 and Win64) |
+
+The test program prints what the system offers first
+(`IORingCapabilities.ToString`), so every CI log says what that runner has.
 
 ## Usage
 
@@ -289,7 +302,8 @@ only; measured, it gave no gain for file I/O and cost much more CPU time
   builds and runs them in WSL, with the FPC installed there (Ubuntu:
   `sudo apt install fpc`). On Linux all tests run except the Windows API
   tests, plus the Linux API tests. `-Distribution Ubuntu-26.04` picks another
-  WSL distribution than the default one.
+  WSL distribution than the default one. On a Linux machine itself (x86-64
+  or ARM64, with PowerShell 7): `pwsh Source/Build-FPC.ps1 -Project Tests -Run`.
 - Benchmarks: `Source\Benchmarks\Delphi.IOUring.Benchmarks.dproj`, and for Free
   Pascal `Source\Build-FPC.ps1 -Project Benchmarks` – see
   [Docs/Benchmarks.md](Docs/Benchmarks.md). The engine's data structures

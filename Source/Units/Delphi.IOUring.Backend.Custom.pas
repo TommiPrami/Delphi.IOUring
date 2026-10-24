@@ -216,23 +216,27 @@ var
   LHighest: Integer;
   LList: string;
 begin
-  if BackendName = '' then
-    Result := 'Not available: ' + NotAvailableReason
-  else
+  // The reason first: also when the system has the API, but too old a
+  // version of it
+  Result := '';
+  if NotAvailableReason <> '' then
+    Result := 'Not available: ' + NotAvailableReason + sLineBreak;
+  if BackendName <> '' then
   begin
 {$IFDEF MSWINDOWS}
     // ioringapi.h numbers the versions 1, 2, 300, 400
     if NativeVersion >= 100 then
-      Result := Format('%s, version %d', [BackendName, NativeVersion div 100])
+      Result := Result + Format('%s, version %d', [BackendName, NativeVersion div 100])
     else
-      Result := Format('%s, version %d', [BackendName, NativeVersion]);
+      Result := Result + Format('%s, version %d', [BackendName, NativeVersion]);
 {$ELSE}
-    Result := Format('%s, kernel %d.%d', [BackendName, NativeVersion div 100, NativeVersion mod 100]);
+    Result := Result + Format('%s, kernel %d.%d', [BackendName, NativeVersion div 100, NativeVersion mod 100]);
 {$ENDIF}
     if Emulated then
       Result := Result + ' (emulated)';
+    Result := Result + sLineBreak;
   end;
-  Result := Result + sLineBreak + 'System: ' + SystemDescription;
+  Result := Result + 'System: ' + SystemDescription;
   if BackendName = '' then
     Exit;
 

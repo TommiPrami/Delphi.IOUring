@@ -1,0 +1,202 @@
+# Free Pascal tests on Linux x64, Linux ARM64 and Windows (Docs/Design.md
+# §12.5). Delphi is tested locally (its compiler needs a licensed IDE).
+#
+# Every push to main and every pull request: the tests (debug build and -O3),
+# the layout check of the Linux API translation, and the benchmarks built.
+# Started by hand (Actions > CI > Run workflow) the benchmarks also run; their
+# output is kept as an artifact of the run.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      benchmarks:
+        description: 'Also run the benchmarks (several minutes per runner)'
+        type: boolean
+        default: false
+      sizes:
+        description: 'File sizes in GiB for the read and write benchmarks (the runners have 14 GB of disk)'
+        type: string
+        default: '1,4'
+
+permissions:
+  contents: read
+
+# A newer push stops the run of the older one
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: ARM64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Free Pascal
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fpc
+
+      - name: The system
+        shell: bash
+        run: |
+          uname -a
+          grep PRETTY_NAME /etc/os-release
+          echo "kernel.io_uring_disabled: $(cat /proc/sys/kernel/io_uring_disabled 2>/dev/null || echo 'not there')"
+          echo "Locked memory limit (ulimit -l): $(ulimit -l)"
+          echo "Free Pascal: $(fpc -iV)"
+
+      - name: Tests (debug build)
+        run: ./Source/Build-FPC.ps1 -Project Tests -Run
+
+      - name: Tests (-O3)
+        run: ./Source/Build-FPC.ps1 -Project Tests -Optimize -Run
+
+      # The C header's layout on this CPU must give the same checks as the
+      # committed file (git keeps it with LF, the generator writes CRLF)
+      - name: Layout of the Linux API translation
+        shell: bash
+        run: |
+          cd Source/UnitTests/Linux
+          cp Tests.Linux.Backend.Posix.API.Layout.inc "$RUNNER_TEMP/committed.inc"
+          bash Generate-PosixApiLayout.sh
+          diff <(tr -d '\r' < "$RUNNER_TEMP/committed.inc") <(tr -d '\r' < Tests.Linux.Backend.Posix.API.Layout.inc)
+
+      - name: Build the benchmarks
+        run: |
+          foreach ($project in 'Benchmarks', 'Structures', 'Blocks', 'Writes') {
+            ./Source/Build-FPC.ps1 -Project $project
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Run the benchmarks
+        if: github.event_name == 'workflow_dispatch' && inputs.benchmarks
+        env:
+          SIZES: ${{ inputs.sizes }}
+        run: |
+          New-Item -ItemType Directory -Force -Path bench-results | Out-Null
+          $runs = @(
+            @{ Project = 'Benchmarks'; Arguments = @('--sizes', $env:SIZES, '--runs', '3') },
+            @{ Project = 'Blocks';     Arguments = @('--runs', '3') },
+            @{ Project = 'Writes';     Arguments = @('--sizes', $env:SIZES, '--runs', '3') },
+            @{ Project = 'Structures'; Arguments = @('--runs', '3') }
+          )
+          foreach ($run in $runs) {
+            ./Source/Build-FPC.ps1 -Project $run.Project -Run -RunArguments $run.Arguments |
+              Tee-Object -FilePath "bench-results/$($run.Project).txt"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Keep the benchmark output
+        if: github.event_name == 'workflow_dispatch' && inputs.benchmarks
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-linux-${{ matrix.arch }}
+          path: bench-results
+
+  windows:
+    name: Windows (Win32, Win64)
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      FPC_DIR: C:\FPC\3.2.2
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache Free Pascal
+        id: fpc-cache
+        uses: actions/cache@v6
+        with:
+          path: C:\FPC
+          key: fpc-3.2.2-win32-and-win64
+
+      # One installer with both compilers: i386 native, x86_64 cross
+      - name: Install Free Pascal 3.2.2
+        if: steps.fpc-cache.outputs.cache-hit != 'true'
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'fpc-3.2.2.win32.and.win64.exe'
+          Invoke-WebRequest -Uri 'https://downloads.freepascal.org/fpc/dist/3.2.2/i386-win32/fpc-3.2.2.win32.and.win64.exe' -OutFile $installer
+          Start-Process -FilePath $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$env:FPC_DIR" -Wait
+          Get-ChildItem -Path "$env:FPC_DIR\bin" -Recurse -Filter 'ppc*.exe' | ForEach-Object FullName
+
+      - name: The system
+        run: |
+          Get-CimInstance Win32_OperatingSystem | Format-List Caption, Version, BuildNumber
+
+      # Where IoRing version 4 is missing, the tests are only built: the test
+      # program then reports "Not available: <reason>" first, and the step
+      # passes with a warning
+      - name: Tests (Win32 and Win64, debug build and -O3)
+        run: |
+          $failed = $false
+          foreach ($platform in 'Win32', 'Win64') {
+            foreach ($optimize in $false, $true) {
+              Write-Host "=== $platform, optimize: $optimize"
+              $output = ./Source/Build-FPC.ps1 -Project Tests -Platform $platform -FpcDir $env:FPC_DIR -Optimize:$optimize -Run 2>&1
+              $code = $LASTEXITCODE
+              $output | ForEach-Object { Write-Host $_ }
+              if ($code -ne 0) {
+                $reason = $output | Where-Object { "$_" -like 'Not available:*' } | Select-Object -First 1
+                if ($reason) {
+                  Write-Host "::warning::$platform built, not tested - $reason"
+                } else {
+                  $failed = $true
+                }
+              }
+            }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Build the benchmarks
+        run: |
+          foreach ($platform in 'Win32', 'Win64') {
+            foreach ($project in 'Benchmarks', 'Structures', 'Blocks', 'Writes') {
+              ./Source/Build-FPC.ps1 -Project $project -Platform $platform -FpcDir $env:FPC_DIR
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+          }
+
+      - name: Run the benchmarks (Win64)
+        if: github.event_name == 'workflow_dispatch' && inputs.benchmarks
+        env:
+          SIZES: ${{ inputs.sizes }}
+        run: |
+          New-Item -ItemType Directory -Force -Path bench-results | Out-Null
+          $runs = @(
+            @{ Project = 'Benchmarks'; Arguments = @('--sizes', $env:SIZES, '--runs', '3') },
+            @{ Project = 'Blocks';     Arguments = @('--runs', '3') },
+            @{ Project = 'Writes';     Arguments = @('--sizes', $env:SIZES, '--runs', '3') },
+            @{ Project = 'Structures'; Arguments = @('--runs', '3') }
+          )
+          foreach ($run in $runs) {
+            ./Source/Build-FPC.ps1 -Project $run.Project -Platform Win64 -FpcDir $env:FPC_DIR -Run -RunArguments $run.Arguments |
+              Tee-Object -FilePath "bench-results/$($run.Project).txt"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Keep the benchmark output
+        if: github.event_name == 'workflow_dispatch' && inputs.benchmarks
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-windows-x64
+          path: bench-results

@@ -326,10 +326,37 @@ Source/
 
 ---
 
+## Milestone 5 – Ready for others to use
+
+All goals of Design §1 are met; this milestone makes the library easy to
+take and keeps it checked on more systems than one machine. (Planned
+2026-10-24; the repository is public on GitHub, so its hosted runners are
+free, ARM64 included.)
+
+- **Phase 23** – Tests in CI (GitHub Actions): the Free Pascal tests on Linux x86-64, Linux ARM64 (the first AArch64 run: closes the [VERIFY] points of Phases 18 and 20) and Windows, on every push; the benchmarks built there, and run on demand (first Linux numbers that are not WSL2). Delphi stays local (license). Decided: Design §12.5.
+  - [x] `Build-FPC.ps1` builds natively on Linux (`Linux64`, new `LinuxArm64`; the RTL unit folder found from the installed fpc); on Windows unchanged, Linux64 through WSL.
+  - [x] The test program prints `IORingCapabilities.ToString` first; `ToString` names the reason first when the ring is not available.
+  - [x] `.github/workflows/ci.yml`: Linux x64 and ARM64 (tests debug and `-O3`, the layout generator against the committed file, benchmarks built), Windows Server 2025 (FPC 3.2.2 installer, cached; tests Win32 and Win64 debug and `-O3`, or built only with a warning when IoRing 4 is missing; benchmarks built); the benchmarks run when started by hand, output kept as an artifact.
+  - [ ] The first runs: read them, fix what fails (AArch64 first).
+  - [ ] The benchmarks once on the runners (first Linux numbers outside WSL2).
+- **Phase 24** – Packages: a Delphi runtime package (`.dpk`) and a Lazarus package (`.lpk`), so a project adds the library in one step; later maybe GetIt or Lazarus's Online Package Manager.
+- **Phase 25** – Examples and a 1.0 release: small example programs (the two streams, the block reader, the engine with callbacks, `IORingCapabilities`, a socket echo on Linux); a version number, a tag and a CHANGELOG.
+
+## Milestone 6 – Faster where it still loses
+
+Only what a benchmark has already shown:
+
+- **Phase 26** – Read straight into the caller's buffer for big aligned reads (Design §7, point 7): with cached data the read stream is 16–20 % slower than `TFileStream`, on both systems, because of one more copy. On Linux also the clock through the C library (13 ns instead of 94 ns; Design §10.14).
+
+Small things, any time: run the Windows benchmarks once more (the shared
+benchmark code changed in Phase 21); close the last open question (Design
+§14); take the Linux build files under `Source/Benchmarks/FPC/Linux64` out
+of git (they are ignored now, but still tracked).
+
+---
+
 ## Immediate next step
 
-Phase 22 is done, and with it Milestone 4: the whole library runs on Linux
-through Free Pascal, with the Linux extras in the low-level ring and
-capabilities that describe either system. Still open from Milestone 4:
-AArch64 (needs an ARM machine) and benchmarks on a real Linux machine (not
-WSL2). What comes next is not planned yet; the ideas are in Design §13.
+Milestone 4 is done: the whole library runs on Linux through Free Pascal.
+Next: **Phase 23 – tests in CI**. The proposal is in Design §12.5, with the
+facts about GitHub's runners; it waits for the decisions marked [DECIDE].
