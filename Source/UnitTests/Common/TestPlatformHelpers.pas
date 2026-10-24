@@ -98,25 +98,25 @@ const
   RESULT_ACCESS_DENIED = -9;                   // -EBADF
 {$ENDIF}
 
-// Writes one byte to a pipe and waits until it is written
-procedure WriteByteToPipe(const APipe: THandle; const AValue: Byte);
+  // Writes one byte to a pipe and waits until it is written
+  procedure WriteByteToPipe(const APipe: THandle; const AValue: Byte);
 
-// Reads ACount bytes from a pipe (waits for them)
-procedure ReadFromPipe(const APipe: THandle; const ACount: Cardinal);
+  // Reads ACount bytes from a pipe (waits for them)
+  procedure ReadFromPipe(const APipe: THandle; const ACount: Cardinal);
 
-// True when the event (Windows event / Linux eventfd) is signalled within ATimeoutMs
-function WaitForEvent(const AHandle: THandle; const ATimeoutMs: Cardinal): Boolean;
+  // True when the event (Windows event / Linux eventfd) is signalled within ATimeoutMs
+  function WaitForEvent(const AHandle: THandle; const ATimeoutMs: Cardinal): Boolean;
 
-function PageSize: NativeUInt;
+  function PageSize: NativeUInt;
 
 {$IFDEF UNIX}
-// The number of open file descriptors of this process (/proc/self/fd)
-function OpenFileDescriptorCount: Integer;
+  // The number of open file descriptors of this process (/proc/self/fd)
+  function OpenFileDescriptorCount: Integer;
 {$ENDIF}
 
 {$IFDEF MSWINDOWS}
-function HResultFromWin32(const ACode: DWORD): HRESULT;
-function HrToStr(const AResult: HRESULT): string;
+  function HResultFromWin32(const ACode: DWORD): HRESULT;
+  function HrToStr(const AResult: HRESULT): string;
 {$ENDIF}
 
 implementation
@@ -332,7 +332,6 @@ begin
   LValue := AValue;
   FillChar(LOverlapped, SizeOf(LOverlapped), 0);
   LOverlapped.hEvent := CreateEvent(nil, True, False, nil);
-
   try
     if not WriteFile(APipe, LValue, 1, LWritten, @LOverlapped) then
       if GetLastError <> ERROR_IO_PENDING then
@@ -359,7 +358,6 @@ begin
   begin
     FillChar(LOverlapped, SizeOf(LOverlapped), 0);
     LOverlapped.hEvent := CreateEvent(nil, True, False, nil);
-
     try
       LRead := 0;
 

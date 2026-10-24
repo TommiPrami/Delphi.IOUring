@@ -40,7 +40,7 @@
 
 interface
 
-procedure RunStructureBenchmarks;
+  procedure RunStructureBenchmarks;
 
 implementation
 
@@ -708,7 +708,6 @@ begin
     begin
       Inc(LIndex);
       LList := TStringList.Create;
-
       try
         LList.CommaText := ParamStr(LIndex);
         SetLength(GThreadCounts, LList.Count);

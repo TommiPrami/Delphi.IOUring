@@ -201,10 +201,8 @@ begin
   SetLength(LActualBuffer, AChunkSize);
 
   LExpected := TFileStream.Create(SharedPatternFile(ASize), fmOpenRead or fmShareDenyNone);
-
   try
     LActual := TSequentialReadOnlyFileStream.Create(SharedPatternFile(ASize), [], SMALL_BUFFER, ABufferCount);
-
     try
       AssertEquals(LContext + ': Size', LExpected.Size, LActual.Size);
 
@@ -427,7 +425,6 @@ var
 begin
   FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 2);
   LTarget := TMemoryStream.Create;
-
   try
     AssertEquals('Copied', Int64(FILE_SIZE), LTarget.CopyFrom(FStream, 0));
     AssertEquals('Size', Int64(FILE_SIZE), LTarget.Size);
@@ -446,7 +443,6 @@ var
 begin
   FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 2);
   LTarget := TMemoryStream.Create;
-
   try
     LTarget.CopyFrom(FStream, 1000);
     LTarget.CopyFrom(FStream, 50000);
@@ -478,7 +474,6 @@ var
 begin
   FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 2);
   LTarget := TBytesStream.Create;
-
   try
     LTarget.LoadFromStream(FStream);
     AssertEquals('Size', Int64(FILE_SIZE), LTarget.Size);
@@ -498,7 +493,6 @@ begin
   LStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 4);
   FStream := LStream;
   LTarget := TMemoryStream.Create;
-
   try
     LTarget.LoadFromStream(LStream);
     AssertEquals('Size', Int64(FILE_SIZE), LTarget.Size);

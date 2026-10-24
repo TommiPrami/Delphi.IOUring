@@ -541,7 +541,6 @@ begin
   AssertTrue('EndBatch without BeginBatch', LRaised);
 
   LOther := TIORingEngine.Create(16, 8);
-
   try
     FEngine.BeginBatch;
     FEngine.BeginBatch;    // nested: fine
@@ -590,7 +589,6 @@ begin
   end;
 
   LThread := TWorkerThread.Create(0, 1, nil, WorkStartThirdRead);
-
   try
     LThread.Start;
     Sleep(100);
@@ -678,7 +676,6 @@ begin
   FResources.OpenPipePair(LServer, LClient);
   FWaitHandle := FEngine.ReadAsync(LClient, LByte, 1, 0, 55);
   LThread := TWorkerThread.Create(0, 1, nil, WorkWait);
-
   try
     LThread.Start;
     Sleep(50);    // it sleeps in Wait now

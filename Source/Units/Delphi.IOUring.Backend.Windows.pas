@@ -36,7 +36,7 @@ type
   TIORingSegment = FILE_SEGMENT_ELEMENT;
   PIORingSegment = PFILE_SEGMENT_ELEMENT;
 
-function IORingSegment(const AAddress: Pointer): TIORingSegment;
+  function IORingSegment(const AAddress: Pointer): TIORingSegment;
 
 type
   TWindowsIORing = record

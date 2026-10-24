@@ -73,11 +73,9 @@ var
 begin
   Result := 0;
   LEngine := TIORingEngine.Create;
-
   try
     // On Windows the handle must allow overlapped I/O (it does), or Windows reads one block at a time
     LFile := TIORingPlatform.OpenFileForRead(AFileName, False, False);
-
     try
       LReader.Open(LEngine, LFile, ABlocks);   // read-ahead 32 by default
 
@@ -109,7 +107,6 @@ var
 begin
   Result := 0;
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
-
   try
     for LIndex := 0 to High(ABlocks) do
     begin

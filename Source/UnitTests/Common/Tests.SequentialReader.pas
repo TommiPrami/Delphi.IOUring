@@ -213,7 +213,6 @@ begin
     [ASize, ABufferCount, AChunkSize, AMisalign]);
   LMemorySize := NativeUInt(AChunkSize + AMisalign);
   LMemory := TIORingPlatform.AllocPages(LMemorySize);
-
   try
     LBuffer := LMemory + AMisalign;
     LReader.Open(SharedPatternFile(ASize), AOptions, SMALL_BUFFER, ABufferCount);
@@ -504,7 +503,6 @@ begin
   SetLength(LExtra, 1024 * 1024);
   FillChar(LExtra[0], Length(LExtra), $EE);
   LWriter := TFileStream.Create(LFileName, fmOpenReadWrite or fmShareDenyNone);
-
   try
     LWriter.Seek(0, soEnd);
     LWriter.WriteBuffer(LExtra[0], Length(LExtra));
@@ -546,7 +544,6 @@ begin
   LReader.Open(LFileName, [sroFixedReadAhead], B, 1);
 
   LWriter := TFileStream.Create(LFileName, fmOpenReadWrite or fmShareDenyNone);
-
   try
     LWriter.Size := NEW_SIZE;
   finally
@@ -590,7 +587,6 @@ begin
   LReader.Open(LFileName, [], B, 2);
 
   LWriter := TFileStream.Create(LFileName, fmOpenReadWrite or fmShareDenyNone);
-
   try
     LWriter.Size := NEW_SIZE;
   finally

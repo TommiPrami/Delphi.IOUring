@@ -31,10 +31,12 @@ What both compilers must support, and the rules for `inline`, are in
   `and`/`or` – and a few characters over is fine when the line reads better
   that way. A continued line is indented 2 more than its start. A statement
   that fits on one line is written on one line.
+- **In the interface section, function and procedure declarations are
+  indented by 2**, with their comments, so the `type`, `const` and
+  `implementation` sections stand out.
 - The OS API translation units (`Delphi.IOUring.Backend.Windows.API`,
   `Delphi.IOUring.Backend.Posix.API`) keep the layout of the C headers they
-  translate; in `Delphi.IOUring.Backend.Windows.API` the function
-  declarations of the interface are indented by 2.
+  translate.
 
 ```pascal
 function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
@@ -49,6 +51,18 @@ function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; co
 - **No empty line where the indentation changes:** none right after
   `begin`, `try`, `repeat` or `then`, and none before `end`, `else`,
   `until`, `except` or `finally`.
+- **Exception: the `try` that protects what the line above created**
+  follows it directly – the block belongs to that line:
+
+```pascal
+  LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
+  try
+    LStream.ReadBuffer(LBuffer[0], Length(LBuffer));
+  finally
+    LStream.Free;
+  end;
+```
+
 - Also an empty line before `Exit`, `Continue` or `Break` that follows other
   statements, and before the `Result :=` that ends a routine.
 - In type declarations: an empty line between a pointer type and its record,

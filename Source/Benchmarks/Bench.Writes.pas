@@ -34,7 +34,7 @@
 
 interface
 
-procedure RunWriteBenchmarks;
+  procedure RunWriteBenchmarks;
 
 implementation
 
@@ -121,7 +121,6 @@ begin
   LMeasurement.Start;
   LStart := BenchMicroseconds;
   LStream := CreateStream(AContender, AFileName);
-
   try
     for LMiB := 1 to ASizeGiB * 1024 do
     begin
@@ -244,7 +243,6 @@ begin
     begin
       Inc(LIndex);
       LList := TStringList.Create;
-
       try
         LList.CommaText := ParamStr(LIndex);
         SetLength(GSizes, LList.Count);
@@ -304,7 +302,6 @@ begin
   Writeln(Format('Median of %d runs; work: %d us of CPU time per MiB', [GRuns, GWorkMicroseconds], GInvariant));
 
   GData := TIORingPlatform.AllocPages(MiB);
-
   try
     for LIndex := 0 to MiB - 1 do
       GData[LIndex] := Byte(LIndex * 7 + LIndex shr 8);

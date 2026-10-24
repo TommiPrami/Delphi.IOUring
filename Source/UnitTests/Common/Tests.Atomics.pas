@@ -537,7 +537,6 @@ begin
   { No call inside the loop: if the compiler kept the value in a register, the loop would never see the change
     and would stop at the limit }
   LThread := TWorkerThread.Create(0, 1, nil, WorkSetFlagLater);
-
   try
     LThread.Start;
     LSpins := 0;
@@ -582,7 +581,6 @@ var
   LStart: UInt64;
 begin
   LThread := TWorkerThread.Create(0, 1, nil, WorkWaitForWake);
-
   try
     LThread.Start;
     Sleep(50); // let it fall asleep

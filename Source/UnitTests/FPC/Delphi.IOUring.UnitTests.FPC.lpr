@@ -110,7 +110,6 @@ begin
 
   LResult := TTestResult.Create;
   LListener := TConsoleListener.Create(nil);
-
   try
     LResult.AddListener(LListener);
     GetTestRegistry.Run(LResult);

@@ -135,7 +135,6 @@ var
   LData: TBytes;
 begin
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
-
   try
     CheckEqualsU64('File size', UInt64(ASize), UInt64(LStream.Size));
     SetLength(LData, ASize);
@@ -460,7 +459,6 @@ begin
   TryOpen(SMALL_BUFFER, 0, nil);                               // no buffers
   TryOpen(SMALL_BUFFER, IORING_WRITER_MAX_BUFFER_COUNT + 1, nil);
   LSmall := TIORingEngine.Create(4, 4);
-
   try
     TryOpen(SMALL_BUFFER, 8, LSmall);                          // too few requests
   finally
@@ -598,7 +596,6 @@ begin
 
   FFailures := 0;
   FEngine := TIORingEngine.Create(SHARED_WRITERS * 8 + 4, 64, 2);
-
   try
     RunThreads(SHARED_WRITERS, WorkWriter);
   finally
@@ -621,12 +618,10 @@ var
 begin
   LName := NewFileName;
   LSource := TMemoryStream.Create;
-
   try
     LSource.Size := 300000;
     TTestFileHelpers.FillPattern(100000, LSource.Memory^, LSource.Size);
     LStream := TSequentialWriteOnlyFileStream.Create(LName, [], SMALL_BUFFER, 4);
-
     try
       WritePatternToStream(LStream, 0, 100000, 4321);
       LStream.CopyFrom(LSource, 0);    // from the source's start
@@ -682,7 +677,6 @@ begin
   end;
 
   LFile := TFileStream.Create(LName, fmOpenRead or fmShareDenyNone);
-
   try
     SetLength(LRead, LFile.Size);
     LFile.ReadBuffer(LRead[0], Length(LRead));
@@ -702,7 +696,6 @@ var
 begin
   LName := NewFileName;
   LStream := TSequentialWriteOnlyFileStream.Create(LName, [], SMALL_BUFFER, 2);
-
   try
     CheckEqualsU64('Start', 0, UInt64(LStream.Position));
     WritePatternToStream(LStream, 0, 10000, 3000);
@@ -745,7 +738,6 @@ var
 begin
   LName := NewFileName;
   LStream := TSequentialWriteOnlyFileStream.Create(LName);
-
   try
     LRaised := 0;
 
@@ -793,7 +785,6 @@ var
 begin
   LName := NewFileName;
   LStream := TSequentialWriteOnlyFileStream.Create(LName, [], SMALL_BUFFER, 2);
-
   try
     FResources.MakeWritesFail(LName);
     WritePatternToStream(LStream, 0, 1000, 1000);
@@ -852,10 +843,8 @@ var
 begin
   LName := NewFileName;
   LEngine := TIORingEngine.Create;
-
   try
     LStream := TSequentialWriteOnlyFileStream.Create(LName, LEngine, [], SMALL_BUFFER, 4);
-
     try
       WritePatternToStream(LStream, 0, 77777, 7777);
     finally
@@ -886,7 +875,6 @@ var
 begin
   LName := NewFileName;
   LStream := TSequentialWriteOnlyFileStream.Create(LName, [swoUnbuffered], 64 * 1024, 4);
-
   try
     WritePatternToStream(LStream, 0, 1000000 + 7, 12345);
   finally

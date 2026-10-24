@@ -99,23 +99,23 @@ const
   ieSqPoll = Delphi.IOUring.Backend.Custom.ieSqPoll;
   ieRawEntries = Delphi.IOUring.Backend.Custom.ieRawEntries;
 
-// True if the ring can be used on this system
-function IORingAvailable: Boolean;
-// What the ring offers on this system, and the system itself (for logs: IORingCapabilities.ToString)
-function IORingCapabilities: TIORingCapabilities;
+  // True if the ring can be used on this system
+  function IORingAvailable: Boolean;
+  // What the ring offers on this system, and the system itself (for logs: IORingCapabilities.ToString)
+  function IORingCapabilities: TIORingCapabilities;
 
-// Readable text for an OS result code (TIORingCompletion.NativeResult)
-function IORingErrorMessage(const ANativeCode: Integer): string;
+  // Readable text for an OS result code (TIORingCompletion.NativeResult)
+  function IORingErrorMessage(const ANativeCode: Integer): string;
 
-// One scatter/gather segment (a page-sized, page-aligned buffer)
-function IORingSegment(const AAddress: Pointer): TIORingSegment;
+  // One scatter/gather segment (a page-sized, page-aligned buffer)
+  function IORingSegment(const AAddress: Pointer): TIORingSegment;
 
-{ Blocking helpers: prepare, submit, wait, pop. They need an idle ring (nothing prepared or in flight) and raise
-  EIORingError on failure. ReadAt returns the bytes read; 0 at or after the end of the file. }
-function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
-  const AOffset: UInt64): Cardinal;
-function WriteAt(var ARing: TIORing; const AFile: TIORingFileRef; const ABuffer; const ACount: Cardinal;
-  const AOffset: UInt64): Cardinal;
+  { Blocking helpers: prepare, submit, wait, pop. They need an idle ring (nothing prepared or in flight) and raise
+    EIORingError on failure. ReadAt returns the bytes read; 0 at or after the end of the file. }
+  function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
+    const AOffset: UInt64): Cardinal;
+  function WriteAt(var ARing: TIORing; const AFile: TIORingFileRef; const ABuffer; const ACount: Cardinal;
+    const AOffset: UInt64): Cardinal;
 
 implementation
 

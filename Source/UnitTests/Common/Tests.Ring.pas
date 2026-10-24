@@ -259,7 +259,6 @@ begin
   FResources.OpenPipePair(LServer, LClient);
   LByte := 0;
   LWriter := TDelayedPipeWriter.Create(LServer, 300, 42);
-
   try
     LWriter.Start;
     LStart := TThread.GetTickCount64;
@@ -805,7 +804,6 @@ begin
   LRing.Submit;
 
   LWriter := TDelayedPipeWriter.Create(LServer, 300, 42);
-
   try
     LWriter.Start;
     LStart := TThread.GetTickCount64;

@@ -24,11 +24,11 @@ type
     Run: TContenderProc;
   end;
 
-// The comparison set (Docs/Plan.md, Phase 5)
-function MainContenders(const AThreadCount: Integer): TArray<TContender>;
+  // The comparison set (Docs/Plan.md, Phase 5)
+  function MainContenders(const AThreadCount: Integer): TArray<TContender>;
 
-// IoRing reader variants for choosing the defaults
-function TuningContenders: TArray<TContender>;
+  // IoRing reader variants for choosing the defaults
+  function TuningContenders: TArray<TContender>;
 
 implementation
 
@@ -46,7 +46,6 @@ var
 begin
   SetLength(LBuffer, AReadSize);
   LStream := TBufferedFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite, ABufferSize);
-
   try
     repeat
       LRead := LStream.Read(LBuffer[0], AReadSize);

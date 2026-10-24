@@ -11,20 +11,20 @@
 
 interface
 
-// <temp folder>/Delphi.IOUring.Demo.<AName>
-function DemoFileName(const AName: string): string;
+  // <temp folder>/Delphi.IOUring.Demo.<AName>
+  function DemoFileName(const AName: string): string;
 
-// Writes ASize bytes of changing data into AFileName (an existing file is replaced), with a plain TFileStream
-procedure CreateDemoFile(const AFileName: string; const ASize: Int64);
+  // Writes ASize bytes of changing data into AFileName (an existing file is replaced), with a plain TFileStream
+  procedure CreateDemoFile(const AFileName: string; const ASize: Int64);
 
-// The size of a file in bytes
-function DemoFileSize(const AFileName: string): Int64;
+  // The size of a file in bytes
+  function DemoFileSize(const AFileName: string): Int64;
 
-// Milliseconds from some fixed point in time (for measuring)
-function DemoMilliseconds: UInt64;
+  // Milliseconds from some fixed point in time (for measuring)
+  function DemoMilliseconds: UInt64;
 
-// "123.4 MiB/s" (or "-" if no time has passed)
-function MiBPerSecond(const ABytes: Int64; const AMilliseconds: UInt64): string;
+  // "123.4 MiB/s" (or "-" if no time has passed)
+  function MiBPerSecond(const ABytes: Int64; const AMilliseconds: UInt64): string;
 
 implementation
 
@@ -60,7 +60,6 @@ begin
   SetLength(LBuffer, CHUNK);
   LValue := 1;
   LStream := TFileStream.Create(AFileName, fmCreate);
-
   try
     LLeft := ASize;
 
@@ -93,7 +92,6 @@ var
   LStream: TFileStream;
 begin
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
-
   try
     Result := LStream.Size;
   finally

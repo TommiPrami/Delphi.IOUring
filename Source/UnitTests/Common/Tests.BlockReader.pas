@@ -355,7 +355,6 @@ begin
   CheckOpenRaises('Block longer than the buffer', FEngine, TIORingBlock.Create(0, 5000), 8, 4096);
   CheckOpenRaises('Block of 0 bytes', FEngine, TIORingBlock.Create(0, 0), 8, 4096);
   LSmall := TIORingEngine.Create(4, 4);
-
   try
     CheckOpenRaises('More read-ahead than the engine has requests', LSmall, TIORingBlock.Create(0, 1), 8, 4096);
   finally
@@ -459,7 +458,6 @@ begin
   FResources.OpenPipePair(LServer, LClient);
   LReader.Open(FEngine, LClient, [TIORingBlock.Create(0, 1)], 4, 4096);
   LWriter := TDelayedPipeWriter.Create(LServer, 100, 1);
-
   try
     LWriter.Start;
     LStart := TThread.GetTickCount64;

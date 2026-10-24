@@ -127,7 +127,6 @@ begin
     else if LName = '--sizes' then
     begin
       LParts := TStringList.Create;
-
       try
         LParts.CommaText := NextValue;
         SetLength(GSizes, LParts.Count);

@@ -200,7 +200,6 @@ begin
   AssertEquals('CQ', Int64(32), Int64(LInfo.CompletionQueueSize));
 
   LRing := NewRing(10, 100);
-
   try
     CheckResult('GetIoRingInfo', S_OK, GetIoRingInfo(LRing, LInfo));
     Log(Format('Requested SQ=10 CQ=100 -> SQ=%d CQ=%d', [LInfo.SubmissionQueueSize, LInfo.CompletionQueueSize]));
@@ -670,7 +669,6 @@ begin
     IoRingBufferRefFromPointer(@LPipeBuffer), SizeOf(LPipeBuffer), 0, 1, IOSQE_FLAGS_NONE));
 
   LThread := TSubmitWaitThread.Create(FRing);
-
   try
     LThread.Start;
     Sleep(200);

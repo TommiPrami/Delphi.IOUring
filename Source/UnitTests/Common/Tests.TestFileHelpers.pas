@@ -115,10 +115,8 @@ begin
   for LSize in SIZES do
   begin
     LFileName := TTestFileHelpers.CreatePatternFile(LSize);
-
     try
       LStream := TFileStream.Create(LFileName, fmOpenRead or fmShareDenyWrite);
-
       try
         AssertEquals('Size', LSize, LStream.Size);
 

@@ -114,15 +114,15 @@ type
 
   TIORingTestCaseClass = class of TIORingTestCase;
 
-{ Registers the published methods of AClass as tests (FPCUnit's RegisterTest, DUnitX's RegisterTestFixture). Call it in
-  the initialization section. }
-procedure RegisterTests(const AClass: TIORingTestCaseClass);
+  { Registers the published methods of AClass as tests (FPCUnit's RegisterTest, DUnitX's RegisterTestFixture). Call it in
+    the initialization section. }
+  procedure RegisterTests(const AClass: TIORingTestCaseClass);
 
-// A pattern file of ASize bytes; created on first use, deleted when the program ends
-function SharedPatternFile(const ASize: Int64): string;
+  // A pattern file of ASize bytes; created on first use, deleted when the program ends
+  function SharedPatternFile(const ASize: Int64): string;
 
-// Busy for AMicroseconds, without giving up the CPU
-procedure SpinMicroseconds(const AMicroseconds: Int64);
+  // Busy for AMicroseconds, without giving up the CPU
+  procedure SpinMicroseconds(const AMicroseconds: Int64);
 
 implementation
 

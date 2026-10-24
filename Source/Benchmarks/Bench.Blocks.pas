@@ -45,7 +45,7 @@
 
 interface
 
-procedure RunBlockBenchmarks;
+  procedure RunBlockBenchmarks;
 
 implementation
 
@@ -221,7 +221,6 @@ begin
     // Page-aligned, as unbuffered reads need
     LBuffer := TIORingPlatform.AllocPages(BLOCK_SIZE);
     LFile := BenchOpenForReading(FFileName, False, FUnbuffered);
-
     try
       TAtomic.Increment(FReady^);
 
@@ -255,7 +254,6 @@ var
   LIndex: Integer;
 begin
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
-
   try
     for LIndex := 0 to High(ABlocks) do
     begin
@@ -275,7 +273,6 @@ var
 begin
   // Page-aligned, as unbuffered reads need
   LBuffer := TIORingPlatform.AllocPages(BLOCK_SIZE);
-
   try
     for LIndex := 0 to High(ABlocks) do
     begin
@@ -405,7 +402,6 @@ begin
   LConsumer.Init(0);
   // The block readers need an overlapped handle on Windows (see above)
   LFile := BenchOpenForReading(AFileName, (READ_AHEAD[AContender] > 0) and (AContender <> cnReader32Sync), LUnbuffered);
-
   try
     LMeasurement.Start;
 

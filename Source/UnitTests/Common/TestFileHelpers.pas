@@ -192,7 +192,6 @@ begin
   SetLength(LBuffer, CREATE_CHUNK_SIZE);
 
   LStream := TFileStream.Create(Result, fmCreate);
-
   try
     LOffset := 0;
 

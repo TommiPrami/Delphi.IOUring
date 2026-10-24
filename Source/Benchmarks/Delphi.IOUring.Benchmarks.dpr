@@ -161,7 +161,6 @@ var
 begin
   Result := '?';
   LRegistry := TRegistry.Create(KEY_READ);
-
   try
     LRegistry.RootKey := HKEY_LOCAL_MACHINE;
 
@@ -402,7 +401,6 @@ var
   LMiB: Double;
 begin
   LLines := TList<TLine>.Create;
-
   try
     for LIndex := 0 to High(GContenders) do
     begin
@@ -469,7 +467,6 @@ begin
 
   LExists := FileExists(GOptions.CsvFileName);
   LLines := TStringList.Create;
-
   try
     if LExists then
       LLines.LoadFromFile(GOptions.CsvFileName)
@@ -556,7 +553,6 @@ begin
       GContenders := MainContenders(GOptions.Threads);
 
     GResults := TList<TRunResult>.Create;
-
     try
       PrintMachine;
 

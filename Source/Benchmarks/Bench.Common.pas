@@ -72,47 +72,47 @@ type
     procedure Stop;
   end;
 
-// A monotonic clock
-function BenchMicroseconds: UInt64;
+  // A monotonic clock
+  function BenchMicroseconds: UInt64;
 
-// Busy-waits for AMicroseconds (simulated work)
-procedure SpinMicroseconds(const AMicroseconds: Cardinal);
+  // Busy-waits for AMicroseconds (simulated work)
+  procedure SpinMicroseconds(const AMicroseconds: Cardinal);
 
-{
-  Drops the file's data from the file cache. Windows: opening a file without buffering makes the cache manager
-  flush and purge it (checked at start-up by the benchmark, see CheckCachePurge in the program). Linux: fsync,
-  then posix_fadvise(POSIX_FADV_DONTNEED). (In WSL2 the Windows host may still have the data in its own cache:
-  there "cold" is not the disk.)
-}
-procedure PurgeFileCache(const AFileName: string);
+  {
+    Drops the file's data from the file cache. Windows: opening a file without buffering makes the cache manager
+    flush and purge it (checked at start-up by the benchmark, see CheckCachePurge in the program). Linux: fsync,
+    then posix_fadvise(POSIX_FADV_DONTNEED). (In WSL2 the Windows host may still have the data in its own cache:
+    there "cold" is not the disk.)
+  }
+  procedure PurgeFileCache(const AFileName: string);
 
-{ Creates a file of ASize bytes (multiple of 4096) with pseudo-random data, written without buffering so the new data
-  is not left in the cache. }
-procedure CreateBenchFile(const AFileName: string; const ASize: Int64);
+  { Creates a file of ASize bytes (multiple of 4096) with pseudo-random data, written without buffering so the new data
+    is not left in the cache. }
+  procedure CreateBenchFile(const AFileName: string; const ASize: Int64);
 
-function FileSizeOf(const AFileName: string): Int64;
+  function FileSizeOf(const AFileName: string): Int64;
 
-{
-  Opens a file for reading. AOverlapped: Windows FILE_FLAG_OVERLAPPED (Linux: no such thing). AUnbuffered: past the file
-  cache (FILE_FLAG_NO_BUFFERING / O_DIRECT): buffers, offsets and lengths must then be sector-aligned. ASequentialHint:
-  FILE_FLAG_SEQUENTIAL_SCAN / POSIX_FADV_SEQUENTIAL.
-}
-function BenchOpenForReading(const AFileName: string; const AOverlapped, AUnbuffered: Boolean;
-  const ASequentialHint: Boolean = False): THandle;
-procedure BenchCloseFile(const AHandle: THandle);
-// Reads at the current position; returns the bytes read (0 at the end)
-function BenchRead(const AFile: THandle; var ABuffer; const ACount: Cardinal): Cardinal;
-// Reads ACount bytes at AOffset (positioned, no seek call); raises on a short read
-procedure BenchReadAt(const AFile: THandle; var ABuffer; const ACount: Cardinal; const AOffset: UInt64);
-// Puts what the file cache still holds of the file onto the disk, through a handle of its own (FlushFileBuffers / fsync)
-procedure BenchFlushFile(const AFileName: string);
+  {
+    Opens a file for reading. AOverlapped: Windows FILE_FLAG_OVERLAPPED (Linux: no such thing). AUnbuffered: past the file
+    cache (FILE_FLAG_NO_BUFFERING / O_DIRECT): buffers, offsets and lengths must then be sector-aligned. ASequentialHint:
+    FILE_FLAG_SEQUENTIAL_SCAN / POSIX_FADV_SEQUENTIAL.
+  }
+  function BenchOpenForReading(const AFileName: string; const AOverlapped, AUnbuffered: Boolean;
+    const ASequentialHint: Boolean = False): THandle;
+  procedure BenchCloseFile(const AHandle: THandle);
+  // Reads at the current position; returns the bytes read (0 at the end)
+  function BenchRead(const AFile: THandle; var ABuffer; const ACount: Cardinal): Cardinal;
+  // Reads ACount bytes at AOffset (positioned, no seek call); raises on a short read
+  procedure BenchReadAt(const AFile: THandle; var ABuffer; const ACount: Cardinal; const AOffset: UInt64);
+  // Puts what the file cache still holds of the file onto the disk, through a handle of its own (FlushFileBuffers / fsync)
+  procedure BenchFlushFile(const AFileName: string);
 
-// The logical processors this process may run on. (Free Pascal 3.2.2's TThread.ProcessorCount is 1 on Linux.)
-function BenchProcessorCount: Integer;
-// 'Win32', 'Win64' or 'Linux64'
-function BenchPlatformName: string;
-// <temp>/Delphi.IOUring.Bench
-function DefaultBenchFolder: string;
+  // The logical processors this process may run on. (Free Pascal 3.2.2's TThread.ProcessorCount is 1 on Linux.)
+  function BenchProcessorCount: Integer;
+  // 'Win32', 'Win64' or 'Linux64'
+  function BenchPlatformName: string;
+  // <temp>/Delphi.IOUring.Bench
+  function DefaultBenchFolder: string;
 
 implementation
 
@@ -329,7 +329,6 @@ var
   LFile: THandle;
 begin
   LFile := TIORingPlatform.OpenFileForRead(AFileName, False, False);
-
   try
     // Dirty pages stay in the cache: write them first
     FpFsync(LFile);
@@ -566,7 +565,6 @@ var
 begin
   // fsync needs no write access
   LFile := TIORingPlatform.OpenFileForRead(AFileName, False, False);
-
   try
     if FpFsync(LFile) <> 0 then
       RaiseLastErrno('fsync');

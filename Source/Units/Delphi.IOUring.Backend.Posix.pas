@@ -53,7 +53,7 @@ type
 
   PIORingSegment = ^TIORingSegment;
 
-function IORingSegment(const AAddress: Pointer): TIORingSegment;
+  function IORingSegment(const AAddress: Pointer): TIORingSegment;
 
 type
   TLinuxIORing = record

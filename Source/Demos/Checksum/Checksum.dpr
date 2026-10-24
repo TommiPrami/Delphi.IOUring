@@ -124,7 +124,6 @@ begin
   SetLength(LBuffer, CHUNK);
   LAdler.Init;
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
-
   try
     repeat
       LRead := LStream.Read(LBuffer[0], CHUNK);

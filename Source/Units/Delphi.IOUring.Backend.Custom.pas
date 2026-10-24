@@ -158,22 +158,22 @@ type
 
   EIORingNotSupported = class(EIORingError);
 
-// Readable text for an OS result code (HRESULT on Windows, -errno on Linux)
-function IORingErrorMessage(const ANativeCode: Integer): string;
+  // Readable text for an OS result code (HRESULT on Windows, -errno on Linux)
+  function IORingErrorMessage(const ANativeCode: Integer): string;
 
-{
-  Raise helpers (Docs/CodingStyle.md, "Raising"), called from the small raise procedures: the text stays out of the
-  routines that do the work. They raise at the caller's address. Pass a constant text, or a format and its
-  arguments - not Format(...) or a string built with +.
-}
-procedure RaiseIORingError(const AMessage: string); {$IFNDEF FPC} noreturn; {$ENDIF}
-procedure RaiseIORingErrorFmt(const AFormat: string; const AArgs: array of const); {$IFNDEF FPC} noreturn; {$ENDIF}
-procedure RaiseIORingErrorNative(const ANativeCode: Integer; const AOperation: string); {$IFNDEF FPC} noreturn; {$ENDIF}
-procedure RaiseIORingErrorNativeFmt(const ANativeCode: Integer; const AFormat: string; const AArgs: array of const);
-  {$IFNDEF FPC} noreturn; {$ENDIF}
-procedure RaiseError(const AClass: ExceptClass; const AMessage: string); {$IFNDEF FPC} noreturn; {$ENDIF}
-procedure RaiseErrorFmt(const AClass: ExceptClass; const AFormat: string; const AArgs: array of const);
-  {$IFNDEF FPC} noreturn; {$ENDIF}
+  {
+    Raise helpers (Docs/CodingStyle.md, "Raising"), called from the small raise procedures: the text stays out of the
+    routines that do the work. They raise at the caller's address. Pass a constant text, or a format and its
+    arguments - not Format(...) or a string built with +.
+  }
+  procedure RaiseIORingError(const AMessage: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+  procedure RaiseIORingErrorFmt(const AFormat: string; const AArgs: array of const); {$IFNDEF FPC} noreturn; {$ENDIF}
+  procedure RaiseIORingErrorNative(const ANativeCode: Integer; const AOperation: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+  procedure RaiseIORingErrorNativeFmt(const ANativeCode: Integer; const AFormat: string; const AArgs: array of const);
+    {$IFNDEF FPC} noreturn; {$ENDIF}
+  procedure RaiseError(const AClass: ExceptClass; const AMessage: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+  procedure RaiseErrorFmt(const AClass: ExceptClass; const AFormat: string; const AArgs: array of const);
+    {$IFNDEF FPC} noreturn; {$ENDIF}
 
 implementation
 

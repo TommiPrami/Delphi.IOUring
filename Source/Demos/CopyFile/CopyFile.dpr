@@ -36,10 +36,8 @@ var
   LTarget: TSequentialWriteOnlyFileStream;
 begin
   LSource := TSequentialReadOnlyFileStream.Create(ASource);
-
   try
     LTarget := TSequentialWriteOnlyFileStream.Create(ATarget);   // creates or empties the file
-
     try
       LTarget.CopyFrom(LSource, 0);      // 0: the whole stream, as with any TStream
     finally
@@ -64,10 +62,8 @@ begin
   SetLength(LBuffer1, CHUNK);
   SetLength(LBuffer2, CHUNK);
   LStream1 := TFileStream.Create(AFileName1, fmOpenRead or fmShareDenyWrite);
-
   try
     LStream2 := TFileStream.Create(AFileName2, fmOpenRead or fmShareDenyWrite);
-
     try
       Result := LStream1.Size = LStream2.Size;
 

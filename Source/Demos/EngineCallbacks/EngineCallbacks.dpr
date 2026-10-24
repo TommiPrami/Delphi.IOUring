@@ -145,7 +145,6 @@ begin
   // Every read in flight needs a buffer of its own
   SetLength(LBuffers, BATCH_READS * BLOCK_SIZE);
   LCounter := TReadCounter.Create;
-
   try
     LSubmitsBefore := AEngine.Stats.Submits;
     AEngine.BeginBatch;
@@ -240,11 +239,9 @@ begin
         RaiseFileTooShort;
 
       LEngine := TIORingEngine.Create;           // starts the I/O thread
-
       try
         // On Windows the handle must allow overlapped I/O (it does), or Windows runs its reads one at a time
         LFile := TIORingPlatform.OpenFileForRead(LFileName, False, False);
-
         try
           StartWorkWait(LEngine, LFile);
           BatchWithCallbacks(LEngine, LFile, LBlockCount);

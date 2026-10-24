@@ -24,35 +24,35 @@ uses
 const
   STREAM_READ_SIZE = 64 * 1024;
 
-// TFileStream.Read with AReadSize blocks
-procedure ReadWithFileStream(const AFileName: string; const AReadSize: Integer; var AConsumer: TBenchConsumer);
+  // TFileStream.Read with AReadSize blocks
+  procedure ReadWithFileStream(const AFileName: string; const AReadSize: Integer; var AConsumer: TBenchConsumer);
 
-{ Plain synchronous ReadFile (Linux: read). ASequentialScanHint: FILE_FLAG_SEQUENTIAL_SCAN
-  (Linux: POSIX_FADV_SEQUENTIAL). }
-procedure ReadWithReadFile(const AFileName: string; const AReadSize: Cardinal; const ASequentialScanHint: Boolean;
-  var AConsumer: TBenchConsumer);
+  { Plain synchronous ReadFile (Linux: read). ASequentialScanHint: FILE_FLAG_SEQUENTIAL_SCAN
+    (Linux: POSIX_FADV_SEQUENTIAL). }
+  procedure ReadWithReadFile(const AFileName: string; const AReadSize: Cardinal; const ASequentialScanHint: Boolean;
+    var AConsumer: TBenchConsumer);
 
 {$IFDEF MSWINDOWS}
-{ Classic asynchronous I/O without IoRing: ABufferCount overlapped ReadFile calls in flight, consumed in order. The fair
-  "is IoRing better than what Windows always had?" baseline. }
-procedure ReadWithOverlapped(const AFileName: string; const AUnbuffered: Boolean;
-  const ABufferSize, ABufferCount: Cardinal; var AConsumer: TBenchConsumer);
+  { Classic asynchronous I/O without IoRing: ABufferCount overlapped ReadFile calls in flight, consumed in order. The fair
+    "is IoRing better than what Windows always had?" baseline. }
+  procedure ReadWithOverlapped(const AFileName: string; const AUnbuffered: Boolean;
+    const ABufferSize, ABufferCount: Cardinal; var AConsumer: TBenchConsumer);
 {$ENDIF}
 
-// TSequentialReadOnlyFileStream with STREAM_READ_SIZE reads; returns the stalls
-function ReadWithIORingStream(const AFileName: string; const AOptions: TIORingSequentialReaderOptions;
-  var AConsumer: TBenchConsumer): UInt64;
+  // TSequentialReadOnlyFileStream with STREAM_READ_SIZE reads; returns the stalls
+  function ReadWithIORingStream(const AFileName: string; const AOptions: TIORingSequentialReaderOptions;
+    var AConsumer: TBenchConsumer): UInt64;
 
-// TIORingSequentialReader with TryAcquireChunk / ReleaseChunk; returns the stalls
-function ReadWithIORingZeroCopy(const AFileName: string; const AOptions: TIORingSequentialReaderOptions;
-  const ABufferSize, ABufferCount: Cardinal; var AConsumer: TBenchConsumer): UInt64;
+  // TIORingSequentialReader with TryAcquireChunk / ReleaseChunk; returns the stalls
+  function ReadWithIORingZeroCopy(const AFileName: string; const AOptions: TIORingSequentialReaderOptions;
+    const ABufferSize, ABufferCount: Cardinal; var AConsumer: TBenchConsumer): UInt64;
 
-{
-  The first unbuffered read after a buffered read of the same file is slower (about 0.13 s here), probably because
-  Windows keeps the file's cache structures for a while after the buffered reader closes it. Doing this untimed
-  unbuffered read first lets the unbuffered contenders be measured fairly.
-}
-procedure ReadUnbufferedUntimed(const AFileName: string);
+  {
+    The first unbuffered read after a buffered read of the same file is slower (about 0.13 s here), probably because
+    Windows keeps the file's cache structures for a while after the buffered reader closes it. Doing this untimed
+    unbuffered read first lets the unbuffered contenders be measured fairly.
+  }
+  procedure ReadUnbufferedUntimed(const AFileName: string);
 
 implementation
 
@@ -72,7 +72,6 @@ var
 begin
   SetLength(LBuffer, AReadSize);
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
-
   try
     repeat
       LRead := LStream.Read(LBuffer[0], AReadSize);
@@ -93,10 +92,8 @@ var
   LRead: Cardinal;
 begin
   LBuffer := TIORingPlatform.AllocPages(AReadSize);
-
   try
     LHandle := BenchOpenForReading(AFileName, False, False, ASequentialScanHint);
-
     try
       repeat
         LRead := BenchRead(LHandle, LBuffer^, AReadSize);
@@ -222,7 +219,6 @@ var
 begin
   SetLength(LBuffer, STREAM_READ_SIZE);
   LStream := TSequentialReadOnlyFileStream.Create(AFileName, AOptions);
-
   try
     repeat
       LRead := LStream.Read(LBuffer[0], STREAM_READ_SIZE);

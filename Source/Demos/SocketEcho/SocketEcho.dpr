@@ -59,7 +59,6 @@ var
   LCount: ssize_t;
 begin
   LSocket := fpsocket(AF_INET, SOCK_STREAM, 0);
-
   try
     if fpconnect(LSocket, psockaddr(@FAddress), SizeOf(FAddress)) <> 0 then
     begin
@@ -173,7 +172,6 @@ begin
 
     LConnection := -1;
     LClient := TClientThread.Create(LAddress);
-
     try
       LRing.Open(8);
 
