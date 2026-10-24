@@ -28,6 +28,7 @@ type
   published
     // Life cycle
     procedure Available_AndCapabilities;
+    procedure Capabilities_DescribeTheSystem;
     procedure Open_RoundsQueueSizes;
     procedure Open_Twice_Raises;
     procedure Close_Twice_DoesNothing;
@@ -88,6 +89,9 @@ uses
   Delphi.IOUring,
 {$IFDEF MSWINDOWS}
   Delphi.IOUring.Backend.Windows.API,
+{$ENDIF}
+{$IFDEF LINUX}
+  Delphi.IOUring.Backend.Posix.API,
 {$ENDIF}
   TestFileHelpers;
 
@@ -152,6 +156,35 @@ begin
   AssertFalse('Emulated', LCapabilities.Emulated);
   AssertTrue('All operations', LCapabilities.SupportedOps = [ioRead, ioWrite, ioFlush, ioCancel, ioRegisterFiles,
     ioRegisterBuffers, ioReadScatter, ioWriteGather]);
+end;
+
+procedure TIORingTests.Capabilities_DescribeTheSystem;
+var
+  LCapabilities: TIORingCapabilities;
+  LText: string;
+{$IFDEF MSWINDOWS}
+  LOpcode: Cardinal;
+{$ENDIF}
+begin
+  LCapabilities := IORingCapabilities;
+  LText := LCapabilities.ToString;
+  Log(LText);
+  AssertEquals('Same as TIORing.QueryCapabilities', TIORing.QueryCapabilities.ToString, LText);
+  AssertTrue('System described', LCapabilities.SystemDescription <> '');
+  AssertEquals('Not-available reason', '', LCapabilities.NotAvailableReason);
+  AssertTrue('Text names the backend', Pos(BACKEND_NAME, LText) > 0);
+  AssertTrue('Text names the system', Pos(LCapabilities.SystemDescription, LText) > 0);
+{$IFDEF MSWINDOWS}
+  AssertTrue('Windows', Pos('Windows ', LCapabilities.SystemDescription) = 1);
+  for LOpcode := IORING_OP_READ to IORING_OP_WRITE_GATHER do
+    AssertTrue(Format('Native opcode %d', [LOpcode]), Byte(LOpcode) in LCapabilities.NativeOps);
+  AssertTrue('No extras on Windows', LCapabilities.Extras = []);
+{$ELSE}
+  AssertTrue('Linux', Pos('Linux ', LCapabilities.SystemDescription) > 0);
+  AssertTrue('Native read', IORING_OP_READ in LCapabilities.NativeOps);
+  AssertTrue('Feature: no dropped completions', LCapabilities.NativeFeatures and IORING_FEAT_NODROP <> 0);
+  AssertTrue('Extras', [ieSockets, ieLinkedOps, ieRawEntries] <= LCapabilities.Extras);
+{$ENDIF}
 end;
 
 procedure TIORingTests.Open_RoundsQueueSizes;

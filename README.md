@@ -32,6 +32,7 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Complete Linux io_uring API translation (`Delphi.IOUring.Backend.Posix.API`, Linux 6.8 header, Free Pascal) | done, tested on x86-64 (WSL2); AArch64 not tested yet |
 | Linux ring `TLinuxIORing` (`Delphi.IOUring.Backend.Posix`; `TIORing` on Linux), the read-ahead reader and the atomics on Linux | done, tested on x86-64 (WSL2) |
 | The engine, block reader, overlap rule and both streams on Linux | done, tested on x86-64 (WSL2); benchmarks run in WSL2 (a first look, not disk numbers) |
+| Linux extras: any io_uring operation (sockets …) and linked operations on the ring; capabilities that describe the system | done, tested on x86-64 (WSL2) |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
 
@@ -226,6 +227,52 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
 `Delphi.IOUring.Backend.Posix.API` is the same for Linux: the whole
 `linux/io_uring.h` of Linux 6.8 and the three system calls, for Free Pascal
 (no C library, no liburing).
+
+### What this system offers
+
+```pascal
+Writeln(IORingCapabilities.ToString);   // for logs and bug reports
+```
+
+```
+Linux io_uring, kernel 6.18
+System: Ubuntu 24.04.5 LTS, Linux 6.18.54.1-microsoft-standard-WSL2
+Queues: submission up to 32768, completion up to 65536
+Operations: read, write, flush, cancel, register files, register buffers, read scatter, write gather
+Native: 63 opcodes (highest 62), features $3FFFF
+Extras: sockets, linked operations, SQPOLL, raw entries
+```
+
+The record also has the fields one by one: `NativeOps` (the system's
+opcodes the kernel supports), `NativeFeatures`, `Extras` (what the system
+offers beyond the common subset; none on Windows), `NotAvailableReason`.
+
+### Linux extras
+
+On Linux the ring can take any io_uring operation, for example sockets
+(`PrepareSqe`, with the names of `Delphi.IOUring.Backend.Posix.API`), and
+link an entry to the next one (`LinkToNext`). This is Linux code: Windows
+IoRing has neither.
+
+```pascal
+{$IFDEF LINUX}
+LRing.PrepareSqe(1, LSqe);            // receive from a socket
+LSqe^.opcode := IORING_OP_RECV;
+LSqe^.fd := LSocket;
+LSqe^.addr := UInt64(@LBuffer);
+LSqe^.len := SizeOf(LBuffer);
+
+LRing.PrepareWrite(LFileRef, LBufferRef, 4096, 0, 2);
+LRing.LinkToNext;                     // the flush starts after the write,
+LRing.PrepareFlush(LFileRef, rfmData, 3);  // and is cancelled if it fails
+LRing.Submit;
+{$ENDIF}
+```
+
+One entry must give one completion: no multishot operations, no zero-copy
+send. SQPOLL (a kernel thread that takes the submissions) is in the API unit
+only; measured, it gave no gain for file I/O and cost much more CPU time
+([Benchmarks](Docs/Benchmarks.md#sqpoll-phase-22)).
 
 ## Building and testing
 

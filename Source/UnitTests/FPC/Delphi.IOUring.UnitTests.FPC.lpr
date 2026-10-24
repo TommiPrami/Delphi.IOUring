@@ -46,6 +46,7 @@ uses
 {$IFDEF LINUX}
   Tests.Linux.Backend.Posix.API.Layout,
   Tests.Linux.Backend.Posix.API,
+  Tests.Linux.Extras,
 {$ENDIF}
   Tests.TestFileHelpers;
 

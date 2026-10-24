@@ -780,6 +780,39 @@ faster in a tight loop; the queue is 7–165× faster under contention, where
 the mutex starves the consumer (with 27 producers it spent 752 s of CPU
 time for what the lock-free queue did in 4.7 s).
 
+### SQPOLL (Phase 22)
+
+With SQPOLL a kernel thread takes the submissions from the ring, so
+submitting needs no system call. Measured before deciding whether
+`TLinuxIORing` should offer it (Design §5.8), with a ring of its own in a
+test program, 4 KiB reads, WSL2, 2026-10-24. Time per read and CPU time per
+read (all threads, the polling thread included):
+
+| Ring | Cached, one at a time | CPU | Cached, 32 at a time | CPU |
+| --- | ---: | ---: | ---: | ---: |
+| Normal | **0.51 µs** | **0.51 µs** | **0.35 µs** | **0.35 µs** |
+| SQPOLL, waiting in `io_uring_enter` | 12.0 µs | 13.6 µs | 0.81 µs | 0.95 µs |
+| SQPOLL, spinning on the completion queue | 0.64 µs | 1.33 µs | 0.44 µs | 1.02 µs |
+| `SINGLE_ISSUER` + `DEFER_TASKRUN` | 0.49 µs | 0.59 µs | 0.34 µs | 0.44 µs |
+
+Unbuffered (`O_DIRECT`) random reads of a 1 GiB file, two runs each,
+thousand reads per second and CPU time per read:
+
+| Ring | 32 in flight | CPU | 128 in flight | CPU |
+| --- | ---: | ---: | ---: | ---: |
+| Normal | 125 / 173 | 1.5–1.7 µs | 160 / 180 | 1.5 µs |
+| SQPOLL, waiting in `io_uring_enter` | 151 / 171 | 6.6–7.4 µs | 176 / 179 | 6.3 µs |
+| SQPOLL, spinning | 125 / 159 | 12.7–16.2 µs | 168 / 164 | 12.1–12.3 µs |
+| `SINGLE_ISSUER` + `DEFER_TASKRUN` | 122 / 172 | 1.7–2.0 µs | 176 / 180 | 1.7–1.8 µs |
+
+**SQPOLL gave no gain for file I/O, and cost 2.6–27× the CPU time per
+read** (unbuffered: 4–10×). With
+cached data the reading happens inside the submit call anyway; with
+unbuffered reads the virtual disk is the limit. So `TLinuxIORing` does not
+offer it; it stays in the API unit (`IORING_SETUP_SQPOLL`) for programs that
+want it – for example network servers with very high rates, not measured
+here.
+
 ## Known limits of these measurements
 
 - **One machine, one very fast disk.** The NVMe drive has low latency, so

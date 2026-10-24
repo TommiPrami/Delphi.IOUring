@@ -48,6 +48,9 @@ type
   TIORingSubmitFlag = Delphi.IOUring.Backend.Custom.TIORingSubmitFlag;
   TIORingSubmitFlags = Delphi.IOUring.Backend.Custom.TIORingSubmitFlags;
   TIORingFlushMode = Delphi.IOUring.Backend.Custom.TIORingFlushMode;
+  TIORingExtra = Delphi.IOUring.Backend.Custom.TIORingExtra;
+  TIORingExtras = Delphi.IOUring.Backend.Custom.TIORingExtras;
+  TIORingNativeOps = Delphi.IOUring.Backend.Custom.TIORingNativeOps;
   TIORingCapabilities = Delphi.IOUring.Backend.Custom.TIORingCapabilities;
   TIORingFileRef = Delphi.IOUring.Backend.Custom.TIORingFileRef;
   TIORingBufferRef = Delphi.IOUring.Backend.Custom.TIORingBufferRef;
@@ -88,9 +91,16 @@ const
   rfmData = Delphi.IOUring.Backend.Custom.rfmData;
   rfmMinMetadata = Delphi.IOUring.Backend.Custom.rfmMinMetadata;
   rfmNoSync = Delphi.IOUring.Backend.Custom.rfmNoSync;
+  ieSockets = Delphi.IOUring.Backend.Custom.ieSockets;
+  ieLinkedOps = Delphi.IOUring.Backend.Custom.ieLinkedOps;
+  ieSqPoll = Delphi.IOUring.Backend.Custom.ieSqPoll;
+  ieRawEntries = Delphi.IOUring.Backend.Custom.ieRawEntries;
 
 // True if the ring can be used on this system
 function IORingAvailable: Boolean;
+// What the ring offers on this system, and the system itself (for logs:
+// IORingCapabilities.ToString)
+function IORingCapabilities: TIORingCapabilities;
 
 // Readable text for an OS result code (TIORingCompletion.NativeResult)
 function IORingErrorMessage(const ANativeCode: Integer): string;
@@ -111,6 +121,11 @@ implementation
 function IORingAvailable: Boolean;
 begin
   Result := TIORing.Available;
+end;
+
+function IORingCapabilities: TIORingCapabilities;
+begin
+  Result := TIORing.QueryCapabilities;
 end;
 
 function IORingErrorMessage(const ANativeCode: Integer): string;

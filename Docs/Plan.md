@@ -315,7 +315,7 @@ Source/
   - [ ] Benchmarks on a real Linux machine (not WSL2), and AArch64.
 
   **Done 2026-10-24** – Linux: 230 tests pass in WSL2 (kernel 6.18; Ubuntu 24.04 and 26.04), with and without `-O3`. Windows: Delphi 245 tests (Win32 and Win64, Debug and Release), FPC 244 (Win32 and Win64, with and without `-O3`; also FPC trunk 3.3.1, Win64); `lazbuild` builds the test project; the benchmarks compile with Delphi and FPC, and the FPC ones also on Linux.
-- **Phase 22** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only.
+- **Phase 22** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only. Proposal: Design §5.8 (facts measured in WSL2); waits for the decisions marked [DECIDE].
 
 ---
 
@@ -323,5 +323,5 @@ Source/
 
 Phase 21 is done: the engine, the block reader and both streams run on Linux,
 and so do the four benchmarks (a first look in WSL2). Next: **Phase 22 – Linux
-extras** (sockets, linked operations, SQPOLL). It starts with a proposal and
-its decisions, as before.
+extras** (sockets, linked operations, SQPOLL). The proposal is in Design §5.8,
+with the facts measured in WSL2; it waits for the decisions marked [DECIDE].

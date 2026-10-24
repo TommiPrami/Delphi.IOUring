@@ -89,6 +89,7 @@ type
     procedure Enter_NotARing_EOPNOTSUPP;
     procedure Enter_ExtArgTimeout_ETIME;
     procedure Timeout_CompletesWithETIME;
+    procedure SqPoll_NopsComplete;
   end;
 
 implementation
@@ -219,6 +220,14 @@ begin
   LFlags := 0;
   if AWaitFor > 0 then
     LFlags := IORING_ENTER_GETEVENTS;
+  if (Params.flags and IORING_SETUP_SQPOLL) <> 0 then
+  begin
+    // The polling thread takes the SQEs by itself; it needs a wake-up only
+    // when it has gone to sleep. The kernel returns the count it was given.
+    ReadWriteBarrier;  // the tail before the flags
+    if (SqWord(Params.sq_off.flags)^ and IORING_SQ_NEED_WAKEUP) <> 0 then
+      LFlags := LFlags or IORING_ENTER_SQ_WAKEUP;
+  end;
   Result := io_uring_enter(Fd, FToSubmit, AWaitFor, LFlags, nil);
   if Result > 0 then
     Dec(FToSubmit, Result);
@@ -709,6 +718,52 @@ begin
   LCqe := PopCqe;
   AssertEquals('user_data', 42, LCqe.user_data);
   AssertEquals('res', -ESysETIME, LCqe.res);
+end;
+
+// SQPOLL is reachable through this unit only (Docs/Design.md §5.8): a kernel
+// thread takes the submissions. Allowed without root since Linux 5.11.
+procedure TPosixApiTests.SqPoll_NopsComplete;
+var
+  LParams: io_uring_params;
+  LSqe: Pio_uring_sqe;
+  LCqe: io_uring_cqe;
+  LResult: Integer;
+  LRound: Integer;
+  LIndex: Integer;
+begin
+  FillChar(LParams, SizeOf(LParams), 0);
+  LParams.flags := IORING_SETUP_SQPOLL;
+  LParams.sq_thread_idle := 10;    // ms until the polling thread sleeps
+  LResult := FRing.Open(8, LParams);
+  if LResult = -ESysEPERM then
+  begin
+    Log('SQPOLL is not allowed here (EPERM): not tested');
+    AssertTrue(True);
+    Exit;
+  end;
+  AssertTrue('setup: ' + IntToStr(LResult), LResult >= 0);
+  AssertTrue('Kept the flag', (FRing.Params.flags and IORING_SETUP_SQPOLL) <> 0);
+
+  // Twice: the second time after the polling thread has gone to sleep, so
+  // the wake-up is needed
+  for LRound := 1 to 2 do
+  begin
+    if LRound = 2 then
+      Sleep(50);
+    for LIndex := 1 to 3 do
+    begin
+      LSqe := FRing.NextSqe;
+      LSqe^.opcode := IORING_OP_NOP;
+      LSqe^.user_data := LRound * 10 + LIndex;
+    end;
+    AssertEquals('submitted', 3, FRing.Submit(3));
+    for LIndex := 1 to 3 do
+    begin
+      LCqe := PopCqe;
+      AssertEquals('res', 0, LCqe.res);
+      AssertTrue('user_data', (LCqe.user_data > UInt64(LRound * 10)) and (LCqe.user_data <= UInt64(LRound * 10 + 3)));
+    end;
+  end;
 end;
 
 initialization

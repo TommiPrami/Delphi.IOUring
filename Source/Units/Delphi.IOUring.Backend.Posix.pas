@@ -27,6 +27,8 @@
 //   unbuffered file is needed.
 // - PrepareCancel finds the operation by its user data only (AFile is not
 //   needed).
+// - Linux only: PrepareSqe (any io_uring operation, for example sockets) and
+//   LinkToNext (linked operations).
 
 {$I Delphi.IOUring.inc}
 
@@ -143,6 +145,22 @@ type
       const AUserData: TIORingUserData): Boolean;
     function PrepareRegisterBuffers(const ABuffers: array of TIORingBufferInfo;
       const AUserData: TIORingUserData): Boolean;
+
+    // --- Linux only (Docs/Design.md §5.8): code that uses these is Linux code.
+    // Any operation of io_uring: the next entry of the submission queue,
+    // zeroed, with the user data set; the caller fills in the rest with the
+    // names of Delphi.IOUring.Backend.Posix.API (opcode, fd, addr, len ...;
+    // for a registered file IOSQE_FIXED_FILE and the index as fd). False = no
+    // room, as for the other Prepare methods. The rule: one entry, one
+    // completion - no multishot operations, no zero-copy send
+    // (IORING_OP_SEND_ZC), no IOSQE_CQE_SKIP_SUCCESS.
+    function PrepareSqe(const AUserData: TIORingUserData; out ASqe: Pio_uring_sqe): Boolean;
+    // Links the entry prepared last to the next one: the next starts only
+    // after this one has completed, and is cancelled (-ECANCELED) if this one
+    // fails - a short read or write counts as a failure. AHard: the next runs
+    // anyway. Both must go to the kernel in the same Submit. Raises if no
+    // entry is prepared.
+    procedure LinkToNext(const AHard: Boolean = False);
 
     // --- Submit: one system call. Submits all prepared entries and, if
     // AWaitCount > 0, waits until that many completions are available (at most
@@ -279,6 +297,10 @@ var
   GNotAvailableReason: string;
   GSupportedOps: TIORingOps;
   GKernelVersion: Cardinal;
+  GNativeOps: TIORingNativeOps;
+  GNativeFeatures: UInt64;
+  // 0 = not checked yet, 1 = a SQPOLL ring can be set up, -1 = not
+  GSqPollAllowed: Integer = 0;
   GPageSize: Cardinal = 0;
 
 function AddressOf(const APointer: Pointer): UInt64; inline;
@@ -286,19 +308,27 @@ begin
   Result := UInt64(PByte(APointer) - PByte(nil));
 end;
 
+// uname's release, e.g. '6.18.54.1-microsoft-standard-WSL2'
+function KernelRelease: string;
+var
+  LName: UtsName;
+begin
+  if FpUname(LName) = 0 then
+    Result := PChar(@LName.Release[0])
+  else
+    Result := '';
+end;
+
 // The kernel version as major * 100 + minor (6.18 = 618)
 function KernelVersion: Cardinal;
 var
-  LName: UtsName;
   LRelease: string;
   LMajor: Integer;
   LMinor: Integer;
   LPosition: Integer;
 begin
   Result := 0;
-  if FpUname(LName) <> 0 then
-    Exit;
-  LRelease := PChar(@LName.Release[0]);
+  LRelease := KernelRelease;
   LPosition := Pos('.', LRelease);
   if LPosition = 0 then
     Exit;
@@ -329,6 +359,8 @@ var
 begin
   GKernelVersion := KernelVersion;
   GSupportedOps := [];
+  GNativeOps := [];
+  GNativeFeatures := 0;
   GNotAvailableReason := '';
 
   FillChar(LParams, SizeOf(LParams), 0);
@@ -346,12 +378,16 @@ begin
   end;
 
   try
+    GNativeFeatures := LParams.features;
     // The kernel wants the probe memory zeroed (SetLength does that)
     SetLength(LProbe, SizeOf(io_uring_probe) + 256 * SizeOf(io_uring_probe_op));
     if io_uring_register(LFd, IORING_REGISTER_PROBE, @LProbe[0], 256) = 0 then
     begin
       LOps := Pio_uring_probe_op(@LProbe[SizeOf(io_uring_probe)]);
       LCount := Pio_uring_probe(@LProbe[0])^.ops_len;
+      for LIndex := 0 to LCount - 1 do
+        if Supported(Byte(LIndex)) then
+          Include(GNativeOps, Byte(LIndex));
       // Registration is a system call (Linux 5.1)
       GSupportedOps := [ioRegisterFiles, ioRegisterBuffers];
       if Supported(IORING_OP_READ) then
@@ -383,6 +419,83 @@ begin
   finally
     FpClose(LFd);
   end;
+end;
+
+// Not in CheckAvailability: a SQPOLL ring starts a kernel thread, and most
+// programs never ask
+function SqPollAllowed: Boolean;
+var
+  LParams: io_uring_params;
+  LFd: Integer;
+begin
+  if GSqPollAllowed = 0 then
+  begin
+    FillChar(LParams, SizeOf(LParams), 0);
+    LParams.flags := IORING_SETUP_SQPOLL;
+    LParams.sq_thread_idle := 1;
+    LFd := io_uring_setup(1, @LParams);
+    if LFd >= 0 then
+    begin
+      FpClose(LFd);
+      GSqPollAllowed := 1;
+    end
+    else
+      GSqPollAllowed := -1;
+  end;
+  Result := GSqPollAllowed > 0;
+end;
+
+// PRETTY_NAME of /etc/os-release (or /usr/lib/os-release), e.g. 'Ubuntu
+// 24.04.3 LTS'; '' if there is none
+function DistributionName: string;
+const
+  FILES: array[0..1] of string = ('/etc/os-release', '/usr/lib/os-release');
+  KEY = #10'PRETTY_NAME=';
+var
+  LFile: Integer;
+  LBuffer: array[0..4095] of AnsiChar;
+  LCount: Integer;
+  LText: string;
+  LStart: Integer;
+  LEnd: Integer;
+  LIndex: Integer;
+begin
+  Result := '';
+  for LIndex := Low(FILES) to High(FILES) do
+  begin
+    LFile := FpOpen(FILES[LIndex], O_RDONLY or O_CLOEXEC_FLAG);
+    if LFile < 0 then
+      Continue;
+    try
+      LCount := FpRead(LFile, LBuffer, SizeOf(LBuffer) - 1);
+    finally
+      FpClose(LFile);
+    end;
+    if LCount <= 0 then
+      Continue;
+    LBuffer[LCount] := #0;
+    LText := #10 + string(PAnsiChar(@LBuffer[0]));
+    LStart := Pos(KEY, LText);
+    if LStart = 0 then
+      Continue;
+    Inc(LStart, Length(KEY));
+    LEnd := LStart;
+    while (LEnd <= Length(LText)) and (LText[LEnd] <> #10) do
+      Inc(LEnd);
+    Result := Trim(Copy(LText, LStart, LEnd - LStart));
+    // The value is usually in quotes
+    if (Length(Result) >= 2) and (Result[1] in ['"', '''']) and (Result[Length(Result)] = Result[1]) then
+      Result := Copy(Result, 2, Length(Result) - 2);
+    Exit;
+  end;
+end;
+
+function SystemDescription: string;
+begin
+  Result := DistributionName;
+  if Result <> '' then
+    Result := Result + ', ';
+  Result := Result + 'Linux ' + KernelRelease;
 end;
 
 function IORingSegment(const AAddress: Pointer): TIORingSegment;
@@ -624,6 +737,30 @@ begin
   LSqe^.rw_flags := ARwFlags;
   LSqe^.user_data := AUserData;
   Result := True;
+end;
+
+function TLinuxIORing.PrepareSqe(const AUserData: TIORingUserData; out ASqe: Pio_uring_sqe): Boolean;
+begin
+  ASqe := NextSqe;
+  Result := ASqe <> nil;
+  if Result then
+    ASqe^.user_data := AUserData;
+end;
+
+procedure TLinuxIORing.LinkToNext(const AHard: Boolean);
+var
+  LSqe: Pio_uring_sqe;
+begin
+  if FFd < 0 then
+    raise EIORingError.Create('The ring is not open');
+  if FPreparedCount = 0 then
+    raise EIORingError.Create('LinkToNext: no prepared entry to link');
+  // The entry prepared last is still in the submission queue (not submitted)
+  LSqe := Pio_uring_sqe(FSqes + ((FSqLocalTail - 1) and FSqMask) * SizeOf(io_uring_sqe));
+  if AHard then
+    LSqe^.flags := LSqe^.flags or IOSQE_IO_HARDLINK
+  else
+    LSqe^.flags := LSqe^.flags or IOSQE_IO_LINK;
 end;
 
 function TLinuxIORing.PrepareRead(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
@@ -1026,11 +1163,25 @@ begin
   Result.MaxCompletionQueueSize := 0;
   Result.SupportedOps := GSupportedOps;
   Result.Emulated := False;
+  Result.SystemDescription := SystemDescription;
+  Result.NotAvailableReason := GNotAvailableReason;
+  Result.NativeFeatures := GNativeFeatures;
+  Result.NativeOps := GNativeOps;
+  Result.Extras := [];
   if GSupportedOps <> [] then
   begin
     Result.BackendName := 'Linux io_uring';
     Result.MaxSubmissionQueueSize := MAX_SUBMISSION_QUEUE_SIZE;
     Result.MaxCompletionQueueSize := MAX_COMPLETION_QUEUE_SIZE;
+  end;
+  if GAvailability > 0 then
+  begin
+    // PrepareSqe and LinkToNext work with every kernel the library accepts
+    Result.Extras := [ieLinkedOps, ieRawEntries];
+    if [IORING_OP_SEND, IORING_OP_RECV, IORING_OP_ACCEPT, IORING_OP_CONNECT] <= GNativeOps then
+      Include(Result.Extras, ieSockets);
+    if SqPollAllowed then
+      Include(Result.Extras, ieSqPoll);
   end;
 end;
 

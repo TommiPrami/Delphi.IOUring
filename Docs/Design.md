@@ -819,6 +819,155 @@ Usage styles, from fastest/most manual to most convenient:
   write-through needs an unbuffered file (§2.1). The test now writes through
   on an unbuffered file, on both systems.
 
+### 5.8 Linux extras – sockets, linked operations, SQPOLL (Phase 22)
+
+§2.3 keeps everything outside the common subset out of the core
+abstraction: Windows IoRing has no sockets, no links and no polling thread.
+The Linux API unit (§6.4) already has all of it – every opcode,
+`IOSQE_IO_LINK`, `IORING_SETUP_SQPOLL` – but only for someone who builds a
+ring of their own: `TLinuxIORing` has no way to put any other operation into
+its queue, no way to link two entries, and `Open` takes no setup flags.
+Phase 22 decides how much of it `TLinuxIORing` opens up. Nothing changes for
+Windows, and the higher layers (reader, engine, streams) stay as they are.
+
+**Facts found before Phase 22** (WSL2, kernel 6.18, a raw ring, 2026-10-24):
+
+- **[VERIFIED]** Every setup flag tried works without root: SQPOLL (allowed
+  since Linux 5.11), `SINGLE_ISSUER`, `COOP_TASKRUN`, `SINGLE_ISSUER` +
+  `DEFER_TASKRUN`. The probe lists every socket operation (`SEND`, `RECV`,
+  `ACCEPT`, `CONNECT`, `SENDMSG`, `RECVMSG`, `SEND_ZC`, `SOCKET`,
+  `SHUTDOWN`); the kernel knows opcodes up to 62.
+- **[VERIFIED] SQPOLL gains nothing here, and costs CPU time.**
+  - Cached 4 KiB reads, one at a time: a normal ring 0.51 µs per read;
+    SQPOLL, waiting in `io_uring_enter`: 12 µs (two threads hand over every
+    read); SQPOLL, spinning on the completion queue: 0.64 µs, with 2.6× the
+    CPU time. 32 at a time: normal 0.35 µs, SQPOLL spinning 0.44 µs with
+    about 3× the CPU time.
+  - Unbuffered (`O_DIRECT`) random 4 KiB reads, 32 or 128 in flight: the
+    same number of reads per second (125–180 thousand; the noise between two
+    runs is bigger than the difference), with 4–10× the CPU time – the
+    polling thread.
+  - `SINGLE_ISSUER` + `DEFER_TASKRUN`: as fast as a normal ring. With
+    `DEFER_TASKRUN` the kernel posts completions only while the ring's
+    thread waits in `io_uring_enter`; the engine, which pops completions
+    without waiting, would not see them.
+- **[VERIFIED] Linked operations** work as documented: a write linked to an
+  `fsync` – both succeed, in order. When a linked operation fails – a short
+  read (4 of 8 bytes) counts as a failure – the next one completes with
+  `-ECANCELED`. With a hard link (`IOSQE_IO_HARDLINK`) the next one runs
+  anyway.
+- **[VERIFIED] Sockets through the ring:** on a socket pair a `RECV` waits
+  in the ring until a `SEND` comes; on TCP loopback `ACCEPT` (its result is
+  the new descriptor) and `CONNECT` both complete through the ring.
+- A completion of `TLinuxIORing` has the user data, the error code and the
+  result; the CQE flags are not passed on. The ring counts one completion
+  per entry. Multishot operations (several completions per entry, flag
+  `IORING_CQE_F_MORE`), zero-copy send (two completions) and
+  `IOSQE_CQE_SKIP_SUCCESS` (none on success) break that count.
+
+**Phase 22 proposal:**
+
+- **[DECIDE] 1. A door for any operation, and linking.** Proposed (A):
+  - `TLinuxIORing.PrepareSqe(AUserData, out ASqe): Boolean` gives the next
+    entry of the submission queue, zeroed and with the user data set,
+    counted like the other Prepare methods (False: no room). The caller
+    fills in the rest with the API unit's names – any operation: sockets,
+    timeouts, opening and closing files, poll … For a registered file the
+    caller sets `IOSQE_FIXED_FILE`.
+  - `TLinuxIORing.LinkToNext(AHard = False)` links the entry prepared last
+    to the next one (`IOSQE_IO_LINK` / `IOSQE_IO_HARDLINK`). It works with
+    the ring's own Prepare methods too – for example a write linked to its
+    flush. Both entries must go to the kernel in the same `Submit`.
+  - The rule: one entry, one completion – no multishot, no zero-copy send,
+    no `IOSQE_CQE_SKIP_SUCCESS`. Documented; the ring cannot check it.
+  - Both are Linux-only: code that uses them is Linux code
+    (`{$IFDEF LINUX}`).
+
+  Other choices: (B) the same plus typed socket methods (`PrepareSend`,
+  `PrepareRecv`, `PrepareAccept`, `PrepareConnect`) – a few lines each on
+  top of A, easy to add later when someone needs them; (C) also multishot:
+  the CQE flags in the completion and a count that knows
+  `IORING_CQE_F_MORE` – needs a Linux field in the shared completion
+  record; later, if ever.
+- **[DECIDE] 2. SQPOLL stays in the API unit.** Proposed (A):
+  `TLinuxIORing` gets no setup options. Measured: no gain for file I/O and
+  much more CPU time. In the ring it would need a second way to submit
+  (wake the polling thread, and check the kernel's queue head before an
+  entry is used again). Documented, with a test that a SQPOLL ring set up
+  through the API unit works. Other choice (B): `Open` takes a Linux-only
+  SQPOLL option (and its idle time) and `TLinuxIORing` handles it – for
+  network servers with very high rates, which were not measured here.
+- **[DECIDE] 3. Capabilities: a Linux-only record.** Proposed (A):
+  `TLinuxIORing.QueryLinuxCapabilities` returns the kernel's feature bits
+  (`io_uring_params.features`), the probe of all opcodes
+  (`OpSupported(AOpcode)`) and whether SQPOLL may be used (a setup tried
+  once). The shared `TIORingCapabilities` stays as it is – it describes the
+  common subset. Other choice (B): native fields in the shared record
+  (feature bits and opcodes of either system; Windows has
+  `IORING_FEATURE_FLAGS` and `IsIoRingOpSupported`).
+- Tests (Linux only): sockets through `PrepareSqe` (a socket pair; accept
+  and connect on loopback; a waiting receive cancelled); a write linked to
+  its flush; a failed link (the next one `IsCancelled`); a hard link;
+  `LinkToNext` with nothing prepared (raises); the capabilities; in the
+  API tests, a SQPOLL ring.
+- Docs: a README section "Linux extras" with a socket example; the SQPOLL
+  numbers in Benchmarks.md.
+- Not in this phase: sockets in the shared `TIORing` or in the engine
+  (Windows has none), AArch64 (no ARM machine yet).
+
+**Phase 22 decisions (decided 2026-10-24):**
+
+- **1 as proposed (A):** `PrepareSqe` and `LinkToNext` in the low-level
+  `TLinuxIORing`, even though the higher layers do not use them yet.
+- **2 as proposed (A):** SQPOLL, and all the other definitions, stay in the
+  API unit, for extensions of the library or other code later.
+- **3 changed: the capabilities move to the shared level**, not a Linux-only
+  record. Windows and Linux will always differ, and Linux systems differ a
+  lot among themselves (distribution, kernel, what is switched off), so one
+  record describes either system. `TIORingCapabilities` gets:
+  - `SystemDescription` – the system for logs and bug reports (Windows:
+    version and build; Linux: the distribution from `/etc/os-release` and
+    the kernel release);
+  - `NotAvailableReason` – why the ring cannot be used ('' if it can);
+  - `NativeFeatures` – the feature bits of the system's ring API (Windows
+    `IORING_FEATURE_FLAGS`, Linux `io_uring_params.features`);
+  - `NativeOps` – the system's opcodes that the kernel supports, a
+    `set of Byte` (Windows `IsIoRingOpSupported`, Linux the probe);
+  - `Extras` – what the system offers beyond the common subset, as a
+    cross-platform set: `ieSockets`, `ieLinkedOps`, `ieSqPoll`,
+    `ieRawEntries` (Windows: none);
+  - `ToString` – all of it in a few lines.
+
+  `Delphi.IOUring` gets `IORingCapabilities`, next to `IORingAvailable`.
+
+**Phase 22 implementation notes** (2026-10-24):
+
+- Built as decided. `PrepareSqe` uses the same room check as the other
+  Prepare methods; `LinkToNext` sets the flag on the entry prepared last,
+  which is still in the submission queue (raises when nothing is prepared:
+  on a closed ring, before the first Prepare, after `Submit`). The flag is
+  OR-ed in, so it must come after the Prepare call (the Prepare methods set
+  the entry's flags).
+- Capabilities, Linux: the opcodes and the feature bits come from the probe
+  that the availability check already does; the SQPOLL check (one setup
+  with `IORING_SETUP_SQPOLL`) runs only when the capabilities are asked for,
+  because it starts a kernel thread; the distribution comes from
+  `PRETTY_NAME` in `/etc/os-release` (or `/usr/lib/os-release`).
+  Windows: `RtlGetVersion` for the version (it is not lied to like
+  `GetVersionEx` without a compatibility manifest; Windows 11 still says
+  10.0, so builds from 22000 on are called Windows 11), and the opcodes from
+  `IsIoRingOpSupported` on a small ring, once.
+- **[VERIFIED]** on Linux (WSL2, 6.18): everything in the facts above, now
+  through `TLinuxIORing`: a receive waits in the ring until the send, accept
+  returns the new descriptor, connect, data both ways over TCP, a waiting
+  receive cancelled; a write linked to its flush completes first; a failed
+  or short read cancels the linked entry (`IsCancelled`), a hard link does
+  not; a read of a registered file through `PrepareSqe` with
+  `IOSQE_FIXED_FILE`. A SQPOLL ring through the API unit, also after its
+  thread has gone to sleep (the wake-up flag).
+- Tests: 11 Linux-only tests (`Tests.Linux.Extras`), a SQPOLL test in the
+  API tests, and a shared capabilities test (both systems).
+
 ---
 
 ## 6. Layer 0 – complete OS API translations
@@ -2709,8 +2858,11 @@ Found while looking (2026-10-23):
 
 - Lighter record-based replacements for RTL containers, only if profiling
   asks for them (§4.2).
-- Linux extras: sockets, linked SQEs, SQPOLL (only through the Posix API unit
-  and capabilities).
+- Linux extras beyond Phase 22 (§5.8): typed socket methods (`PrepareSend`,
+  `PrepareRecv` …) on top of `PrepareSqe`; multishot operations and
+  zero-copy send (they need the CQE flags in the completion and a count
+  that knows `IORING_CQE_F_MORE`); SQPOLL in `TLinuxIORing`, if a benchmark
+  ever shows a gain.
 - Read directly into the caller's buffer for big aligned reads (§7.7).
 
 ---
@@ -2749,3 +2901,4 @@ decision 17.)
 | 18 | 2026-10-23 | **One set of tests** for Delphi, Free Pascal and Linux in `Source/UnitTests/Common`: a base class over DUnitX and FPCUnit with the FPCUnit check names; one Free Pascal test program for Windows and Linux; done on main (§12.4). |
 | 19 | 2026-10-24 | **The Linux ring** (§5.7): Phase 20 is the ring, the platform record and the atomics on Linux, Phase 21 the engine on Linux; `NativeResult` is 0 or a negative error code on both systems (bytes in `BytesTransferred`); registration on Linux is a system call at `Prepare` with a completion of its own; minimum Linux 5.11. |
 | 20 | 2026-10-24 | **The engine on Linux** (§10.14): the I/O thread sleeps as on Windows – a wake event and the ring's completion event, through a small event API in `TIORingPlatform` (`eventfd` and `poll` on Linux; the io_uring-only way measured no faster); the benchmarks run on Linux in this phase, WSL2 results marked as not disk numbers. |
+| 21 | 2026-10-24 | **Linux extras** (§5.8): `TLinuxIORing.PrepareSqe` (any io_uring operation, for example sockets) and `LinkToNext` (linked operations) in the low-level ring, one completion per entry; SQPOLL and all other definitions stay in the API unit (measured: no gain for file I/O); the shared `TIORingCapabilities` describes either system – `SystemDescription`, `NotAvailableReason`, `NativeFeatures`, `NativeOps`, `Extras`, `ToString` – and `IORingCapabilities` in `Delphi.IOUring`. |

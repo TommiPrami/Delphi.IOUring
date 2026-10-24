@@ -680,6 +680,67 @@ begin
   Result := GAvailability > 0;
 end;
 
+type
+  // RTL_OSVERSIONINFOW (wdm.h)
+  TRtlOsVersionInfo = record
+    dwOSVersionInfoSize: ULONG;
+    dwMajorVersion: ULONG;
+    dwMinorVersion: ULONG;
+    dwBuildNumber: ULONG;
+    dwPlatformId: ULONG;
+    szCSDVersion: array[0..127] of WideChar;
+  end;
+
+// The real version, also for programs without a compatibility manifest
+// (GetVersionEx says 6.2 to them)
+function RtlGetVersion(var AInfo: TRtlOsVersionInfo): LongInt; stdcall; external 'ntdll.dll' name 'RtlGetVersion';
+
+function SystemDescription: string;
+var
+  LInfo: TRtlOsVersionInfo;
+begin
+  FillChar(LInfo, SizeOf(LInfo), 0);
+  LInfo.dwOSVersionInfoSize := SizeOf(LInfo);
+  if RtlGetVersion(LInfo) <> 0 then
+    Exit('Windows');
+  // Windows 11 still reports 10.0; its builds start at 22000
+  if (LInfo.dwMajorVersion = 10) and (LInfo.dwBuildNumber >= 22000) then
+    Result := 'Windows 11'
+  else if LInfo.dwMajorVersion = 10 then
+    Result := 'Windows 10'
+  else
+    Result := Format('Windows %d.%d', [LInfo.dwMajorVersion, LInfo.dwMinorVersion]);
+  Result := Result + Format(' (%d.%d, build %d)', [LInfo.dwMajorVersion, LInfo.dwMinorVersion, LInfo.dwBuildNumber]);
+end;
+
+var
+  GNativeOpsChecked: Boolean = False;
+  GNativeOps: TIORingNativeOps;
+
+// IsIoRingOpSupported needs a ring: one small ring, once
+function NativeOps(const AVersion: IORING_VERSION): TIORingNativeOps;
+var
+  LFlags: IORING_CREATE_FLAGS;
+  LRing: HIORING;
+  LOpcode: Integer;
+begin
+  if not GNativeOpsChecked then
+  begin
+    GNativeOps := [];
+    LFlags.Required := IORING_CREATE_REQUIRED_FLAGS_NONE;
+    LFlags.Advisory := IORING_CREATE_ADVISORY_FLAGS_NONE;
+    if CreateIoRing(AVersion, LFlags, 1, 2, LRing) = S_OK then
+    begin
+      for LOpcode := 0 to 255 do
+        if IsIoRingOpSupported(LRing, IORING_OP_CODE(LOpcode)) then
+          Include(GNativeOps, Byte(LOpcode));
+      CloseIoRing(LRing);
+    end;
+    GNativeOpsChecked := True;
+  end;
+  Result := GNativeOps;
+end;
+
 class function TWindowsIORing.QueryCapabilities: TIORingCapabilities;
 var
   LCapabilities: IORING_CAPABILITIES;
@@ -690,6 +751,14 @@ begin
   Result.MaxCompletionQueueSize := 0;
   Result.SupportedOps := [];
   Result.Emulated := False;
+  Result.SystemDescription := SystemDescription;
+  Result.NotAvailableReason := '';
+  Result.NativeFeatures := 0;
+  Result.NativeOps := [];
+  // No sockets, no links, no polling thread, no raw entries in IoRing
+  Result.Extras := [];
+  if not Available then
+    Result.NotAvailableReason := NotAvailableMessage;
 
   if not LoadCapabilities(LCapabilities) then
     Exit;
@@ -699,6 +768,9 @@ begin
   Result.MaxSubmissionQueueSize := LCapabilities.MaxSubmissionQueueSize;
   Result.MaxCompletionQueueSize := LCapabilities.MaxCompletionQueueSize;
   Result.Emulated := (LCapabilities.FeatureFlags and IORING_FEATURE_UM_EMULATION) <> 0;
+  Result.NativeFeatures := LCapabilities.FeatureFlags;
+  if LCapabilities.MaxVersion >= IORING_VERSION_1 then
+    Result.NativeOps := NativeOps(LCapabilities.MaxVersion);
 
   if LCapabilities.MaxVersion >= IORING_VERSION_1 then
     Result.SupportedOps := [ioRead, ioCancel, ioRegisterFiles, ioRegisterBuffers];

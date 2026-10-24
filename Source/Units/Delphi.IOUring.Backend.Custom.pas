@@ -59,13 +59,45 @@ type
     rfmNoSync          // data + metadata, no sync command
   );
 
+  // What a system offers beyond the common subset (Docs/Design.md §5.8)
+  TIORingExtra = (
+    ieSockets,         // socket operations through the ring (Linux: send, receive, accept, connect)
+    ieLinkedOps,       // an operation can wait for the one before it (Linux: TLinuxIORing.LinkToNext)
+    ieSqPoll,          // a kernel thread can take the submissions, without system calls
+                       // (Linux: IORING_SETUP_SQPOLL, through Delphi.IOUring.Backend.Posix.API)
+    ieRawEntries       // any operation of the system can be prepared (Linux: TLinuxIORing.PrepareSqe)
+  );
+  TIORingExtras = set of TIORingExtra;
+
+  // Opcodes of the system's ring API: Windows IORING_OP_*, Linux IORING_OP_*
+  TIORingNativeOps = set of Byte;
+
+  // What this system offers. Windows and Linux differ, and so do Linux
+  // systems among themselves (kernel, distribution, what is switched off):
+  // ToString describes it all for logs and bug reports.
   TIORingCapabilities = record
     BackendName: string;              // e.g. 'Windows IoRing'; empty if not available
-    NativeVersion: Cardinal;          // IORING_VERSION on Windows
+    // Windows: the IoRing version (IORING_VERSION_*); Linux: the kernel
+    // version, major * 100 + minor (618 = 6.18)
+    NativeVersion: Cardinal;
     MaxSubmissionQueueSize: Cardinal;
     MaxCompletionQueueSize: Cardinal;
     SupportedOps: TIORingOps;
     Emulated: Boolean;                // works, but without kernel support (slow)
+    // The system, e.g. 'Windows 11 (10.0, build 26300)' or
+    // 'Ubuntu 24.04.3 LTS, Linux 6.18.54.1-microsoft-standard-WSL2'
+    SystemDescription: string;
+    // Why the ring cannot be used here; empty if it can
+    NotAvailableReason: string;
+    // Feature bits of the system's ring API: Windows IORING_FEATURE_FLAGS,
+    // Linux io_uring_params.features (IORING_FEAT_*)
+    NativeFeatures: UInt64;
+    // The opcodes the kernel supports (Windows: IsIoRingOpSupported, Linux:
+    // the probe)
+    NativeOps: TIORingNativeOps;
+    Extras: TIORingExtras;
+    // All of the above in a few lines
+    function ToString: string;
   end;
 
   // A file: raw OS handle, or index into the files registered with the ring
@@ -167,6 +199,73 @@ begin
   Result.Address := nil;
   Result.Index := AIndex;
   Result.Offset := AOffset;
+end;
+
+{ TIORingCapabilities }
+
+function TIORingCapabilities.ToString: string;
+const
+  OP_NAMES: array[TIORingOp] of string = ('read', 'write', 'flush', 'cancel', 'register files',
+    'register buffers', 'read scatter', 'write gather');
+  EXTRA_NAMES: array[TIORingExtra] of string = ('sockets', 'linked operations', 'SQPOLL', 'raw entries');
+var
+  LOp: TIORingOp;
+  LExtra: TIORingExtra;
+  LOpcode: Integer;
+  LCount: Integer;
+  LHighest: Integer;
+  LList: string;
+begin
+  if BackendName = '' then
+    Result := 'Not available: ' + NotAvailableReason
+  else
+  begin
+{$IFDEF MSWINDOWS}
+    Result := Format('%s, version %d', [BackendName, NativeVersion]);
+{$ELSE}
+    Result := Format('%s, kernel %d.%d', [BackendName, NativeVersion div 100, NativeVersion mod 100]);
+{$ENDIF}
+    if Emulated then
+      Result := Result + ' (emulated)';
+  end;
+  Result := Result + sLineBreak + 'System: ' + SystemDescription;
+  if BackendName = '' then
+    Exit;
+
+  Result := Result + sLineBreak + Format('Queues: submission up to %d, completion up to %d',
+    [MaxSubmissionQueueSize, MaxCompletionQueueSize]);
+  LList := '';
+  for LOp := Low(TIORingOp) to High(TIORingOp) do
+    if LOp in SupportedOps then
+    begin
+      if LList <> '' then
+        LList := LList + ', ';
+      LList := LList + OP_NAMES[LOp];
+    end;
+  Result := Result + sLineBreak + 'Operations: ' + LList;
+
+  LCount := 0;
+  LHighest := -1;
+  for LOpcode := 0 to 255 do
+    if Byte(LOpcode) in NativeOps then
+    begin
+      Inc(LCount);
+      LHighest := LOpcode;
+    end;
+  Result := Result + sLineBreak + Format('Native: %d opcodes (highest %d), features $%x',
+    [LCount, LHighest, NativeFeatures]);
+
+  LList := '';
+  for LExtra := Low(TIORingExtra) to High(TIORingExtra) do
+    if LExtra in Extras then
+    begin
+      if LList <> '' then
+        LList := LList + ', ';
+      LList := LList + EXTRA_NAMES[LExtra];
+    end;
+  if LList = '' then
+    LList := 'none';
+  Result := Result + sLineBreak + 'Extras: ' + LList;
 end;
 
 { TIORingCompletion }
