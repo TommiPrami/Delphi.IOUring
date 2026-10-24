@@ -81,32 +81,29 @@ type
     // --- Prepare: no system call. False = no room (submission queue full, or the
     // completion queue could not take one more completion): pop completions,
     // Submit and try again.
-    function PrepareRead(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
-      const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
-      const AFlags: TIORingSubmitFlags = []): Boolean;
+    function PrepareRead(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef; const ACount: Cardinal; 
+      const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = []): Boolean;
     // AWriteThrough: only on a file opened with FILE_FLAG_NO_BUFFERING; on a
     // cached file the write fails with 0x800701FD (found by testing)
-    function PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
-      const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
-      const AFlags: TIORingSubmitFlags = []; const AWriteThrough: Boolean = False): Boolean;
-    function PrepareFlush(const AFile: TIORingFileRef; const AMode: TIORingFlushMode;
-      const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = []): Boolean;
+    function PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef; const ACount: Cardinal; 
+      const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = []; 
+      const AWriteThrough: Boolean = False): Boolean;
+    function PrepareFlush(const AFile: TIORingFileRef; const AMode: TIORingFlushMode; const AUserData: TIORingUserData; 
+      const AFlags: TIORingSubmitFlags = []): Boolean;
     // ASegments: ASegmentCount page-sized buffers; the array must stay valid
     // until the completion is popped. ACount = bytes to transfer.
-    function PrepareReadScatter(const AFile: TIORingFileRef; const ASegments: PIORingSegment;
-      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64;
-      const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = []): Boolean;
+    function PrepareReadScatter(const AFile: TIORingFileRef; const ASegments: PIORingSegment; 
+      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; 
+      const AFlags: TIORingSubmitFlags = []): Boolean;
     function PrepareWriteGather(const AFile: TIORingFileRef; const ASegments: PIORingSegment;
-      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64;
-      const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = [];
-      const AWriteThrough: Boolean = False): Boolean;
+      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; 
+      const AFlags: TIORingSubmitFlags = []; const AWriteThrough: Boolean = False): Boolean;
     // Requests cancellation of the operation prepared with ATargetUserData on
     // AFile. Both operations produce a completion.
     function PrepareCancel(const AFile: TIORingFileRef; const ATargetUserData: TIORingUserData;
       const AUserData: TIORingUserData): Boolean;
     // Replaces all registered files / buffers. The arrays are copied.
-    function PrepareRegisterFiles(const AHandles: array of THandle;
-      const AUserData: TIORingUserData): Boolean;
+    function PrepareRegisterFiles(const AHandles: array of THandle; const AUserData: TIORingUserData): Boolean;
     function PrepareRegisterBuffers(const ABuffers: array of TIORingBufferInfo;
       const AUserData: TIORingUserData): Boolean;
 
@@ -148,8 +145,7 @@ type
     // Read-only, shared for reading and writing (so a file being written by
     // someone else can be read), overlapped. AUnbuffered = FILE_FLAG_NO_BUFFERING,
     // ASequentialHint = FILE_FLAG_SEQUENTIAL_SCAN.
-    class function OpenFileForRead(const AFileName: string; const AUnbuffered,
-      ASequentialHint: Boolean): THandle; static;
+    class function OpenFileForRead(const AFileName: string; const AUnbuffered, ASequentialHint: Boolean): THandle; static;
     // Creates the file, or empties it if it exists; write access, others may
     // read meanwhile, overlapped. AUnbuffered = FILE_FLAG_NO_BUFFERING.
     class function CreateFileForWrite(const AFileName: string; const AUnbuffered: Boolean): THandle; static;
@@ -212,6 +208,7 @@ var
 begin
   FillChar(ACapabilities, SizeOf(ACapabilities), 0);
   @LQuery := GetProcAddress(GetModuleHandle(IORING_DLL), 'QueryIoRingCapabilities');
+
   Result := Assigned(LQuery) and (LQuery(ACapabilities) = S_OK);
 end;
 
@@ -225,6 +222,7 @@ begin
     and ((LCapabilities.FeatureFlags and IORING_FEATURE_UM_EMULATION) = 0);
 
   GCapabilities := LCapabilities;
+
   if LAvailable then
     GAvailability := 1
   else
@@ -318,6 +316,7 @@ var
 begin
   if FHandle <> 0 then
     raise EIORingError.Create('The ring is already open');
+
   if not Available then
     raise EIORingNotSupported.Create(NotAvailableMessage);
 
@@ -325,32 +324,42 @@ begin
   LFlags.Advisory := IORING_CREATE_ADVISORY_FLAGS_NONE;
 
   LResult := CreateIoRing(IORING_VERSION_4, LFlags, ASubmissionQueueSize, ACompletionQueueSize, FHandle);
+
   if LResult <> S_OK then
   begin
     FHandle := 0;
+
     raise EIORingError.CreateNative(LResult, 'CreateIoRing');
   end;
 
   try
     LResult := GetIoRingInfo(FHandle, LInfo);
+
     if LResult <> S_OK then
       raise EIORingError.CreateNative(LResult, 'GetIoRingInfo');
+
     FSubmissionQueueSize := LInfo.SubmissionQueueSize;
     FCompletionQueueSize := LInfo.CompletionQueueSize;
 
     // Auto-reset. Close needs it to wait without submitting anything.
     FCompletionEvent := CreateEvent(nil, False, False, nil);
+
     if FCompletionEvent = 0 then
       RaiseLastOSError;
+
     LResult := SetIoRingCompletionEvent(FHandle, FCompletionEvent);
+
     if LResult <> S_OK then
       raise EIORingError.CreateNative(LResult, 'SetIoRingCompletionEvent');
   except
     CloseIoRing(FHandle);
     FHandle := 0;
+
     if FCompletionEvent <> 0 then
       CloseHandle(FCompletionEvent);
+
     FCompletionEvent := 0;
+
     raise;
   end;
 end;
@@ -382,8 +391,10 @@ begin
   finally
     CloseIoRing(FHandle);
     FHandle := 0;
+
     if FCompletionEvent <> 0 then
       CloseHandle(FCompletionEvent);
+
     FCompletionEvent := 0;
     FSubmissionQueueSize := 0;
     FCompletionQueueSize := 0;
@@ -404,6 +415,7 @@ function TWindowsIORing.NoRoom: Boolean;
 begin
   if FHandle = 0 then
     raise EIORingError.Create('The ring is not open');
+
   Result := False;
 end;
 
@@ -411,6 +423,7 @@ function TWindowsIORing.BuildFailed(const AResult: HRESULT; const AFunctionName:
 begin
   if AResult = IORING_E_SUBMISSION_QUEUE_FULL then
     Exit(False);
+
   raise EIORingError.CreateNative(AResult, AFunctionName);
 end;
 
@@ -444,8 +457,9 @@ begin
   if FPreparedCount + FPendingCount >= FCompletionQueueSize then
     Exit(NoRoom);
 
-  LResult := BuildIoRingReadFile(FHandle, ToHandleRef(AFile), ToBufferRef(ABuffer), ACount, AOffset,
-    AUserData, ToSqeFlags(AFlags));
+  LResult := BuildIoRingReadFile(FHandle, ToHandleRef(AFile), ToBufferRef(ABuffer), ACount, AOffset, AUserData, 
+    ToSqeFlags(AFlags));
+
   if LResult = S_OK then
   begin
     Inc(FPreparedCount);
@@ -456,8 +470,8 @@ begin
 end;
 
 function TWindowsIORing.PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
-  const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
-  const AFlags: TIORingSubmitFlags; const AWriteThrough: Boolean): Boolean;
+  const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags; 
+  const AWriteThrough: Boolean): Boolean;
 var
   LResult: HRESULT;
 begin
@@ -466,6 +480,7 @@ begin
 
   LResult := BuildIoRingWriteFile(FHandle, ToHandleRef(AFile), ToBufferRef(ABuffer), ACount, AOffset,
     ToWriteFlags(AWriteThrough), AUserData, ToSqeFlags(AFlags));
+
   if LResult = S_OK then
   begin
     Inc(FPreparedCount);
@@ -486,8 +501,8 @@ begin
   if FPreparedCount + FPendingCount >= FCompletionQueueSize then
     Exit(NoRoom);
 
-  LResult := BuildIoRingFlushFile(FHandle, ToHandleRef(AFile), FLUSH_MODES[AMode], AUserData,
-    ToSqeFlags(AFlags));
+  LResult := BuildIoRingFlushFile(FHandle, ToHandleRef(AFile), FLUSH_MODES[AMode], AUserData, ToSqeFlags(AFlags));
+
   if LResult = S_OK then
   begin
     Inc(FPreparedCount);
@@ -506,8 +521,9 @@ begin
   if FPreparedCount + FPendingCount >= FCompletionQueueSize then
     Exit(NoRoom);
 
-  LResult := BuildIoRingReadFileScatter(FHandle, ToHandleRef(AFile), ASegmentCount, ASegments, ACount,
-    AOffset, AUserData, ToSqeFlags(AFlags));
+  LResult := BuildIoRingReadFileScatter(FHandle, ToHandleRef(AFile), ASegmentCount, ASegments, ACount, AOffset, 
+    AUserData, ToSqeFlags(AFlags));
+
   if LResult = S_OK then
   begin
     Inc(FPreparedCount);
@@ -526,8 +542,9 @@ begin
   if FPreparedCount + FPendingCount >= FCompletionQueueSize then
     Exit(NoRoom);
 
-  LResult := BuildIoRingWriteFileGather(FHandle, ToHandleRef(AFile), ASegmentCount, ASegments, ACount,
-    AOffset, ToWriteFlags(AWriteThrough), AUserData, ToSqeFlags(AFlags));
+  LResult := BuildIoRingWriteFileGather(FHandle, ToHandleRef(AFile), ASegmentCount, ASegments, ACount, AOffset, 
+    ToWriteFlags(AWriteThrough), AUserData, ToSqeFlags(AFlags));
+
   if LResult = S_OK then
   begin
     Inc(FPreparedCount);
@@ -546,6 +563,7 @@ begin
     Exit(NoRoom);
 
   LResult := BuildIoRingCancelRequest(FHandle, ToHandleRef(AFile), ATargetUserData, AUserData);
+
   if LResult = S_OK then
   begin
     Inc(FPreparedCount);
@@ -555,8 +573,7 @@ begin
     Result := BuildFailed(LResult, 'BuildIoRingCancelRequest');
 end;
 
-function TWindowsIORing.PrepareRegisterFiles(const AHandles: array of THandle;
-  const AUserData: TIORingUserData): Boolean;
+function TWindowsIORing.PrepareRegisterFiles(const AHandles: array of THandle; const AUserData: TIORingUserData): Boolean;
 var
   LHandles: PHandle;
   LResult: HRESULT;
@@ -570,6 +587,7 @@ begin
     LHandles := nil;
 
   LResult := BuildIoRingRegisterFileHandles(FHandle, Length(AHandles), LHandles, AUserData);
+
   if LResult = S_OK then
   begin
     Inc(FPreparedCount);
@@ -595,6 +613,7 @@ begin
     LBuffers := nil;
 
   LResult := BuildIoRingRegisterBuffers(FHandle, Length(ABuffers), LBuffers, AUserData);
+
   if LResult = S_OK then
   begin
     Inc(FPreparedCount);
@@ -616,6 +635,7 @@ begin
 
   // Never wait for more completions than there can be
   LWaitCount := AWaitCount;
+
   if LWaitCount > FPreparedCount + FPendingCount then
     LWaitCount := FPreparedCount + FPendingCount;
 
@@ -623,18 +643,21 @@ begin
     Exit(True);
 
   LResult := SubmitIoRing(FHandle, LWaitCount, ATimeoutMs, nil);
+
   if (LResult <> S_OK) and (LResult <> SUBMIT_WAIT_TIMEOUT) then
     raise EIORingError.CreateNative(LResult, 'SubmitIoRing');  // all entries stay prepared
 
   // Also on a wait timeout every prepared entry was submitted
   Inc(FPendingCount, FPreparedCount);
   FPreparedCount := 0;
+
   Result := LResult = S_OK;
 end;
 
 function TWindowsIORing.Submit(const AWaitCount, ATimeoutMs: Cardinal): Cardinal;
 begin
   Result := FPreparedCount;
+
   SubmitAndWait(AWaitCount, ATimeoutMs);
 end;
 
@@ -650,9 +673,11 @@ begin
 
   // TIORingCompletion has the layout of IORING_CQE (checked above)
   Result := PopIoRingCompletion(FHandle, PIORING_CQE(@ACompletion)^) = S_OK;
+
   if Result then
   begin
     Dec(FPendingCount);
+
     // Nothing in flight and nothing prepared: no registration array is needed any more
     if (FPendingCount = 0) and (FPreparedCount = 0) and (FKeepAlive <> nil) then
       FKeepAlive := nil;
@@ -662,6 +687,7 @@ end;
 function TWindowsIORing.PopCompletions(var ACompletions: array of TIORingCompletion): Integer;
 begin
   Result := 0;
+
   while (Result <= High(ACompletions)) and TryPopCompletion(ACompletions[Result]) do
     Inc(Result);
 end;
@@ -677,6 +703,7 @@ class function TWindowsIORing.Available: Boolean;
 begin
   if GAvailability = 0 then
     CheckAvailability;
+
   Result := GAvailability > 0;
 end;
 
@@ -701,8 +728,10 @@ var
 begin
   FillChar(LInfo, SizeOf(LInfo), 0);
   LInfo.dwOSVersionInfoSize := SizeOf(LInfo);
+
   if RtlGetVersion(LInfo) <> 0 then
     Exit('Windows');
+
   // Windows 11 still reports 10.0; its builds start at 22000
   if (LInfo.dwMajorVersion = 10) and (LInfo.dwBuildNumber >= 22000) then
     Result := 'Windows 11'
@@ -710,6 +739,7 @@ begin
     Result := 'Windows 10'
   else
     Result := Format('Windows %d.%d', [LInfo.dwMajorVersion, LInfo.dwMinorVersion]);
+
   Result := Result + Format(' (%d.%d, build %d)', [LInfo.dwMajorVersion, LInfo.dwMinorVersion, LInfo.dwBuildNumber]);
 end;
 
@@ -729,13 +759,16 @@ begin
     GNativeOps := [];
     LFlags.Required := IORING_CREATE_REQUIRED_FLAGS_NONE;
     LFlags.Advisory := IORING_CREATE_ADVISORY_FLAGS_NONE;
+
     if CreateIoRing(AVersion, LFlags, 1, 2, LRing) = S_OK then
     begin
       for LOpcode := 0 to 255 do
         if IsIoRingOpSupported(LRing, IORING_OP_CODE(LOpcode)) then
           Include(GNativeOps, Byte(LOpcode));
+
       CloseIoRing(LRing);
     end;
+
     GNativeOpsChecked := True;
   end;
   Result := GNativeOps;
@@ -757,6 +790,7 @@ begin
   Result.NativeOps := [];
   // No sockets, no links, no polling thread, no raw entries in IoRing
   Result.Extras := [];
+
   if not Available then
     Result.NotAvailableReason := NotAvailableMessage;
 
@@ -769,13 +803,16 @@ begin
   Result.MaxCompletionQueueSize := LCapabilities.MaxCompletionQueueSize;
   Result.Emulated := (LCapabilities.FeatureFlags and IORING_FEATURE_UM_EMULATION) <> 0;
   Result.NativeFeatures := LCapabilities.FeatureFlags;
+
   if LCapabilities.MaxVersion >= IORING_VERSION_1 then
     Result.NativeOps := NativeOps(LCapabilities.MaxVersion);
 
   if LCapabilities.MaxVersion >= IORING_VERSION_1 then
     Result.SupportedOps := [ioRead, ioCancel, ioRegisterFiles, ioRegisterBuffers];
+
   if LCapabilities.MaxVersion >= IORING_VERSION_3 then
     Result.SupportedOps := Result.SupportedOps + [ioWrite, ioFlush];
+
   if LCapabilities.MaxVersion >= IORING_VERSION_4 then
     Result.SupportedOps := Result.SupportedOps + [ioReadScatter, ioWriteGather];
 end;
@@ -804,23 +841,24 @@ const
   FILE_INFO_CLASS_STORAGE_INFO = 16;  // FILE_INFO_BY_HANDLE_CLASS.FileStorageInfo
   DEFAULT_SECTOR_SIZE = 4096;
 
-function GetFileInformationByHandleEx(hFile: THandle; FileInformationClass: Integer;
-  lpFileInformation: Pointer; dwBufferSize: DWORD): BOOL; stdcall; external kernel32;
+  function GetFileInformationByHandleEx(hFile: THandle; FileInformationClass: Integer;
+    lpFileInformation: Pointer; dwBufferSize: DWORD): BOOL; stdcall; external kernel32;
 
-// Own import: works on any handle, also overlapped ones (no file position)
-function IORingSetFileInformationByHandle(hFile: THandle; FileInformationClass: Integer;
-  lpFileInformation: Pointer; dwBufferSize: DWORD): BOOL; stdcall; external kernel32
-  name 'SetFileInformationByHandle';
+  // Own import: works on any handle, also overlapped ones (no file position)
+  function IORingSetFileInformationByHandle(hFile: THandle; FileInformationClass: Integer;
+    lpFileInformation: Pointer; dwBufferSize: DWORD): BOOL; stdcall; external kernel32
+    name 'SetFileInformationByHandle';
 
-// Own import: FPC's Windows unit does not declare GetFileSizeEx
-function IORingGetFileSizeEx(hFile: THandle; out lpFileSize: Int64): BOOL; stdcall;
-  external kernel32 name 'GetFileSizeEx';
+  // Own import: FPC's Windows unit does not declare GetFileSizeEx
+  function IORingGetFileSizeEx(hFile: THandle; out lpFileSize: Int64): BOOL; stdcall;
+    external kernel32 name 'GetFileSizeEx';
 
 function LastErrorAsHResult: HRESULT;
 var
   LError: DWORD;
 begin
   LError := GetLastError;
+
   if LError = 0 then
     Result := E_FAIL
   else
@@ -833,13 +871,15 @@ var
   LFlags: DWORD;
 begin
   LFlags := FILE_ATTRIBUTE_NORMAL or FILE_FLAG_OVERLAPPED;
+
   if AUnbuffered then
     LFlags := LFlags or FILE_FLAG_NO_BUFFERING;
+
   if ASequentialHint then
     LFlags := LFlags or FILE_FLAG_SEQUENTIAL_SCAN;
 
-  Result := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, nil,
-    OPEN_EXISTING, LFlags, 0);
+  Result := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING, LFlags, 0);
+
   if Result = INVALID_HANDLE_VALUE then
     raise EIORingError.CreateNative(LastErrorAsHResult, 'Open "' + AFileName + '"');
 end;
@@ -849,10 +889,12 @@ var
   LFlags: DWORD;
 begin
   LFlags := FILE_ATTRIBUTE_NORMAL or FILE_FLAG_OVERLAPPED;
+
   if AUnbuffered then
     LFlags := LFlags or FILE_FLAG_NO_BUFFERING;
 
   Result := CreateFile(PChar(AFileName), GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, LFlags, 0);
+
   if Result = INVALID_HANDLE_VALUE then
     raise EIORingError.CreateNative(LastErrorAsHResult, 'Create "' + AFileName + '"');
 end;
@@ -862,6 +904,7 @@ var
   LInfo: TFileEndOfFileInfo;
 begin
   LInfo.EndOfFile := ASize;
+
   if not IORingSetFileInformationByHandle(AHandle, FILE_INFO_CLASS_END_OF_FILE_INFO, @LInfo, SizeOf(LInfo)) then
     raise EIORingError.CreateNative(LastErrorAsHResult, 'Set the file size');
 end;
@@ -882,6 +925,7 @@ var
   LInfo: FILE_STORAGE_INFO;
 begin
   FillChar(LInfo, SizeOf(LInfo), 0);
+
   if GetFileInformationByHandleEx(AHandle, FILE_INFO_CLASS_STORAGE_INFO, @LInfo, SizeOf(LInfo))
     and (LInfo.LogicalBytesPerSector > 0) then
     Result := LInfo.LogicalBytesPerSector
@@ -894,12 +938,14 @@ var
   LInfo: TSystemInfo;
 begin
   GetSystemInfo(LInfo);
+
   Result := LInfo.dwPageSize;
 end;
 
 class function TWindowsIORingPlatform.AllocPages(const ASize: NativeUInt): Pointer;
 begin
   Result := VirtualAlloc(nil, ASize, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
+
   if Result = nil then
     raise EIORingError.CreateNative(LastErrorAsHResult, 'VirtualAlloc');
 end;
@@ -917,12 +963,14 @@ var
 begin
   QueryPerformanceCounter(LCounter);
   QueryPerformanceFrequency(LFrequency);
+
   Result := UInt64(LCounter div LFrequency) * 1000000 + UInt64((LCounter mod LFrequency) * 1000000 div LFrequency);
 end;
 
 class function TWindowsIORingPlatform.CreateWakeEvent: THandle;
 begin
   Result := CreateEvent(nil, False, False, nil);   // auto-reset
+
   if Result = 0 then
     raise EIORingError.CreateNative(LastErrorAsHResult, 'CreateEvent');
 end;
@@ -943,6 +991,7 @@ var
 begin
   LEvents[0] := AEvent1;
   LEvents[1] := AEvent2;
+
   WaitForMultipleObjects(2, @LEvents[0], False, INFINITE);
 end;
 

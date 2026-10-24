@@ -38,8 +38,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Engine;
+  Delphi.IOUring, Delphi.IOUring.Engine;
 
 const
   IORING_WRITER_DEFAULT_BUFFER_SIZE = 1024 * 1024;
@@ -53,6 +52,7 @@ type
   TIORingSequentialWriterOption = (
     swoUnbuffered     // past the OS file cache (FILE_FLAG_NO_BUFFERING)
   );
+
   TIORingSequentialWriterOptions = set of TIORingSequentialWriterOption;
 
   TIORingWriterStats = record
@@ -64,6 +64,7 @@ type
 
   // One buffer (internal)
   PIORingWriterSlot = ^TIORingWriterSlot;
+
   TIORingWriterSlot = record
     Data: PByte;
     FileOffset: Int64;
@@ -210,7 +211,7 @@ begin
 end;
 
 {$IFDEF FPC}
-class operator TIORingSequentialWriter.Copy(constref ASource: TIORingSequentialWriter;
+class operator TIORingSequentialWriter.Copy(constref ASource: TIORingSequentialWriter; 
   var ADest: TIORingSequentialWriter);
 {$ELSE}
 class operator TIORingSequentialWriter.Assign(var ADest: TIORingSequentialWriter;
@@ -248,19 +249,25 @@ begin
   try
     if (ABufferSize = 0) or (ABufferSize mod IORING_WRITER_BUFFER_SIZE_UNIT <> 0) then
       raise EIORingError.CreateFmt('Buffer size %d is not a multiple of %d', [ABufferSize, IORING_WRITER_BUFFER_SIZE_UNIT]);
+
     if (ABufferCount = 0) or (ABufferCount > IORING_WRITER_MAX_BUFFER_COUNT) then
       raise EIORingError.CreateFmt('Buffer count %d is not between 1 and %d', [ABufferCount, IORING_WRITER_MAX_BUFFER_COUNT]);
+
     LTotalSize := UInt64(ABufferSize) * ABufferCount;
+
     if LTotalSize > UInt64(High(NativeInt) div 2) then
       raise EIORingError.CreateFmt('%d buffers of %d bytes do not fit in memory', [ABufferCount, ABufferSize]);
+
     if (AEngine <> nil) and (AEngine.MaxRequests < ABufferCount) then
       raise EIORingError.CreateFmt('%d buffers need an engine of at least %d requests, not %d',
         [ABufferCount, ABufferCount, AEngine.MaxRequests]);
 
     FUnbuffered := swoUnbuffered in AOptions;
+
     if FUnbuffered then
     begin
       FSectorSize := TIORingPlatform.GetSectorSize(AHandle);
+
       if ABufferSize mod FSectorSize <> 0 then
         raise EIORingError.CreateFmt('Unbuffered writing needs a buffer size that is a multiple of the sector size %d',
           [FSectorSize]);
@@ -271,6 +278,7 @@ begin
     FMemorySize := NativeUInt(LTotalSize);
     FMemory := TIORingPlatform.AllocPages(FMemorySize);
     SetLength(FSlots, ABufferCount);
+
     for LIndex := 0 to ABufferCount - 1 do
     begin
       FSlots[LIndex].Data := FMemory + NativeUInt(LIndex) * ABufferSize;
@@ -315,6 +323,7 @@ begin
     // A write in flight still uses its buffer
     if FEngine <> nil then
       WaitForAll;
+
     // The rest (not after a failure: the file is not right anyway). A buffer
     // acquired but not committed is not written.
     if not FFailed and (FEngine <> nil) and (FFill > 0) then
@@ -328,6 +337,7 @@ begin
         FFailContext := 'Write the last part';
       end;
     end;
+
     if FUnbuffered and not FFailed and (FMemory <> nil) then
     try
       TIORingPlatform.SetFileSize(FFile, FPosition);
@@ -342,13 +352,16 @@ begin
   finally
     if FOwnsEngine then
       FEngine.Free;
+
     FEngine := nil;
     FOwnsEngine := False;
     FSlots := nil;
     TIORingPlatform.FreePages(FMemory, FMemorySize);
     FMemory := nil;
+
     if FOwnsFile then
       TIORingPlatform.CloseFile(FFile);
+
     FFile := 0;
     FHasFile := False;
     FOwnsFile := False;
@@ -377,6 +390,7 @@ end;
 procedure TIORingSequentialWriter.CheckUsable;
 begin
   CheckOpen;
+
   if FFailed then
     RaiseFailure;
 end;
@@ -384,6 +398,7 @@ end;
 procedure TIORingSequentialWriter.RaiseFailure;
 begin
   FErrorReported := True;
+
   if FFailCode <> 0 then
     raise EIORingError.CreateNative(FFailCode, FFailContext)
   else
@@ -406,13 +421,18 @@ begin
     Result := FEngine.Wait(ASlot^.Request, LCompletion)
   else
     Result := FEngine.TryGetResult(ASlot^.Request, LCompletion);
+
   if not Result then
     Exit;
+
   ASlot^.Request.Value := 0;
+
   if LCompletion.Succeeded then
     Inc(FStats.BytesWritten, LCompletion.BytesTransferred);
+
   if FFailed then
     Exit;
+
   if not LCompletion.Succeeded then
   begin
     FFailed := True;
@@ -423,8 +443,8 @@ begin
   begin
     FFailed := True;
     FFailCode := 0;
-    FFailContext := Format('Write at offset %d: only %d of %d bytes written',
-      [ASlot^.FileOffset, LCompletion.BytesTransferred, ASlot^.Length]);
+    FFailContext := Format('Write at offset %d: only %d of %d bytes written', [ASlot^.FileOffset, 
+      LCompletion.BytesTransferred, ASlot^.Length]);
   end;
 end;
 
@@ -491,12 +511,14 @@ begin
   // (sector-aligned for unbuffered writes)
   LSlot := CurrentSlot;
   LLength := FFill;
+
   if FUnbuffered and (LLength mod FSectorSize <> 0) then
   begin
     // Whole sectors only; the file is cut to its size afterwards
     LLength := (LLength div FSectorSize + 1) * FSectorSize;
     FillChar((LSlot^.Data + FFill)^, LLength - FFill, 0);
   end;
+
   LSlot^.FileOffset := FCurrentOffset;
   LSlot^.Length := LLength;
   LSlot^.Request := FEngine.WriteAsync(FFile, LSlot^.Data^, LLength, UInt64(FCurrentOffset));
@@ -513,29 +535,38 @@ var
   LChunk: NativeInt;
 begin
   CheckUsable;
+
   if FBufferAcquired then
     raise EInvalidOpException.Create('Call CommitBuffer before Write');
+
   if ACount <= 0 then
     Exit;
 
   LSource := @ABuffer;
   LRemaining := ACount;
+
   while LRemaining > 0 do
   begin
     MakeCurrentFree;
+
     if FFailed then
       RaiseFailure;
+
     LChunk := FBufferSize - FFill;
+
     if LChunk > LRemaining then
       LChunk := LRemaining;
+
     Move(LSource^, (CurrentSlot^.Data + FFill)^, LChunk);
     Inc(LSource, LChunk);
     Dec(LRemaining, LChunk);
     Inc(FFill, LChunk);
     Inc(FPosition, LChunk);
+
     if FFill = FBufferSize then
       SubmitCurrent;
   end;
+
   if FFailed then
     RaiseFailure;
 end;
@@ -545,11 +576,15 @@ begin
   AData := nil;
   ACapacity := 0;
   CheckUsable;
+
   if FBufferAcquired then
     raise EInvalidOpException.Create('Call CommitBuffer before acquiring the next buffer');
+
   MakeCurrentFree;
+
   if FFailed then
     RaiseFailure;
+
   AData := CurrentSlot^.Data + FFill;
   ACapacity := FBufferSize - FFill;
   FBufferAcquired := True;
@@ -558,15 +593,20 @@ end;
 procedure TIORingSequentialWriter.CommitBuffer(const ALength: NativeInt);
 begin
   CheckOpen;
+
   if not FBufferAcquired then
     raise EInvalidOpException.Create('No buffer is acquired');
+
   if (ALength < 0) or (ALength > NativeInt(FBufferSize - FFill)) then
     raise EIORingError.CreateFmt('CommitBuffer: %d bytes do not fit (0..%d)', [ALength, FBufferSize - FFill]);
+
   FBufferAcquired := False;
   Inc(FFill, ALength);
   Inc(FPosition, ALength);
+
   if FFill = FBufferSize then
     SubmitCurrent;
+
   if FFailed then
     RaiseFailure;
 end;
@@ -576,12 +616,15 @@ var
   LCompletion: TIORingCompletion;
 begin
   CheckUsable;
+
   if FBufferAcquired then
     raise EInvalidOpException.Create('Call CommitBuffer before Flush');
 
   WaitForAll;
+
   if not FFailed and (FFill > 0) then
     WritePartOfCurrent;
+
   // A part written in whole sectors made the file longer
   if not FFailed and FUnbuffered and (FFill mod FSectorSize <> 0) then
     try
@@ -594,9 +637,11 @@ begin
         FFailContext := 'Set the file size';
       end;
     end;
+
   if not FFailed and AToDisk then
   begin
     FEngine.Wait(FEngine.FlushAsync(FFile), LCompletion);
+
     if not LCompletion.Succeeded then
     begin
       FFailed := True;
@@ -604,6 +649,7 @@ begin
       FFailContext := 'Flush to the disk';
     end;
   end;
+
   if FFailed then
     RaiseFailure;
 end;

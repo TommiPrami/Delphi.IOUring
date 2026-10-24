@@ -271,121 +271,121 @@ type
       1: (Alignment: UInt64);
   end;
 
-{ ---------------------------------------------------------------------------- }
-{ Helpers (macros / C++ constructors in ioringapi.h)                           }
-{ ---------------------------------------------------------------------------- }
+  { ---------------------------------------------------------------------------- }
+  { Helpers (macros / C++ constructors in ioringapi.h)                           }
+  { ---------------------------------------------------------------------------- }
 
-function IoRingHandleRefFromHandle(const h: THandle): IORING_HANDLE_REF; inline;
-function IoRingHandleRefFromIndex(const i: UInt32): IORING_HANDLE_REF; inline;
-function IoRingBufferRefFromPointer(const p: Pointer): IORING_BUFFER_REF; inline;
-function IoRingBufferRefFromIndexAndOffset(const i, o: UInt32): IORING_BUFFER_REF; inline;
+  function IoRingHandleRefFromHandle(const h: THandle): IORING_HANDLE_REF; inline;
+  function IoRingHandleRefFromIndex(const i: UInt32): IORING_HANDLE_REF; inline;
+  function IoRingBufferRefFromPointer(const p: Pointer): IORING_BUFFER_REF; inline;
+  function IoRingBufferRefFromIndexAndOffset(const i, o: UInt32): IORING_BUFFER_REF; inline;
 
-{ ---------------------------------------------------------------------------- }
-{ Functions. Record parameters are passed by value like in C: do not change    }
-{ them to const (Delphi may then pass them by reference).                      }
-{ ---------------------------------------------------------------------------- }
+  { ---------------------------------------------------------------------------- }
+  { Functions. Record parameters are passed by value like in C: do not change    }
+  { them to const (Delphi may then pass them by reference).                      }
+  { ---------------------------------------------------------------------------- }
 
-// Version 1. Queries the OS for the supported IoRing capabilities.
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-queryioringcapabilities
-function QueryIoRingCapabilities(out capabilities: IORING_CAPABILITIES): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'QueryIoRingCapabilities' delayed;{$ENDIF}
+  // Version 1. Queries the OS for the supported IoRing capabilities.
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-queryioringcapabilities
+  function QueryIoRingCapabilities(out capabilities: IORING_CAPABILITIES): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'QueryIoRingCapabilities' delayed;{$ENDIF}
 
-// Version 1. Is the operation supported by this ring?
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-isioringopsupported
-function IsIoRingOpSupported(ioRing: HIORING; op: IORING_OP_CODE): BOOL;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'IsIoRingOpSupported' delayed;{$ENDIF}
+  // Version 1. Is the operation supported by this ring?
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-isioringopsupported
+  function IsIoRingOpSupported(ioRing: HIORING; op: IORING_OP_CODE): BOOL;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'IsIoRingOpSupported' delayed;{$ENDIF}
 
-// Version 1. Creates a ring. Queue sizes are rounded up to powers of two; the
-// completion queue is at least twice the submission queue.
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-createioring
-function CreateIoRing(ioringVersion: IORING_VERSION; flags: IORING_CREATE_FLAGS;
-  submissionQueueSize: UInt32; completionQueueSize: UInt32; out h: HIORING): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'CreateIoRing' delayed;{$ENDIF}
+  // Version 1. Creates a ring. Queue sizes are rounded up to powers of two; the
+  // completion queue is at least twice the submission queue.
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-createioring
+  function CreateIoRing(ioringVersion: IORING_VERSION; flags: IORING_CREATE_FLAGS;
+    submissionQueueSize: UInt32; completionQueueSize: UInt32; out h: HIORING): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'CreateIoRing' delayed;{$ENDIF}
 
-// Version 1. Version and actual queue sizes of a ring.
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-getioringinfo
-function GetIoRingInfo(ioRing: HIORING; out info: IORING_INFO): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'GetIoRingInfo' delayed;{$ENDIF}
+  // Version 1. Version and actual queue sizes of a ring.
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-getioringinfo
+  function GetIoRingInfo(ioRing: HIORING; out info: IORING_INFO): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'GetIoRingInfo' delayed;{$ENDIF}
 
-// Version 1. Submits all built entries; optionally waits for waitOperations
-// completions (0 = no wait; IORING_SUBMIT_WAIT_ALL = all). submittedEntries
-// may be nil. On failure (other than a wait timeout) all entries stay queued.
-// A wait timeout returns HRESULT_FROM_WIN32(ERROR_TIMEOUT): the entries were
-// submitted, but submittedEntries is not written.
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-submitioring
-function SubmitIoRing(ioRing: HIORING; waitOperations: UInt32; milliseconds: UInt32;
-  submittedEntries: PCardinal): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'SubmitIoRing' delayed;{$ENDIF}
+  // Version 1. Submits all built entries; optionally waits for waitOperations
+  // completions (0 = no wait; IORING_SUBMIT_WAIT_ALL = all). submittedEntries
+  // may be nil. On failure (other than a wait timeout) all entries stay queued.
+  // A wait timeout returns HRESULT_FROM_WIN32(ERROR_TIMEOUT): the entries were
+  // submitted, but submittedEntries is not written.
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-submitioring
+  function SubmitIoRing(ioRing: HIORING; waitOperations: UInt32; milliseconds: UInt32;
+    submittedEntries: PCardinal): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'SubmitIoRing' delayed;{$ENDIF}
 
-// Version 1. Closes a ring.
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-closeioring
-function CloseIoRing(ioRing: HIORING): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'CloseIoRing' delayed;{$ENDIF}
+  // Version 1. Closes a ring.
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-closeioring
+  function CloseIoRing(ioRing: HIORING): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'CloseIoRing' delayed;{$ENDIF}
 
-// Version 1. Pops one completion: S_OK, or S_FALSE if the queue is empty
-// (do not use cqe then; it is zeroed although Learn says "unmodified").
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-popioringcompletion
-function PopIoRingCompletion(ioRing: HIORING; out cqe: IORING_CQE): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'PopIoRingCompletion' delayed;{$ENDIF}
+  // Version 1. Pops one completion: S_OK, or S_FALSE if the queue is empty
+  // (do not use cqe then; it is zeroed although Learn says "unmodified").
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-popioringcompletion
+  function PopIoRingCompletion(ioRing: HIORING; out cqe: IORING_CQE): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'PopIoRingCompletion' delayed;{$ENDIF}
 
-// Version 1. Event signalled when the completion queue goes from empty to
-// non-empty. Pop until S_FALSE before waiting on it. 0 clears the event.
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-setioringcompletionevent
-function SetIoRingCompletionEvent(ioRing: HIORING; hEvent: THandle): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'SetIoRingCompletionEvent' delayed;{$ENDIF}
+  // Version 1. Event signalled when the completion queue goes from empty to
+  // non-empty. Pop until S_FALSE before waiting on it. 0 clears the event.
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-setioringcompletionevent
+  function SetIoRingCompletionEvent(ioRing: HIORING; hEvent: THandle): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'SetIoRingCompletionEvent' delayed;{$ENDIF}
 
-// Version 1. Requests cancellation of the operation built with userData = opToCancel.
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringcancelrequest
-function BuildIoRingCancelRequest(ioRing: HIORING; file_: IORING_HANDLE_REF;
-  opToCancel: NativeUInt; userData: NativeUInt): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingCancelRequest' delayed;{$ENDIF}
+  // Version 1. Requests cancellation of the operation built with userData = opToCancel.
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringcancelrequest
+  function BuildIoRingCancelRequest(ioRing: HIORING; file_: IORING_HANDLE_REF;
+    opToCancel: NativeUInt; userData: NativeUInt): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingCancelRequest' delayed;{$ENDIF}
 
-// Version 1. Read from a file.
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringreadfile
-function BuildIoRingReadFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
-  dataRef: IORING_BUFFER_REF; numberOfBytesToRead: UInt32; fileOffset: UInt64;
-  userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingReadFile' delayed;{$ENDIF}
+  // Version 1. Read from a file.
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringreadfile
+  function BuildIoRingReadFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
+    dataRef: IORING_BUFFER_REF; numberOfBytesToRead: UInt32; fileOffset: UInt64;
+    userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingReadFile' delayed;{$ENDIF}
 
-// Version 1. Registers file handles (replaces any earlier registration).
-// INVALID_HANDLE_VALUE entries are sparse. The array must stay valid until
-// the operation completes.
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringregisterfilehandles
-function BuildIoRingRegisterFileHandles(ioRing: HIORING; count: UInt32;
-  handles: PHandle; userData: NativeUInt): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingRegisterFileHandles' delayed;{$ENDIF}
+  // Version 1. Registers file handles (replaces any earlier registration).
+  // INVALID_HANDLE_VALUE entries are sparse. The array must stay valid until
+  // the operation completes.
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringregisterfilehandles
+  function BuildIoRingRegisterFileHandles(ioRing: HIORING; count: UInt32;
+    handles: PHandle; userData: NativeUInt): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingRegisterFileHandles' delayed;{$ENDIF}
 
-// Version 1. Registers buffers (replaces any earlier registration).
-// Entries with Address = nil and Length = 0 are sparse. The array must stay
-// valid until the operation completes.
-// https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringregisterbuffers
-function BuildIoRingRegisterBuffers(ioRing: HIORING; count: UInt32;
-  buffers: PIORING_BUFFER_INFO; userData: NativeUInt): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingRegisterBuffers' delayed;{$ENDIF}
+  // Version 1. Registers buffers (replaces any earlier registration).
+  // Entries with Address = nil and Length = 0 are sparse. The array must stay
+  // valid until the operation completes.
+  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringregisterbuffers
+  function BuildIoRingRegisterBuffers(ioRing: HIORING; count: UInt32;
+    buffers: PIORING_BUFFER_INFO; userData: NativeUInt): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingRegisterBuffers' delayed;{$ENDIF}
 
-// Version 3 (api-ms-win-core-ioring-l1-1-1). Write to a file.
-function BuildIoRingWriteFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
-  bufferRef: IORING_BUFFER_REF; numberOfBytesToWrite: UInt32; fileOffset: UInt64;
-  writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingWriteFile' delayed;{$ENDIF}
+  // Version 3 (api-ms-win-core-ioring-l1-1-1). Write to a file.
+  function BuildIoRingWriteFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
+    bufferRef: IORING_BUFFER_REF; numberOfBytesToWrite: UInt32; fileOffset: UInt64;
+    writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingWriteFile' delayed;{$ENDIF}
 
-// Version 3 (api-ms-win-core-ioring-l1-1-1). Flush a file.
-function BuildIoRingFlushFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
-  flushMode: FILE_FLUSH_MODE; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingFlushFile' delayed;{$ENDIF}
+  // Version 3 (api-ms-win-core-ioring-l1-1-1). Flush a file.
+  function BuildIoRingFlushFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
+    flushMode: FILE_FLUSH_MODE; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingFlushFile' delayed;{$ENDIF}
 
-// Version 4 (api-ms-win-core-ioring-l1-1-2). Read from a file into buffer segments.
-function BuildIoRingReadFileScatter(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
-  segmentCount: UInt32; segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToRead: UInt32;
-  fileOffset: UInt64; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingReadFileScatter' delayed;{$ENDIF}
+  // Version 4 (api-ms-win-core-ioring-l1-1-2). Read from a file into buffer segments.
+  function BuildIoRingReadFileScatter(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
+    segmentCount: UInt32; segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToRead: UInt32;
+    fileOffset: UInt64; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingReadFileScatter' delayed;{$ENDIF}
 
-// Version 4 (api-ms-win-core-ioring-l1-1-2). Write to a file from buffer segments.
-function BuildIoRingWriteFileGather(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
-  segmentCount: UInt32; segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToWrite: UInt32;
-  fileOffset: UInt64; writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt;
-  sqeFlags: IORING_SQE_FLAGS): HRESULT;
-  stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingWriteFileGather' delayed;{$ENDIF}
+  // Version 4 (api-ms-win-core-ioring-l1-1-2). Write to a file from buffer segments.
+  function BuildIoRingWriteFileGather(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
+    segmentCount: UInt32; segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToWrite: UInt32;
+    fileOffset: UInt64; writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt;
+    sqeFlags: IORING_SQE_FLAGS): HRESULT;
+    stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingWriteFileGather' delayed;{$ENDIF}
 
 implementation
 
@@ -484,6 +484,7 @@ function Resolve(var AFunction; const AName: PAnsiChar): Boolean;
 begin
   if Pointer(AFunction) = nil then
     Pointer(AFunction) := GetProcAddress(GetModuleHandle(IORING_DLL), AName);
+
   Result := Pointer(AFunction) <> nil;
 end;
 
@@ -511,6 +512,7 @@ begin
   else
   begin
     h := 0;
+
     Result := E_NOTIMPL_RESULT;
   end;
 end;
@@ -565,9 +567,8 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingReadFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
-  dataRef: IORING_BUFFER_REF; numberOfBytesToRead: UInt32; fileOffset: UInt64;
-  userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
+function BuildIoRingReadFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF; dataRef: IORING_BUFFER_REF; 
+  numberOfBytesToRead: UInt32; fileOffset: UInt64; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingReadFile, 'BuildIoRingReadFile') then
     Result := GBuildIoRingReadFile(ioRing, fileRef, dataRef, numberOfBytesToRead, fileOffset, userData, sqeFlags)
@@ -575,8 +576,8 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingRegisterFileHandles(ioRing: HIORING; count: UInt32;
-  handles: PHandle; userData: NativeUInt): HRESULT; stdcall;
+function BuildIoRingRegisterFileHandles(ioRing: HIORING; count: UInt32; handles: PHandle; 
+  userData: NativeUInt): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingRegisterFileHandles, 'BuildIoRingRegisterFileHandles') then
     Result := GBuildIoRingRegisterFileHandles(ioRing, count, handles, userData)
@@ -584,8 +585,8 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingRegisterBuffers(ioRing: HIORING; count: UInt32;
-  buffers: PIORING_BUFFER_INFO; userData: NativeUInt): HRESULT; stdcall;
+function BuildIoRingRegisterBuffers(ioRing: HIORING; count: UInt32; buffers: PIORING_BUFFER_INFO; 
+  userData: NativeUInt): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingRegisterBuffers, 'BuildIoRingRegisterBuffers') then
     Result := GBuildIoRingRegisterBuffers(ioRing, count, buffers, userData)
@@ -593,9 +594,9 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingWriteFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
-  bufferRef: IORING_BUFFER_REF; numberOfBytesToWrite: UInt32; fileOffset: UInt64;
-  writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
+function BuildIoRingWriteFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF; bufferRef: IORING_BUFFER_REF; 
+  numberOfBytesToWrite: UInt32; fileOffset: UInt64; writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt; 
+  sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingWriteFile, 'BuildIoRingWriteFile') then
     Result := GBuildIoRingWriteFile(ioRing, fileRef, bufferRef, numberOfBytesToWrite, fileOffset, writeFlags,
@@ -604,8 +605,8 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingFlushFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
-  flushMode: FILE_FLUSH_MODE; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
+function BuildIoRingFlushFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF; flushMode: FILE_FLUSH_MODE; 
+  userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingFlushFile, 'BuildIoRingFlushFile') then
     Result := GBuildIoRingFlushFile(ioRing, fileRef, flushMode, userData, sqeFlags)
@@ -613,9 +614,9 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingReadFileScatter(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
-  segmentCount: UInt32; segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToRead: UInt32;
-  fileOffset: UInt64; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
+function BuildIoRingReadFileScatter(ioRing: HIORING; fileRef: IORING_HANDLE_REF; segmentCount: UInt32; 
+  segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToRead: UInt32; fileOffset: UInt64; userData: NativeUInt; 
+  sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingReadFileScatter, 'BuildIoRingReadFileScatter') then
     Result := GBuildIoRingReadFileScatter(ioRing, fileRef, segmentCount, segmentArray, numberOfBytesToRead,
@@ -624,10 +625,9 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingWriteFileGather(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
-  segmentCount: UInt32; segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToWrite: UInt32;
-  fileOffset: UInt64; writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt;
-  sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
+function BuildIoRingWriteFileGather(ioRing: HIORING; fileRef: IORING_HANDLE_REF; segmentCount: UInt32; 
+  segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToWrite: UInt32; fileOffset: UInt64; 
+  writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingWriteFileGather, 'BuildIoRingWriteFileGather') then
     Result := GBuildIoRingWriteFileGather(ioRing, fileRef, segmentCount, segmentArray, numberOfBytesToWrite,

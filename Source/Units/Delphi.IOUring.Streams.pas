@@ -18,10 +18,7 @@ uses
   System.Classes,
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Engine,
-  Delphi.IOUring.SequentialReader,
-  Delphi.IOUring.SequentialWriter;
+  Delphi.IOUring, Delphi.IOUring.Engine, Delphi.IOUring.SequentialReader, Delphi.IOUring.SequentialWriter;
 
 type
   // Misuse of an IoRing stream (writing to a read-only stream, seeking a
@@ -151,6 +148,7 @@ var
   LHandle: THandle;
 begin
   inherited Create;
+
   FFileName := AFileName;
 
   try
@@ -169,7 +167,8 @@ end;
 destructor TSequentialReadOnlyFileStream.Destroy;
 begin
   FReader.Close;
-  inherited;
+
+  inherited Destroy;
 end;
 
 function TSequentialReadOnlyFileStream.GetStats: TIORingReaderStats;
@@ -207,12 +206,14 @@ function TSequentialReadOnlyFileStream.Read(var Buffer; Count: Longint): Longint
 begin
   if Count <= 0 then
     Exit(0);
+
   Result := Longint(FReader.Read(Buffer, Count));
 end;
 
 function TSequentialReadOnlyFileStream.Write(const Buffer; Count: Longint): Longint;
 begin
   RaiseReadOnly;
+
   Result := 0;
 end;
 
@@ -222,6 +223,7 @@ function TSequentialReadOnlyFileStream.Read(var Buffer; Count: NativeInt): Nativ
 begin
   if Count <= 0 then
     Exit(0);
+
   Result := FReader.Read(Buffer, Count);
 end;
 
@@ -238,12 +240,10 @@ var
   LTarget: Int64;
 begin
   case Origin of
-    soBeginning:
-      LTarget := Offset;
-    soCurrent:
-      LTarget := FReader.Position + Offset;
-  else
-    LTarget := FReader.Size + Offset;   // soEnd
+    soBeginning: LTarget := Offset;
+    soCurrent: LTarget := FReader.Position + Offset;
+    else
+      LTarget := FReader.Size + Offset;   // soEnd
   end;
 
   // TStream.Position and CopyFrom/LoadFromStream "seek" to where the stream
@@ -261,6 +261,7 @@ constructor TSequentialWriteOnlyFileStream.Create(const AFileName: string;
   const AOptions: TIORingSequentialWriterOptions; const ABufferSize, ABufferCount: Cardinal);
 begin
   inherited Create;
+
   OpenWriter(AFileName, AOptions, ABufferSize, ABufferCount, nil);
 end;
 
@@ -268,8 +269,10 @@ constructor TSequentialWriteOnlyFileStream.Create(const AFileName: string; const
   const AOptions: TIORingSequentialWriterOptions; const ABufferSize, ABufferCount: Cardinal);
 begin
   inherited Create;
+
   if AEngine = nil then
     raise EIORingError.Create('TSequentialWriteOnlyFileStream: no engine');
+
   OpenWriter(AFileName, AOptions, ABufferSize, ABufferCount, AEngine);
 end;
 
@@ -280,6 +283,7 @@ var
   LHandle: THandle;
 begin
   FFileName := AFileName;
+
   try
     LHandle := TIORingPlatform.CreateFileForWrite(AFileName, swoUnbuffered in AOptions);
   except
@@ -302,7 +306,8 @@ begin
     on E: EIORingError do
       raise EWriteError.Create(E.Message);
   end;
-  inherited;
+
+  inherited Destroy;
 end;
 
 function TSequentialWriteOnlyFileStream.GetStats: TIORingWriterStats;
@@ -346,6 +351,7 @@ function TSequentialWriteOnlyFileStream.Write(const Buffer; Count: Longint): Lon
 begin
   if Count <= 0 then
     Exit(0);
+
   try
     FWriter.Write(Buffer, Count);
   except
@@ -367,12 +373,14 @@ function TSequentialWriteOnlyFileStream.Write(const Buffer; Count: NativeInt): N
 begin
   if Count <= 0 then
     Exit(0);
+
   try
     FWriter.Write(Buffer, Count);
   except
     on E: EIORingError do
       raise EWriteError.Create(E.Message);
   end;
+
   Result := Count;
 end;
   {$IFEND}
@@ -384,10 +392,9 @@ var
 begin
   // The end is where the stream is: Position = Size
   case Origin of
-    soBeginning:
-      LTarget := Offset;
-  else
-    LTarget := FWriter.Position + Offset;    // soCurrent, soEnd
+    soBeginning: LTarget := Offset;
+    else
+      LTarget := FWriter.Position + Offset;    // soCurrent, soEnd
   end;
 
   if LTarget <> FWriter.Position then

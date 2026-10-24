@@ -42,9 +42,7 @@
 interface
 
 uses
-  SysUtils,
-  Delphi.IOUring.Backend.Custom,
-  Delphi.IOUring.Backend.Posix.API;
+  SysUtils, Delphi.IOUring.Backend.Custom, Delphi.IOUring.Backend.Posix.API;
 
 type
   // One scatter/gather segment: struct iovec. IORingSegment gives one page.
@@ -52,6 +50,7 @@ type
     Address: Pointer;     // iov_base
     Length: NativeUInt;   // iov_len
   end;
+
   PIORingSegment = ^TIORingSegment;
 
 function IORingSegment(const AAddress: Pointer): TIORingSegment;
@@ -91,8 +90,8 @@ type
     procedure Unmap;
     function NextSqe: Pio_uring_sqe;
     function PrepareReadWrite(const AOpcode, AFixedOpcode: Byte; const AFile: TIORingFileRef;
-      const ABuffer: TIORingBufferRef; const ACount: Cardinal; const AOffset: UInt64;
-      const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags; const ARwFlags: Cardinal): Boolean;
+      const ABuffer: TIORingBufferRef; const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; 
+      const AFlags: TIORingSubmitFlags; const ARwFlags: Cardinal): Boolean;
     function PrepareVectored(const AOpcode: Byte; const AFile: TIORingFileRef; const ASegments: PIORingSegment;
       const ASegmentCount, ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
       const AFlags: TIORingSubmitFlags; const ARwFlags: Cardinal): Boolean;
@@ -117,33 +116,30 @@ type
     // --- Prepare: no system call (except the registrations). False = no room
     // (submission queue full, or the completion queue could not take one more
     // completion): pop completions, Submit and try again.
-    function PrepareRead(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
-      const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
+    function PrepareRead(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef; const ACount: Cardinal; 
+      const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = []): Boolean;
+    function PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef; const ACount: Cardinal; 
+      const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = []; 
+      const AWriteThrough: Boolean = False): Boolean;
+    function PrepareFlush(const AFile: TIORingFileRef; const AMode: TIORingFlushMode; const AUserData: TIORingUserData; 
       const AFlags: TIORingSubmitFlags = []): Boolean;
-    function PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
-      const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
-      const AFlags: TIORingSubmitFlags = []; const AWriteThrough: Boolean = False): Boolean;
-    function PrepareFlush(const AFile: TIORingFileRef; const AMode: TIORingFlushMode;
-      const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = []): Boolean;
     // ASegments: ASegmentCount segments; ACount = bytes to transfer (at most
     // the sum of the segment lengths). The array must stay valid until the
     // completion is popped.
     function PrepareReadScatter(const AFile: TIORingFileRef; const ASegments: PIORingSegment;
-      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64;
-      const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = []): Boolean;
-    function PrepareWriteGather(const AFile: TIORingFileRef; const ASegments: PIORingSegment;
-      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64;
-      const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = [];
-      const AWriteThrough: Boolean = False): Boolean;
+      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; 
+      const AFlags: TIORingSubmitFlags = []): Boolean;
+    function PrepareWriteGather(const AFile: TIORingFileRef; const ASegments: PIORingSegment; 
+      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; 
+      const AFlags: TIORingSubmitFlags = []; const AWriteThrough: Boolean = False): Boolean;
     // Requests cancellation of the operation with ATargetUserData. Both
     // operations produce a completion.
     function PrepareCancel(const AFile: TIORingFileRef; const ATargetUserData: TIORingUserData;
       const AUserData: TIORingUserData): Boolean;
     // Replaces all registered files / buffers, at once (a system call). A
     // failure comes back in the completion.
-    function PrepareRegisterFiles(const AHandles: array of THandle;
-      const AUserData: TIORingUserData): Boolean;
-    function PrepareRegisterBuffers(const ABuffers: array of TIORingBufferInfo;
+    function PrepareRegisterFiles(const AHandles: array of THandle; const AUserData: TIORingUserData): Boolean;
+    function PrepareRegisterBuffers(const ABuffers: array of TIORingBufferInfo; 
       const AUserData: TIORingUserData): Boolean;
 
     // --- Linux only (Docs/Design.md §5.8): code that uses these is Linux code.
@@ -200,8 +196,7 @@ type
   public
     // Read-only. AUnbuffered = O_DIRECT, ASequentialHint =
     // posix_fadvise(POSIX_FADV_SEQUENTIAL).
-    class function OpenFileForRead(const AFileName: string; const AUnbuffered,
-      ASequentialHint: Boolean): THandle; static;
+    class function OpenFileForRead(const AFileName: string; const AUnbuffered, ASequentialHint: Boolean): THandle; static;
     // Creates the file, or empties it if it exists; write access.
     // AUnbuffered = O_DIRECT.
     class function CreateFileForWrite(const AFileName: string; const AUnbuffered: Boolean): THandle; static;
@@ -234,10 +229,7 @@ type
 implementation
 
 uses
-  BaseUnix,
-  Linux,
-  Syscall,
-  Delphi.IOUring.Atomics;
+  BaseUnix, Linux, Syscall, Delphi.IOUring.Atomics;
 
 // Pointers go to the kernel as system call arguments and in SQE fields. The
 // unit is for 64-bit CPUs only, where both are 64 bits.
@@ -339,13 +331,17 @@ begin
   Result := 0;
   LRelease := KernelRelease;
   LPosition := Pos('.', LRelease);
+
   if LPosition = 0 then
     Exit;
+
   LMajor := StrToIntDef(Copy(LRelease, 1, LPosition - 1), 0);
   Delete(LRelease, 1, LPosition);
   LPosition := 1;
+
   while (LPosition <= Length(LRelease)) and (LRelease[LPosition] in ['0'..'9']) do
     Inc(LPosition);
+
   LMinor := StrToIntDef(Copy(LRelease, 1, LPosition - 1), 0);
   Result := Cardinal(LMajor * 100 + LMinor);
 end;
@@ -374,6 +370,7 @@ begin
 
   FillChar(LParams, SizeOf(LParams), 0);
   LFd := io_uring_setup(4, @LParams);
+
   if LFd < 0 then
   begin
     if LFd = -ESysENOSYS then
@@ -382,7 +379,9 @@ begin
       GNotAvailableReason := 'io_uring is switched off on this system (kernel.io_uring_disabled, or seccomp in a container).'
     else
       GNotAvailableReason := 'io_uring_setup failed: ' + IORingErrorMessage(LFd);
+
     GAvailability := -1;
+
     Exit;
   end;
 
@@ -390,29 +389,39 @@ begin
     GNativeFeatures := LParams.features;
     // The kernel wants the probe memory zeroed (SetLength does that)
     SetLength(LProbe, SizeOf(io_uring_probe) + 256 * SizeOf(io_uring_probe_op));
+
     if io_uring_register(LFd, IORING_REGISTER_PROBE, @LProbe[0], 256) = 0 then
     begin
       LOps := Pio_uring_probe_op(@LProbe[SizeOf(io_uring_probe)]);
       LCount := Pio_uring_probe(@LProbe[0])^.ops_len;
+
       for LIndex := 0 to LCount - 1 do
         if Supported(Byte(LIndex)) then
           Include(GNativeOps, Byte(LIndex));
+
       // Registration is a system call (Linux 5.1)
       GSupportedOps := [ioRegisterFiles, ioRegisterBuffers];
+
       if Supported(IORING_OP_READ) then
         Include(GSupportedOps, ioRead);
+
       if Supported(IORING_OP_WRITE) then
         Include(GSupportedOps, ioWrite);
+
       if Supported(IORING_OP_FSYNC) and Supported(IORING_OP_SYNC_FILE_RANGE) then
         Include(GSupportedOps, ioFlush);
+
       if Supported(IORING_OP_ASYNC_CANCEL) then
         Include(GSupportedOps, ioCancel);
+
       if Supported(IORING_OP_READV) then
         Include(GSupportedOps, ioReadScatter);
+
       if Supported(IORING_OP_WRITEV) then
         Include(GSupportedOps, ioWriteGather);
 
       GAvailability := 1;
+
       for LIndex := Low(REQUIRED_OPS) to High(REQUIRED_OPS) do
         if not Supported(REQUIRED_OPS[LIndex]) then
           GAvailability := -1;
@@ -422,6 +431,7 @@ begin
 
     if (LParams.features and REQUIRED_FEATURES) <> REQUIRED_FEATURES then
       GAvailability := -1;
+
     if GAvailability < 0 then
       GNotAvailableReason := Format('This Linux kernel (%d.%d) lacks io_uring features the library needs. ' +
         'Linux 5.11 or newer is required.', [GKernelVersion div 100, GKernelVersion mod 100]);
@@ -443,6 +453,7 @@ begin
     LParams.flags := IORING_SETUP_SQPOLL;
     LParams.sq_thread_idle := 1;
     LFd := io_uring_setup(1, @LParams);
+
     if LFd >= 0 then
     begin
       FpClose(LFd);
@@ -451,6 +462,7 @@ begin
     else
       GSqPollAllowed := -1;
   end;
+
   Result := GSqPollAllowed > 0;
 end;
 
@@ -470,31 +482,42 @@ var
   LIndex: Integer;
 begin
   Result := '';
+
   for LIndex := Low(FILES) to High(FILES) do
   begin
     LFile := FpOpen(FILES[LIndex], O_RDONLY or O_CLOEXEC_FLAG);
+
     if LFile < 0 then
       Continue;
+
     try
       LCount := FpRead(LFile, LBuffer, SizeOf(LBuffer) - 1);
     finally
       FpClose(LFile);
     end;
+
     if LCount <= 0 then
       Continue;
+
     LBuffer[LCount] := #0;
     LText := #10 + string(PAnsiChar(@LBuffer[0]));
     LStart := Pos(KEY, LText);
+
     if LStart = 0 then
       Continue;
+
     Inc(LStart, Length(KEY));
     LEnd := LStart;
+
     while (LEnd <= Length(LText)) and (LText[LEnd] <> #10) do
       Inc(LEnd);
+
     Result := Trim(Copy(LText, LStart, LEnd - LStart));
     // The value is usually in quotes
+
     if (Length(Result) >= 2) and (Result[1] in ['"', '''']) and (Result[Length(Result)] = Result[1]) then
       Result := Copy(Result, 2, Length(Result) - 2);
+
     Exit;
   end;
 end;
@@ -502,8 +525,10 @@ end;
 function SystemDescription: string;
 begin
   Result := DistributionName;
+
   if Result <> '' then
     Result := Result + ', ';
+
   Result := Result + 'Linux ' + KernelRelease;
 end;
 
@@ -562,6 +587,7 @@ end;
 function TLinuxIORing.Map(const ASize: NativeUInt; const AOffset: Int64): PByte;
 begin
   Result := fpmmap(nil, ASize, PROT_READ or PROT_WRITE, MAP_SHARED or MAP_POPULATE_FLAG, FFd, AOffset);
+
   if Pointer(Result) = MAP_FAILED then
     raise EIORingError.CreateNative(-fpgeterrno, 'mmap of the ring');
 end;
@@ -570,8 +596,10 @@ procedure TLinuxIORing.Unmap;
 begin
   if FSqes <> nil then
     fpmunmap(FSqes, FSqesSize);
+
   if FRingMemory <> nil then
     fpmunmap(FRingMemory, FRingMemorySize);
+
   FSqes := nil;
   FRingMemory := nil;
 end;
@@ -587,14 +615,18 @@ var
 begin
   if FFd >= 0 then
     raise EIORingError.Create('The ring is already open');
+
   if not Available then
     raise EIORingNotSupported.Create(GNotAvailableReason);
 
   LEntries := ASubmissionQueueSize;
+
   if LEntries = 0 then
     LEntries := 1;
+
   // The completion queue at least twice the submission queue, as on Windows
   LCompletionEntries := ACompletionQueueSize;
+
   if (LEntries <= MAX_SUBMISSION_QUEUE_SIZE) and (LCompletionEntries < 2 * LEntries) then
     LCompletionEntries := 2 * LEntries;
 
@@ -602,8 +634,10 @@ begin
   FParams.flags := IORING_SETUP_CQSIZE;
   FParams.cq_entries := LCompletionEntries;
   LResult := io_uring_setup(LEntries, @FParams);
+
   if LResult < 0 then
     raise EIORingError.CreateNative(LResult, 'io_uring_setup');
+
   FFd := LResult;
 
   try
@@ -611,8 +645,10 @@ begin
     LSqRingSize := FParams.sq_off.&array + FParams.sq_entries * SizeOf(Cardinal);
     LCqRingSize := FParams.cq_off.cqes + FParams.cq_entries * SizeOf(io_uring_cqe);
     FRingMemorySize := LSqRingSize;
+
     if LCqRingSize > FRingMemorySize then
       FRingMemorySize := LCqRingSize;
+
     FRingMemory := Map(FRingMemorySize, IORING_OFF_SQ_RING);
     FSqesSize := FParams.sq_entries * SizeOf(io_uring_sqe);
     FSqes := Map(FSqesSize, IORING_OFF_SQES);
@@ -623,9 +659,11 @@ begin
     FCqTail := PCardinal(FRingMemory + FParams.cq_off.tail);
     FCqMask := PCardinal(FRingMemory + FParams.cq_off.ring_mask)^;
     FCqes := FRingMemory + FParams.cq_off.cqes;
+
     // The SQ array maps ring slot I to SQE I, for good
     for LIndex := 0 to FParams.sq_entries - 1 do
       PCardinal(FRingMemory + FParams.sq_off.&array + LIndex * SizeOf(Cardinal))^ := LIndex;
+
     FSqLocalTail := FSqTail^;
 
     FSubmissionQueueSize := FParams.sq_entries;
@@ -646,10 +684,14 @@ begin
   while FPendingCount > 0 do
   begin
     while TryPopCompletion(LCompletion) do
-      ;
+    begin
+      // Do Nothing
+    end;
+
     if FPendingCount > 0 then
     begin
       LResult := io_uring_enter(FFd, 0, 1, IORING_ENTER_GETEVENTS, nil);
+
       if (LResult < 0) and (LResult <> -ESysEINTR) then
         Break;    // cannot wait: give up rather than hang
     end;
@@ -672,10 +714,13 @@ begin
     // gives the memory back at once.
     if FRegisteredBuffers <> nil then
       io_uring_register(FFd, IORING_UNREGISTER_BUFFERS, nil, 0);
+
     io_uring_register(FFd, IORING_UNREGISTER_FILES, nil, 0);
     Unmap;
+
     if FEventFd >= 0 then
       FpClose(FEventFd);
+
     FpClose(FFd);
     FFd := -1;
     FEventFd := -1;
@@ -704,10 +749,12 @@ function TLinuxIORing.NextSqe: Pio_uring_sqe;
 begin
   if FFd < 0 then
     raise EIORingError.Create('The ring is not open');
+
   if (FPreparedCount + FPendingCount >= FCompletionQueueSize) or (FPreparedCount >= FSubmissionQueueSize) then
     Exit(nil);
 
   Result := Pio_uring_sqe(FSqes + (FSqLocalTail and FSqMask) * SizeOf(io_uring_sqe));
+
   FillChar(Result^, SizeOf(io_uring_sqe), 0);
   Inc(FSqLocalTail);
   Inc(FPreparedCount);
@@ -720,6 +767,7 @@ var
   LSqe: Pio_uring_sqe;
 begin
   LSqe := NextSqe;
+
   if LSqe = nil then
     Exit(False);
 
@@ -727,6 +775,7 @@ begin
   begin
     LSqe^.opcode := AFixedOpcode;
     LSqe^.buf_index := Word(ABuffer.Index);
+
     // The kernel wants the address inside the registered buffer. An index
     // that is not registered: the kernel fails the operation (-EFAULT).
     if ABuffer.Index < Cardinal(Length(FRegisteredBuffers)) then
@@ -739,6 +788,7 @@ begin
     LSqe^.opcode := AOpcode;
     LSqe^.addr := AddressOf(ABuffer.Address);
   end;
+
   LSqe^.flags := ToSqeFlags(AFlags);
   SetFile(LSqe, AFile);
   LSqe^.len := ACount;
@@ -752,6 +802,7 @@ function TLinuxIORing.PrepareSqe(const AUserData: TIORingUserData; out ASqe: Pio
 begin
   ASqe := NextSqe;
   Result := ASqe <> nil;
+
   if Result then
     ASqe^.user_data := AUserData;
 end;
@@ -762,10 +813,13 @@ var
 begin
   if FFd < 0 then
     raise EIORingError.Create('The ring is not open');
+
   if FPreparedCount = 0 then
     raise EIORingError.Create('LinkToNext: no prepared entry to link');
+
   // The entry prepared last is still in the submission queue (not submitted)
   LSqe := Pio_uring_sqe(FSqes + ((FSqLocalTail - 1) and FSqMask) * SizeOf(io_uring_sqe));
+
   if AHard then
     LSqe^.flags := LSqe^.flags or IOSQE_IO_HARDLINK
   else
@@ -776,13 +830,13 @@ function TLinuxIORing.PrepareRead(const AFile: TIORingFileRef; const ABuffer: TI
   const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
   const AFlags: TIORingSubmitFlags): Boolean;
 begin
-  Result := PrepareReadWrite(IORING_OP_READ, IORING_OP_READ_FIXED, AFile, ABuffer, ACount, AOffset,
-    AUserData, AFlags, 0);
+  Result := PrepareReadWrite(IORING_OP_READ, IORING_OP_READ_FIXED, AFile, ABuffer, ACount, AOffset, AUserData, AFlags, 
+    0);
 end;
 
-function TLinuxIORing.PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
-  const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
-  const AFlags: TIORingSubmitFlags; const AWriteThrough: Boolean): Boolean;
+function TLinuxIORing.PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef; const ACount: Cardinal; 
+  const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags;
+  const AWriteThrough: Boolean): Boolean;
 var
   LRwFlags: Cardinal;
 begin
@@ -790,22 +844,23 @@ begin
     LRwFlags := RWF_DSYNC
   else
     LRwFlags := 0;
-  Result := PrepareReadWrite(IORING_OP_WRITE, IORING_OP_WRITE_FIXED, AFile, ABuffer, ACount, AOffset,
-    AUserData, AFlags, LRwFlags);
+
+  Result := PrepareReadWrite(IORING_OP_WRITE, IORING_OP_WRITE_FIXED, AFile, ABuffer, ACount, AOffset, AUserData, AFlags, 
+    LRwFlags);
 end;
 
-function TLinuxIORing.PrepareFlush(const AFile: TIORingFileRef; const AMode: TIORingFlushMode;
+function TLinuxIORing.PrepareFlush(const AFile: TIORingFileRef; const AMode: TIORingFlushMode; 
   const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags): Boolean;
 var
   LSqe: Pio_uring_sqe;
 begin
   LSqe := NextSqe;
+
   if LSqe = nil then
     Exit(False);
 
   case AMode of
-    rfmDefault:
-      LSqe^.opcode := IORING_OP_FSYNC;
+    rfmDefault: LSqe^.opcode := IORING_OP_FSYNC;
     rfmData, rfmMinMetadata:
       begin
         LSqe^.opcode := IORING_OP_FSYNC;
@@ -820,15 +875,16 @@ begin
           SYNC_FILE_RANGE_WAIT_AFTER;
       end;
   end;
+
   LSqe^.flags := ToSqeFlags(AFlags);
   SetFile(LSqe, AFile);
   LSqe^.user_data := AUserData;
   Result := True;
 end;
 
-function TLinuxIORing.PrepareVectored(const AOpcode: Byte; const AFile: TIORingFileRef;
-  const ASegments: PIORingSegment; const ASegmentCount, ACount: Cardinal; const AOffset: UInt64;
-  const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags; const ARwFlags: Cardinal): Boolean;
+function TLinuxIORing.PrepareVectored(const AOpcode: Byte; const AFile: TIORingFileRef; const ASegments: PIORingSegment; 
+  const ASegmentCount, ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; 
+  const AFlags: TIORingSubmitFlags; const ARwFlags: Cardinal): Boolean;
 var
   LSqe: Pio_uring_sqe;
   LCopy: TBytes;
@@ -838,6 +894,7 @@ var
   LSegment: PIORingSegment;
 begin
   LSqe := NextSqe;
+
   if LSqe = nil then
     Exit(False);
 
@@ -846,18 +903,23 @@ begin
   // flight; the caller's array stays as it is).
   SetLength(LCopy, ASegmentCount * SizeOf(TIORingSegment));
   LSegments := nil;
+
   if ASegmentCount > 0 then
   begin
     Move(ASegments^, LCopy[0], Length(LCopy));
     LSegments := PIORingSegment(@LCopy[0]);
     LLeft := ACount;
+
     for LIndex := 0 to ASegmentCount - 1 do
     begin
       LSegment := PIORingSegment(PByte(LSegments) + LIndex * SizeOf(TIORingSegment));
+
       if LSegment^.Length > LLeft then
         LSegment^.Length := LLeft;
+
       Dec(LLeft, LSegment^.Length);
     end;
+
     SetLength(FKeepAlive, Length(FKeepAlive) + 1);
     FKeepAlive[High(FKeepAlive)] := LCopy;
   end;
@@ -877,8 +939,7 @@ function TLinuxIORing.PrepareReadScatter(const AFile: TIORingFileRef; const ASeg
   const ASegmentCount, ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
   const AFlags: TIORingSubmitFlags): Boolean;
 begin
-  Result := PrepareVectored(IORING_OP_READV, AFile, ASegments, ASegmentCount, ACount, AOffset, AUserData,
-    AFlags, 0);
+  Result := PrepareVectored(IORING_OP_READV, AFile, ASegments, ASegmentCount, ACount, AOffset, AUserData, AFlags, 0);
 end;
 
 function TLinuxIORing.PrepareWriteGather(const AFile: TIORingFileRef; const ASegments: PIORingSegment;
@@ -891,16 +952,18 @@ begin
     LRwFlags := RWF_DSYNC
   else
     LRwFlags := 0;
-  Result := PrepareVectored(IORING_OP_WRITEV, AFile, ASegments, ASegmentCount, ACount, AOffset, AUserData,
-    AFlags, LRwFlags);
+
+  Result := PrepareVectored(IORING_OP_WRITEV, AFile, ASegments, ASegmentCount, ACount, AOffset, AUserData, AFlags, 
+    LRwFlags);
 end;
 
-function TLinuxIORing.PrepareCancel(const AFile: TIORingFileRef; const ATargetUserData,
+function TLinuxIORing.PrepareCancel(const AFile: TIORingFileRef; const ATargetUserData, 
   AUserData: TIORingUserData): Boolean;
 var
   LSqe: Pio_uring_sqe;
 begin
   LSqe := NextSqe;
+
   if LSqe = nil then
     Exit(False);
 
@@ -923,32 +986,37 @@ begin
   LIndex := Length(FLocalCompletions);
   SetLength(FLocalCompletions, LIndex + 1);
   FLocalCompletions[LIndex].UserData := AUserData;
+
   if AResult < 0 then
     FLocalCompletions[LIndex].NativeResult := AResult
   else
     FLocalCompletions[LIndex].NativeResult := 0;
+
   FLocalCompletions[LIndex].BytesTransferred := 0;
   Inc(FPendingCount);
 end;
 
-function TLinuxIORing.PrepareRegisterFiles(const AHandles: array of THandle;
-  const AUserData: TIORingUserData): Boolean;
+function TLinuxIORing.PrepareRegisterFiles(const AHandles: array of THandle; const AUserData: TIORingUserData): Boolean;
 var
   LResult: Integer;
 begin
   if FFd < 0 then
     raise EIORingError.Create('The ring is not open');
+
   if FPreparedCount + FPendingCount >= FCompletionQueueSize then
     Exit(False);
 
   // A second registration fails with EBUSY: remove the old one first
   // (ENXIO when there is none)
   io_uring_register(FFd, IORING_UNREGISTER_FILES, nil, 0);
+
   if Length(AHandles) > 0 then
     LResult := io_uring_register(FFd, IORING_REGISTER_FILES, @AHandles[0], Length(AHandles))
   else
     LResult := 0;
+
   AddLocalCompletion(AUserData, LResult);
+
   Result := True;
 end;
 
@@ -961,30 +1029,38 @@ var
 begin
   if FFd < 0 then
     raise EIORingError.Create('The ring is not open');
+
   if FPreparedCount + FPendingCount >= FCompletionQueueSize then
     Exit(False);
 
   io_uring_register(FFd, IORING_UNREGISTER_BUFFERS, nil, 0);
   FRegisteredBuffers := nil;
   LResult := 0;
+
   if Length(ABuffers) > 0 then
   begin
     // Address nil and length 0: a sparse entry (Linux 5.13 and newer)
     SetLength(LSegments, Length(ABuffers));
+
     for LIndex := 0 to High(ABuffers) do
     begin
       LSegments[LIndex].Address := ABuffers[LIndex].Address;
       LSegments[LIndex].Length := ABuffers[LIndex].Length;
     end;
+
     LResult := io_uring_register(FFd, IORING_REGISTER_BUFFERS, @LSegments[0], Length(LSegments));
+
     if LResult >= 0 then
     begin
       SetLength(FRegisteredBuffers, Length(ABuffers));
+
       for LIndex := 0 to High(ABuffers) do
         FRegisteredBuffers[LIndex] := ABuffers[LIndex].Address;
     end;
   end;
+
   AddLocalCompletion(AUserData, LResult);
+
   Result := True;
 end;
 
@@ -1012,8 +1088,10 @@ begin
 
   // Never wait for more completions than there can be
   LWaitCount := AWaitCount;
+
   if LWaitCount > FPreparedCount + FPendingCount then
     LWaitCount := FPreparedCount + FPendingCount;
+
   if (FPreparedCount = 0) and (ReadyCount >= LWaitCount) then
     Exit(True);
 
@@ -1030,11 +1108,13 @@ begin
     LMinComplete := 0;
     LArgPointer := nil;
     LArgSize := 0;
+
     if ReadyCount < LWaitCount then
     begin
       // The kernel counts only the completions in its queue
       LFlags := IORING_ENTER_GETEVENTS;
       LMinComplete := LWaitCount - LocalCompletionCount;
+
       if ATimeoutMs <> IORING_INFINITE then
       begin
         LFlags := LFlags or IORING_ENTER_EXT_ARG;
@@ -1044,6 +1124,7 @@ begin
     end;
 
     LResult := io_uring_enter2(FFd, FPreparedCount, LMinComplete, LFlags, LArgPointer, LArgSize);
+
     if LResult >= 0 then
     begin
       // The kernel stops at an entry that fails early (its error comes in a
@@ -1086,24 +1167,29 @@ begin
   begin
     ACompletion := FLocalCompletions[FLocalFirst];
     Inc(FLocalFirst);
+
     if FLocalFirst = Length(FLocalCompletions) then
     begin
       FLocalCompletions := nil;
       FLocalFirst := 0;
     end;
+
     Dec(FPendingCount);
     Exit(True);
   end;
+
   if FPendingCount = 0 then
     Exit(False);
 
   // Only this thread moves the head; the kernel moves the tail
   LHead := FCqHead^;
+
   if LHead = TAtomic.LoadAcquire(FCqTail^) then
     Exit(False);
 
   LCqe := Pio_uring_cqe(FCqes + (LHead and FCqMask) * SizeOf(io_uring_cqe));
   ACompletion.UserData := TIORingUserData(LCqe^.user_data);
+
   if LCqe^.res < 0 then
   begin
     ACompletion.NativeResult := LCqe^.res;
@@ -1114,19 +1200,23 @@ begin
     ACompletion.NativeResult := 0;
     ACompletion.BytesTransferred := NativeUInt(LCqe^.res);
   end;
+
   // The CQE is read before its slot is given back
   TAtomic.StoreRelease(FCqHead^, LHead + 1);
 
   Dec(FPendingCount);
+
   // Nothing in flight and nothing prepared: no segment copy is needed any more
   if (FPendingCount = 0) and (FPreparedCount = 0) and (FKeepAlive <> nil) then
     FKeepAlive := nil;
+
   Result := True;
 end;
 
 function TLinuxIORing.PopCompletions(var ACompletions: array of TIORingCompletion): Integer;
 begin
   Result := 0;
+
   while (Result <= High(ACompletions)) and TryPopCompletion(ACompletions[Result]) do
     Inc(Result);
 end;
@@ -1138,19 +1228,25 @@ var
 begin
   if FFd < 0 then
     raise EIORingError.Create('The ring is not open');
+
   if FEventFd < 0 then
   begin
     LFd := Integer(do_SysCall(SYSCALL_EVENTFD2, 0, EFD_CLOEXEC));
+
     if LFd < 0 then
       raise EIORingError.CreateNative(-fpgeterrno, 'eventfd');
+
     LResult := io_uring_register(FFd, IORING_REGISTER_EVENTFD, @LFd, 1);
+
     if LResult < 0 then
     begin
       FpClose(LFd);
       raise EIORingError.CreateNative(LResult, 'IORING_REGISTER_EVENTFD');
     end;
+
     FEventFd := LFd;
   end;
+
   Result := THandle(FEventFd);
 end;
 
@@ -1160,6 +1256,7 @@ class function TLinuxIORing.Available: Boolean;
 begin
   if GAvailability = 0 then
     CheckAvailability;
+
   Result := GAvailability > 0;
 end;
 
@@ -1177,18 +1274,22 @@ begin
   Result.NativeFeatures := GNativeFeatures;
   Result.NativeOps := GNativeOps;
   Result.Extras := [];
+
   if GSupportedOps <> [] then
   begin
     Result.BackendName := 'Linux io_uring';
     Result.MaxSubmissionQueueSize := MAX_SUBMISSION_QUEUE_SIZE;
     Result.MaxCompletionQueueSize := MAX_COMPLETION_QUEUE_SIZE;
   end;
+
   if GAvailability > 0 then
   begin
     // PrepareSqe and LinkToNext work with every kernel the library accepts
     Result.Extras := [ieLinkedOps, ieRawEntries];
+
     if [IORING_OP_SEND, IORING_OP_RECV, IORING_OP_ACCEPT, IORING_OP_CONNECT] <= GNativeOps then
       Include(Result.Extras, ieSockets);
+
     if SqPollAllowed then
       Include(Result.Extras, ieSqPoll);
   end;
@@ -1199,6 +1300,7 @@ end;
 function OpenFlags(const AUnbuffered: Boolean): Integer;
 begin
   Result := O_CLOEXEC_FLAG;
+
   if AUnbuffered then
     Result := Result or O_DIRECT_FLAG;
 end;
@@ -1207,8 +1309,10 @@ class function TLinuxIORingPlatform.OpenFileForRead(const AFileName: string; con
   ASequentialHint: Boolean): THandle;
 begin
   Result := FpOpen(AFileName, O_RDONLY or OpenFlags(AUnbuffered));
+
   if Result < 0 then
     raise EIORingError.CreateNative(-fpgeterrno, 'Open "' + AFileName + '"');
+
   // A hint only: a failure does not matter
   if ASequentialHint then
     do_SysCall(syscall_nr_fadvise64, TSysParam(Result), 0, 0, POSIX_FADV_SEQUENTIAL);
@@ -1217,6 +1321,7 @@ end;
 class function TLinuxIORingPlatform.CreateFileForWrite(const AFileName: string; const AUnbuffered: Boolean): THandle;
 begin
   Result := FpOpen(AFileName, O_WRONLY or O_CREAT or O_TRUNC or OpenFlags(AUnbuffered), &666);
+
   if Result < 0 then
     raise EIORingError.CreateNative(-fpgeterrno, 'Create "' + AFileName + '"');
 end;
@@ -1238,6 +1343,7 @@ var
 begin
   if FpFstat(AHandle, LStat) < 0 then
     raise EIORingError.CreateNative(-fpgeterrno, 'fstat');
+
   Result := LStat.st_size;
 end;
 
@@ -1246,6 +1352,7 @@ var
   LStatx: TStatx;
 begin
   FillChar(LStatx, SizeOf(LStatx), 0);
+
   if (do_SysCall(SYSCALL_STATX, TSysParam(AHandle), TSysParam(PChar('')), AT_EMPTY_PATH, STATX_DIOALIGN,
     TSysParam(@LStatx)) = 0) and (LStatx.stx_mask and STATX_DIOALIGN <> 0) and (LStatx.stx_dio_offset_align > 0) then
     Result := LStatx.stx_dio_offset_align
@@ -1261,15 +1368,19 @@ var
   LPair: array[0..1] of NativeUInt;
 begin
   Result := DEFAULT_PAGE_SIZE;
+
   LFile := FpOpen('/proc/self/auxv', O_RDONLY or O_CLOEXEC_FLAG);
+
   if LFile < 0 then
     Exit;
+
   try
     while (FpRead(LFile, LPair, SizeOf(LPair)) = SizeOf(LPair)) and (LPair[0] <> 0) do
       if LPair[0] = AT_PAGESZ then
       begin
         if LPair[1] > 0 then
           Result := Cardinal(LPair[1]);
+
         Break;
       end;
   finally
@@ -1281,12 +1392,14 @@ class function TLinuxIORingPlatform.PageSize: Cardinal;
 begin
   if GPageSize = 0 then
     GPageSize := ReadPageSize;
+
   Result := GPageSize;
 end;
 
 class function TLinuxIORingPlatform.AllocPages(const ASize: NativeUInt): Pointer;
 begin
   Result := fpmmap(nil, ASize, PROT_READ or PROT_WRITE, MAP_PRIVATE or MAP_ANONYMOUS, -1, 0);
+
   if Result = MAP_FAILED then
     raise EIORingError.CreateNative(-fpgeterrno, 'mmap');
 end;
@@ -1311,8 +1424,10 @@ var
 begin
   // Non-blocking: resetting it never waits
   LFd := Integer(do_SysCall(SYSCALL_EVENTFD2, 0, EFD_CLOEXEC or EFD_NONBLOCK));
+
   if LFd < 0 then
     raise EIORingError.CreateNative(-fpgeterrno, 'eventfd');
+
   Result := THandle(LFd);
 end;
 
@@ -1337,6 +1452,7 @@ var
 begin
   LPoll[0].fd := AEvent1;
   LPoll[1].fd := AEvent2;
+
   repeat
     for LIndex := 0 to 1 do
     begin
@@ -1344,6 +1460,7 @@ begin
       LPoll[LIndex].revents := 0;
     end;
   until (FpPoll(@LPoll[0], 2, -1) > 0) or (fpgeterrno <> ESysEINTR);
+
   // Reset what woke us: an eventfd read takes its count back to 0 (the ring's
   // completion eventfd blocks on reading, so only when it is signalled)
   for LIndex := 0 to 1 do

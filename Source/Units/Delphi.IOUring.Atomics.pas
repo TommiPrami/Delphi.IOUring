@@ -181,10 +181,10 @@ type
     class procedure WakeAll(var ATarget); static;
   end;
 
-// ASize bytes, zeroed, starting at a cache-line boundary - for data that
-// threads share (lock-free structures). Free with FreeMem(AMemory): AMemory
-// is the block as allocated.
-function IORingAllocCacheAligned(const ASize: NativeUInt; out AMemory: Pointer): Pointer;
+  // ASize bytes, zeroed, starting at a cache-line boundary - for data that
+  // threads share (lock-free structures). Free with FreeMem(AMemory): AMemory
+  // is the block as allocated.
+  function IORingAllocCacheAligned(const ASize: NativeUInt; out AMemory: Pointer): Pointer;
 
 implementation
 
@@ -198,12 +198,12 @@ uses
 const
   SYNCHRONIZATION_DLL = 'api-ms-win-core-synch-l1-2-0.dll';
 
-// Windows 8 and newer. Delphi's Winapi.Windows declares them too, Free
-// Pascal 3.2.2's Windows unit does not.
-function IORingWaitOnAddress(AAddress, ACompareAddress: Pointer; AAddressSize: NativeUInt;
-  AMilliseconds: Cardinal): LongBool; stdcall; external SYNCHRONIZATION_DLL name 'WaitOnAddress';
-procedure IORingWakeByAddressSingle(AAddress: Pointer); stdcall; external SYNCHRONIZATION_DLL name 'WakeByAddressSingle';
-procedure IORingWakeByAddressAll(AAddress: Pointer); stdcall; external SYNCHRONIZATION_DLL name 'WakeByAddressAll';
+  // Windows 8 and newer. Delphi's Winapi.Windows declares them too, Free
+  // Pascal 3.2.2's Windows unit does not.
+  function IORingWaitOnAddress(AAddress, ACompareAddress: Pointer; AAddressSize: NativeUInt;
+    AMilliseconds: Cardinal): LongBool; stdcall; external SYNCHRONIZATION_DLL name 'WaitOnAddress';
+  procedure IORingWakeByAddressSingle(AAddress: Pointer); stdcall; external SYNCHRONIZATION_DLL name 'WakeByAddressSingle';
+  procedure IORingWakeByAddressAll(AAddress: Pointer); stdcall; external SYNCHRONIZATION_DLL name 'WakeByAddressAll';
 {$ENDIF}
 
 { TAtomic }
@@ -316,10 +316,13 @@ begin
   // no other thread changed the value in between. A torn first read only
   // costs one more round.
   Result := ATarget;
+
   repeat
     LSeen := CompareExchange(ATarget, AValue, Result);
+
     if LSeen = Result then
       Exit;
+
     Result := LSeen;
   until False;
 end;
@@ -370,8 +373,10 @@ begin
   Result := ATarget;
   repeat
     LSeen := CompareExchange(ATarget, Result + ADelta, Result);
+
     if LSeen = Result then
       Exit;
+
     Result := LSeen;
   until False;
 end;
@@ -443,6 +448,7 @@ end;
 class function TAtomic.LoadAcquire(var ATarget: Cardinal): Cardinal;
 begin
   Result := ATarget;
+
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 end;
 
@@ -460,6 +466,7 @@ end;
 class function TAtomic.LoadAcquire(var ATarget: Int64): Int64;
 begin
   Result := ATarget;
+
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 end;
 {$ENDIF}
@@ -479,12 +486,14 @@ end;
 class procedure TAtomic.StoreRelease(var ATarget: Integer; AValue: Integer);
 begin
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
+
   ATarget := AValue;
 end;
 
 class procedure TAtomic.StoreRelease(var ATarget: Cardinal; AValue: Cardinal);
 begin
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
+
   ATarget := AValue;
 end;
 
@@ -505,6 +514,7 @@ end;
 class procedure TAtomic.StoreRelease(var ATarget: Int64; AValue: Int64);
 begin
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
+
   ATarget := AValue;
 end;
 {$ENDIF}
@@ -567,16 +577,18 @@ var
 begin
   for LPause := 1 to APauses do
     CpuPause;
+
   if APauses < AMaxPauses then
   begin
     APauses := APauses * 2;
+
     if APauses > AMaxPauses then
       APauses := AMaxPauses;
   end;
 end;
 
 {$IFDEF MSWINDOWS}
-class function TAtomic.WaitWhileEqual(var ATarget: Integer; AExpected: Integer;
+class function TAtomic.WaitWhileEqual(var ATarget: Integer; AExpected: Integer; 
   ATimeoutMilliseconds: Cardinal): Boolean;
 begin
   // FALSE means timeout (ERROR_TIMEOUT); the value is checked by the caller
@@ -622,18 +634,17 @@ begin
     LTimeout.tv_nsec := (ATimeoutMilliseconds mod 1000) * 1000000;
     LTimeoutPointer := @LTimeout;
   end;
+
   Result := (Futex(AAddress, FUTEX_WAIT_PRIVATE, AExpected, LTimeoutPointer) = 0) or
     (fpgeterrno <> ESysETIMEDOUT);
 end;
 
-class function TAtomic.WaitWhileEqual(var ATarget: Integer; AExpected: Integer;
-  ATimeoutMilliseconds: Cardinal): Boolean;
+class function TAtomic.WaitWhileEqual(var ATarget: Integer; AExpected: Integer; ATimeoutMilliseconds: Cardinal): Boolean;
 begin
   Result := FutexWait(@ATarget, AExpected, ATimeoutMilliseconds);
 end;
 
-class function TAtomic.WaitWhileEqual(var ATarget: Cardinal; AExpected: Cardinal;
-  ATimeoutMilliseconds: Cardinal): Boolean;
+class function TAtomic.WaitWhileEqual(var ATarget: Cardinal; AExpected: Cardinal; ATimeoutMilliseconds: Cardinal): Boolean;
 begin
   Result := FutexWait(@ATarget, Integer(AExpected), ATimeoutMilliseconds);
 end;
@@ -656,7 +667,9 @@ begin
   GetMem(AMemory, ASize + (IORING_CACHE_LINE_SIZE - 1));
   LAddress := NativeUInt(AMemory) + NativeUInt(IORING_CACHE_LINE_SIZE - 1);
   LAddress := LAddress and not NativeUInt(IORING_CACHE_LINE_SIZE - 1);
+
   Result := Pointer(LAddress);
+
   FillChar(Result^, ASize, 0);
 end;
 

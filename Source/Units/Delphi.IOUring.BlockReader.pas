@@ -35,8 +35,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Engine;
+  Delphi.IOUring, Delphi.IOUring.Engine;
 
 const
   IORING_BLOCK_READER_DEFAULT_READ_AHEAD = 32;
@@ -66,6 +65,7 @@ type
   // One buffer and its read (internal)
   TIORingBlockSlotState = (bssFree, bssInFlight, bssReady);
   PIORingBlockSlot = ^TIORingBlockSlot;
+
   TIORingBlockSlot = record
     State: TIORingBlockSlotState;
     Data: PByte;
@@ -101,8 +101,8 @@ type
     FBlockAcquired: Boolean;
     FStats: TIORingBlockReaderStats;
 
-    procedure OpenCommon(const AEngine: TIORingEngine; const AFile: THandle;
-      const AReadAhead, ABufferSize, AMaxGap: Cardinal);
+    procedure OpenCommon(const AEngine: TIORingEngine; const AFile: THandle; const AReadAhead, ABufferSize, 
+      AMaxGap: Cardinal);
     function FetchBlock(out ABlock: TIORingBlock): Boolean;
     function CanJoin(const ASlot: PIORingBlockSlot; const ABlock: TIORingBlock): Boolean;
     procedure StartReads;
@@ -209,8 +209,10 @@ procedure TIORingBlockReader.Open(const AEngine: TIORingEngine; const AFile: THa
 begin
   if IsOpen then
     raise EIORingError.Create('The block reader is already open');
+
   if not Assigned(AProvider) then
     raise EIORingError.Create('Block reader: no block provider');
+
   FProvider := AProvider;
   FUseList := False;
   OpenCommon(AEngine, AFile, AReadAhead, ABufferSize, AMaxGap);
@@ -223,9 +225,12 @@ var
 begin
   if IsOpen then
     raise EIORingError.Create('The block reader is already open');
+
   SetLength(FList, Length(ABlocks));
+
   for LIndex := 0 to High(ABlocks) do
     FList[LIndex] := ABlocks[LIndex];
+
   FListIndex := 0;
   FUseList := True;
   OpenCommon(AEngine, AFile, AReadAhead, ABufferSize, AMaxGap);
@@ -240,27 +245,34 @@ begin
   try
     if AEngine = nil then
       raise EIORingError.Create('Block reader: no engine');
+
     if (AReadAhead = 0) or (AReadAhead > IORING_BLOCK_READER_MAX_READ_AHEAD) then
       raise EIORingError.CreateFmt('Read-ahead %d is not between 1 and %d',
         [AReadAhead, IORING_BLOCK_READER_MAX_READ_AHEAD]);
+
     if AReadAhead > AEngine.MaxRequests then
       raise EIORingError.CreateFmt('Read-ahead %d is more than the engine''s %d requests',
         [AReadAhead, AEngine.MaxRequests]);
+
     if ABufferSize = 0 then
       raise EIORingError.Create('Block reader: the buffer size must not be 0');
+
     LTotalSize := UInt64(AReadAhead) * ABufferSize;
+
     if LTotalSize > UInt64(High(NativeInt) div 2) then
       raise EIORingError.CreateFmt('%d buffers of %d bytes do not fit in memory', [AReadAhead, ABufferSize]);
 
     FMemorySize := NativeUInt(LTotalSize);
     FMemory := TIORingPlatform.AllocPages(FMemorySize);
     SetLength(FSlots, AReadAhead);
+
     for LIndex := 0 to High(FSlots) do
     begin
       FSlots[LIndex].State := bssFree;
       FSlots[LIndex].Data := FMemory + NativeUInt(LIndex) * ABufferSize;
       FSlots[LIndex].BlockCount := 0;
     end;
+
     FEngine := AEngine;
     FFile := AFile;
     FBufferSize := ABufferSize;
@@ -294,6 +306,7 @@ begin
         on EIORingError do
           ;    // not a valid request any more: nothing to wait for
       end;
+
   TIORingPlatform.FreePages(FMemory, FMemorySize);
   FMemory := nil;
   FSlots := nil;
@@ -329,6 +342,7 @@ begin
   if FUseList then
   begin
     Result := FListIndex < Length(FList);
+
     if Result then
     begin
       ABlock := FList[FListIndex];
@@ -339,6 +353,7 @@ begin
   end
   else
     Result := FProvider(ABlock);
+
   if Result and ((ABlock.Length = 0) or (ABlock.Length > FBufferSize)) then
     raise EIORingError.CreateFmt('Block of %d bytes at offset %d: the length must be 1..%d (the buffer size)',
       [ABlock.Length, ABlock.Offset, FBufferSize]);
@@ -361,6 +376,7 @@ var
 begin
   if not FHaveNext or (FOutstanding >= Length(FSlots)) then
     Exit;
+
   // All reads of this round wake the I/O thread once
   FEngine.BeginBatch;
   try
@@ -370,9 +386,11 @@ begin
       LSlot^.Offset := FNext.Offset;
       LSlot^.Length := FNext.Length;
       LSlot^.BlockCount := 0;
+
       repeat
         if LSlot^.BlockCount = Length(LSlot^.Blocks) then
           SetLength(LSlot^.Blocks, 2 * LSlot^.BlockCount + 4);
+
         LSlot^.Blocks[LSlot^.BlockCount] := FNext;
         Inc(LSlot^.BlockCount);
         LSlot^.Length := Cardinal(FNext.Offset + FNext.Length - LSlot^.Offset);
@@ -398,10 +416,12 @@ var
   LStart: UInt64;
 begin
   LSlot := @FSlots[FHead];
+
   if not FEngine.TryGetResult(LSlot^.Request, LCompletion) then
   begin
     if not AWait then
       Exit(False);
+
     Inc(FStats.Stalls);
     LStart := TIORingPlatform.TimestampMicroseconds;
     FEngine.Wait(LSlot^.Request, LCompletion);
@@ -410,12 +430,15 @@ begin
   // The request is finished either way: the slot no longer waits for it.
   // A failure is kept: every block of this read raises it.
   LSlot^.State := bssReady;
+
   if LCompletion.IsEndOfFile then
     LSlot^.NativeResult := 0
   else
     LSlot^.NativeResult := LCompletion.NativeResult;
+
   if LCompletion.Succeeded then
     LSlot^.BytesRead := Cardinal(LCompletion.BytesTransferred);
+
   Inc(FStats.BytesRead, LSlot^.BytesRead);
   Result := True;
 end;
@@ -429,23 +452,30 @@ begin
   ABlock := TIORingBlock.Create(0, 0);
   AData := nil;
   ALength := 0;
+
   if not IsOpen then
     raise EIORingError.Create('The block reader is not open');
+
   if FBlockAcquired then
     raise EIORingError.Create('TryGetBlock: call ReleaseBlock first');
 
   StartReads;
+
   if FOutstanding = 0 then
     Exit(False);    // every block delivered
+
   LSlot := @FSlots[FHead];
+
   if (LSlot^.State = bssInFlight) and not CompleteHead(AWait) then
     Exit(False);
+
   if LSlot^.NativeResult < 0 then
     raise EIORingError.CreateNative(LSlot^.NativeResult, Format('Block read at offset %d', [LSlot^.Offset]));
 
   ABlock := LSlot^.Blocks[FHeadBlock];
   LStart := ABlock.Offset - LSlot^.Offset;
   AData := LSlot^.Data + NativeUInt(LStart);
+
   // Shorter only where the read stopped at the end of the file
   if LSlot^.BytesRead <= LStart then
     ALength := 0
@@ -453,6 +483,7 @@ begin
     ALength := Cardinal(LSlot^.BytesRead - LStart)
   else
     ALength := ABlock.Length;
+
   FBlockAcquired := True;
   Inc(FStats.Blocks);
   Result := True;
@@ -464,9 +495,11 @@ var
 begin
   if not FBlockAcquired then
     raise EIORingError.Create('ReleaseBlock without a block from TryGetBlock');
+
   FBlockAcquired := False;
   LSlot := @FSlots[FHead];
   Inc(FHeadBlock);
+
   if FHeadBlock >= LSlot^.BlockCount then
   begin
     // The buffer is free: its next read starts at once

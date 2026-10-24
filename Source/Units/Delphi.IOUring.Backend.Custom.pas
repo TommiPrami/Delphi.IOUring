@@ -163,6 +163,18 @@ type
 // Readable text for an OS result code (HRESULT on Windows, -errno on Linux)
 function IORingErrorMessage(const ANativeCode: Integer): string;
 
+{
+  Raise helpers (Docs/CodingStyle.md, "Raising"): a routine that raises through these gets no hidden try/finally for
+  the exception's message. They raise at the caller's address, so the exception points to the line that called them.
+  Pass a constant text, or a format and its arguments - not Format(...) or a string built with +.
+}
+procedure RaiseIORingError(const AMessage: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+procedure RaiseIORingErrorFmt(const AFormat: string; const AArgs: array of const); {$IFNDEF FPC} noreturn; {$ENDIF}
+procedure RaiseIORingErrorNative(const ANativeCode: Integer; const AOperation: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+procedure RaiseError(const AClass: ExceptClass; const AMessage: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+procedure RaiseErrorFmt(const AClass: ExceptClass; const AFormat: string; const AArgs: array of const);
+  {$IFNDEF FPC} noreturn; {$ENDIF}
+
 implementation
 
 {$IFDEF MSWINDOWS}
@@ -236,10 +248,13 @@ begin
 {$ELSE}
     Result := Result + Format('%s, kernel %d.%d', [BackendName, NativeVersion div 100, NativeVersion mod 100]);
 {$ENDIF}
+
     if Emulated then
       Result := Result + ' (emulated)';
+
     Result := Result + sLineBreak;
   end;
+
   Result := Result + 'System: ' + SystemDescription;
 
   if BackendName <> '' then
@@ -247,36 +262,45 @@ begin
     Result := Result + sLineBreak + Format('Queues: submission up to %d, completion up to %d',
       [MaxSubmissionQueueSize, MaxCompletionQueueSize]);
     LList := '';
+
     for LOp := Low(TIORingOp) to High(TIORingOp) do
       if LOp in SupportedOps then
       begin
         if LList <> '' then
           LList := LList + ', ';
+
         LList := LList + OP_NAMES[LOp];
       end;
+
     Result := Result + sLineBreak + 'Operations: ' + LList;
 
     LCount := 0;
     LHighest := -1;
+
     for LOpcode := 0 to 255 do
       if Byte(LOpcode) in NativeOps then
       begin
         Inc(LCount);
         LHighest := LOpcode;
       end;
-    Result := Result + sLineBreak + Format('Native: %d opcodes (highest %d), features $%x',
-      [LCount, LHighest, NativeFeatures]);
+
+    Result := Result + sLineBreak + Format('Native: %d opcodes (highest %d), features $%x', [LCount, LHighest, 
+      NativeFeatures]);
 
     LList := '';
+
     for LExtra := Low(TIORingExtra) to High(TIORingExtra) do
       if LExtra in Extras then
       begin
         if LList <> '' then
           LList := LList + ', ';
+
         LList := LList + EXTRA_NAMES[LExtra];
       end;
+
     if LList = '' then
       LList := 'none';
+
     Result := Result + sLineBreak + 'Extras: ' + LList;
   end;
 
@@ -316,9 +340,9 @@ begin
   if not Succeeded then
   begin
     if AOperation <> '' then
-      raise EIORingError.CreateNative(NativeResult, AOperation)
+      RaiseIORingErrorNative(NativeResult, AOperation)
     else
-      raise EIORingError.CreateNative(NativeResult, 'I/O operation');
+      RaiseIORingErrorNative(NativeResult, 'I/O operation');
   end;
 end;
 
@@ -327,6 +351,7 @@ end;
 constructor EIORingError.CreateNative(const ANativeCode: Integer; const AOperation: string);
 begin
   inherited Create(AOperation + ' failed: ' + IORingErrorMessage(ANativeCode));
+
   FNativeCode := ANativeCode;
 end;
 
@@ -343,18 +368,66 @@ begin
     $80460006: Result := 'Another thread is submitting to this IoRing at the same time';
     $80460007: Result := 'The shared ring buffers of the IoRing are corrupt';
     $80460008: Result := 'The IoRing completion queue does not have room for the completions of all entries being submitted';
-  else
-    if (ANativeCode and FACILITY_WIN32_MASK) = FACILITY_WIN32_VALUE then
-      Result := SysErrorMessage(Cardinal(ANativeCode) and $FFFF)
     else
-      Result := SysErrorMessage(Cardinal(ANativeCode));
+      if (ANativeCode and FACILITY_WIN32_MASK) = FACILITY_WIN32_VALUE then
+        Result := SysErrorMessage(Cardinal(ANativeCode) and $FFFF)
+      else
+        Result := SysErrorMessage(Cardinal(ANativeCode));
   end;
 
   if Result = '' then
     Result := 'Unknown error';
+
   Result := Result + Format(' (0x%.8x)', [Cardinal(ANativeCode)]);
 {$ELSE}
   Result := SysErrorMessage(-ANativeCode) + Format(' (errno %d)', [-ANativeCode]);
+{$ENDIF}
+end;
+
+{ Raise helpers. Free Pascal: get_caller_addr and get_caller_frame give what Delphi's ReturnAddress gives. }
+
+procedure RaiseIORingError(const AMessage: string);
+begin
+{$IFDEF FPC}
+  raise EIORingError.Create(AMessage) at get_caller_addr(get_frame), get_caller_frame(get_frame);
+{$ELSE}
+  raise EIORingError.Create(AMessage) at ReturnAddress;
+{$ENDIF}
+end;
+
+procedure RaiseIORingErrorFmt(const AFormat: string; const AArgs: array of const);
+begin
+{$IFDEF FPC}
+  raise EIORingError.CreateFmt(AFormat, AArgs) at get_caller_addr(get_frame), get_caller_frame(get_frame);
+{$ELSE}
+  raise EIORingError.CreateFmt(AFormat, AArgs) at ReturnAddress;
+{$ENDIF}
+end;
+
+procedure RaiseIORingErrorNative(const ANativeCode: Integer; const AOperation: string);
+begin
+{$IFDEF FPC}
+  raise EIORingError.CreateNative(ANativeCode, AOperation) at get_caller_addr(get_frame), get_caller_frame(get_frame);
+{$ELSE}
+  raise EIORingError.CreateNative(ANativeCode, AOperation) at ReturnAddress;
+{$ENDIF}
+end;
+
+procedure RaiseError(const AClass: ExceptClass; const AMessage: string);
+begin
+{$IFDEF FPC}
+  raise AClass.Create(AMessage) at get_caller_addr(get_frame), get_caller_frame(get_frame);
+{$ELSE}
+  raise AClass.Create(AMessage) at ReturnAddress;
+{$ENDIF}
+end;
+
+procedure RaiseErrorFmt(const AClass: ExceptClass; const AFormat: string; const AArgs: array of const);
+begin
+{$IFDEF FPC}
+  raise AClass.CreateFmt(AFormat, AArgs) at get_caller_addr(get_frame), get_caller_frame(get_frame);
+{$ELSE}
+  raise AClass.CreateFmt(AFormat, AArgs) at ReturnAddress;
 {$ENDIF}
 end;
 

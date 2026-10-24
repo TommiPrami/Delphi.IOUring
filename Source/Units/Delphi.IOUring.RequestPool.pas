@@ -1,36 +1,38 @@
 ﻿unit Delphi.IOUring.RequestPool;
 
-// The engine's request slots (Docs/Design.md §10.3): a fixed number of slots,
-// made once and used again and again - no memory allocation per request.
-//
-// Each slot has a 32-bit state word and room for the engine's own request
-// data (the "payload", APayloadSize bytes; the pool does not look at it).
-// Slots are padded to whole cache lines, so two requests never share one.
-//
-// A request is known by its handle: slot index + generation in one
-// NativeUInt, which is also the UserData the ring gives back in the
-// completion. Releasing a slot moves its generation on, so an old handle (a
-// late WaitFor, a stale completion) is recognised: every method that takes a
-// handle checks it. (The generation wraps around after 2^GenerationBits
-// releases of the same slot; a handle that old is not recognised as stale.)
-//
-// Life of a request:
-//
-//   TryAcquire       Free      -> Defined     the owner (any thread)
-//   TryChangeState   Defined   -> Queued      the owner, when it hands the request on
-//   TryChangeState   Queued    -> Submitted   the I/O thread
-//   TryChangeState   Submitted -> Completed   the I/O thread; wakes WaitFor
-//   WaitFor                                   the owner (or anyone with the handle)
-//   Release          Completed -> Free        the owner (also Defined -> Free)
-//
-// TryChangeState allows any change between Defined, Queued, Submitted and
-// Completed (for example Queued -> Completed for a request cancelled before
-// it was submitted); the caller says which state it expects.
-//
-// Free slots are kept in a TIORingFreeList, a lock-free stack.
-//
-// All methods are thread-safe, except Open and Close: no other thread may use
-// the pool (or the free list) during them.
+{
+  The engine's request slots (Docs/Design.md §10.3): a fixed number of slots,
+  made once and used again and again - no memory allocation per request.
+
+  Each slot has a 32-bit state word and room for the engine's own request
+  data (the "payload", APayloadSize bytes; the pool does not look at it).
+  Slots are padded to whole cache lines, so two requests never share one.
+
+  A request is known by its handle: slot index + generation in one
+  NativeUInt, which is also the UserData the ring gives back in the
+  completion. Releasing a slot moves its generation on, so an old handle (a
+  late WaitFor, a stale completion) is recognised: every method that takes a
+  handle checks it. (The generation wraps around after 2^GenerationBits
+  releases of the same slot; a handle that old is not recognised as stale.)
+
+  Life of a request:
+
+   TryAcquire       Free      -> Defined     the owner (any thread)
+   TryChangeState   Defined   -> Queued      the owner, when it hands the request on
+   TryChangeState   Queued    -> Submitted   the I/O thread
+   TryChangeState   Submitted -> Completed   the I/O thread; wakes WaitFor
+   WaitFor                                   the owner (or anyone with the handle)
+   Release          Completed -> Free        the owner (also Defined -> Free)
+
+  TryChangeState allows any change between Defined, Queued, Submitted and
+  Completed (for example Queued -> Completed for a request cancelled before
+  it was submitted); the caller says which state it expects.
+
+  Free slots are kept in a TIORingFreeList, a lock-free stack.
+
+  All methods are thread-safe, except Open and Close: no other thread may use
+  the pool (or the free list) during them.
+}
 
 {$I Delphi.IOUring.inc}
 
@@ -46,8 +48,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Atomics;
+  Delphi.IOUring, Delphi.IOUring.Atomics;
 
 const
   IORING_POOL_MAX_CAPACITY = 1 shl 20;
@@ -65,15 +66,15 @@ type
   TCardinalArray = array[0..MaxInt div SizeOf(Cardinal) - 1] of Cardinal;
   PCardinalArray = ^TCardinalArray;
 
-  // Lock-free stack of the indices 0..Capacity-1 (a Treiber stack).
-  //
-  // The top of the stack and a counter (the "tag") share one 64-bit word,
-  // changed with one compare-exchange (CMPXCHG8B on Win32). The tag changes on
-  // every push and pop, so a thread that read the top before another thread
-  // changed the stack always fails and tries again (no ABA problem). The links
-  // stay in memory until Close, so reading the link of an index that another
-  // thread has just taken is harmless. Before trying again, a thread backs
-  // off (TAtomic.BackOff).
+  {
+    Lock-free stack of the indices 0..Capacity-1 (a Treiber stack).
+
+    The top of the stack and a counter (the "tag") share one 64-bit word, changed with one compare-exchange 
+    (CMPXCHG8B on Win32). The tag changes on every push and pop, so a thread that read the top before another thread
+    changed the stack always fails and tries again (no ABA problem). The links stay in memory until Close, so reading 
+    the link of an index that another thread has just taken is harmless. Before trying again, a thread backs off 
+    (TAtomic.BackOff).
+  }
   TIORingFreeList = record
   private
     FMemory: Pointer;          // as allocated
@@ -199,9 +200,11 @@ implementation
 const
   NO_INDEX = Cardinal($FFFFFFFF);
 
-  // State word: generation (bits 4..31) | WAITING_FLAG | state (bits 0..2).
-  // WAITING_FLAG is set by a thread that is about to sleep in WaitFor; only
-  // then does a change to Completed (or a release) call the wake function.
+  {
+    State word: generation (bits 4..31) | WAITING_FLAG | state (bits 0..2).
+    WAITING_FLAG is set by a thread that is about to sleep in WaitFor; only
+    then does a change to Completed (or a release) call the wake function.
+  }
   STATE_MASK = Cardinal($7);
   WAITING_FLAG = Cardinal($8);
   GENERATION_SHIFT = 4;
@@ -243,13 +246,25 @@ begin
 end;
 
 procedure TIORingFreeList.Open(const ACapacity: Cardinal; const AFull: Boolean);
+
+  procedure RaiseRingCapasityException(const ACapacity: Cardinal);
+  begin
+    raise EIORingError.CreateFmt('Free list capacity must be 1..%d, not %d', [IORING_POOL_MAX_CAPACITY, ACapacity]);
+  end;
+
+  procedure RaiseListAlreadyOpenException;
+  begin
+     raise EIORingError.Create('The free list is already open');
+  end;
+
 var
   LIndex: Cardinal;
 begin
   if (ACapacity = 0) or (ACapacity > IORING_POOL_MAX_CAPACITY) then
-    raise EIORingError.CreateFmt('Free list capacity must be 1..%d, not %d', [IORING_POOL_MAX_CAPACITY, ACapacity]);
+    RaiseRingCapasityException(ACapacity);
+
   if FMemory <> nil then
-    raise EIORingError.Create('The free list is already open');
+    RaiseListAlreadyOpenException;
 
   // The head alone on the first cache line, the links after it
   FHead := IORingAllocCacheAligned(IORING_CACHE_LINE_SIZE + NativeUInt(ACapacity) * SizeOf(Cardinal), FMemory);
@@ -260,6 +275,7 @@ begin
   begin
     for LIndex := 1 to ACapacity - 1 do
       FNext^[LIndex - 1] := LIndex;
+
     FNext^[ACapacity - 1] := NO_INDEX;
     FHead^ := 0;              // tag 0, top 0
   end
@@ -267,6 +283,7 @@ begin
   begin
     for LIndex := 0 to ACapacity - 1 do
       FNext^[LIndex] := NO_INDEX;
+
     FHead^ := NO_INDEX;       // tag 0, empty
   end;
 end;
@@ -275,6 +292,7 @@ procedure TIORingFreeList.Close;
 begin
   if FMemory <> nil then
     FreeMem(FMemory);
+
   FMemory := nil;
   FHead := nil;
   FNext := nil;
@@ -289,40 +307,59 @@ var
   LBackoff: Integer;
 begin
   AIndex := NO_INDEX;
+
   if FHead = nil then
     Exit(False);
+
   LBackoff := 1;
+
   repeat
     LOld := TAtomic.LoadAcquire(FHead^);
     LTop := Cardinal(LOld and $FFFFFFFF);
+
     if LTop = NO_INDEX then
       Exit(False);
-    // If another thread took LTop meanwhile, this link may be wrong - but
-    // then the tag has changed too, and the compare-exchange fails
+
+    {
+      If another thread took LTop meanwhile, this link may be wrong - but
+      then the tag has changed too, and the compare-exchange fails
+    }
     LNew := (((LOld shr 32) + 1) shl 32) or TAtomic.LoadAcquire(FNext^[LTop]);
+
     if TAtomic.CompareExchange(FHead^, LNew, LOld) = LOld then
       Break;
+
     TAtomic.BackOff(LBackoff);
   until False;
+
   AIndex := LTop;
   Result := True;
 end;
 
 procedure TIORingFreeList.Push(const AIndex: Cardinal);
+
+  procedure RaiseFriilistIndexOutOfRangeExceptiuon(const AIndex, ACapacity: Cardinal);
+  begin
+    raise EIORingError.CreateFmt('Free list index %d out of range (capacity %d)', [AIndex, ACapacity]);
+  end;
+
 var
   LOld: UInt64;
   LNew: UInt64;
   LBackoff: Integer;
 begin
   if AIndex >= FCapacity then
-    raise EIORingError.CreateFmt('Free list index %d out of range (capacity %d)', [AIndex, FCapacity]);
+    RaiseFriilistIndexOutOfRangeExceptiuon(ACapacity, FCapacity);
+
   LBackoff := 1;
   repeat
     LOld := TAtomic.LoadAcquire(FHead^);
     TAtomic.StoreRelease(FNext^[AIndex], Cardinal(LOld and $FFFFFFFF));
     LNew := (((LOld shr 32) + 1) shl 32) or AIndex;
+
     if TAtomic.CompareExchange(FHead^, LNew, LOld) = LOld then
       Exit;
+
     TAtomic.BackOff(LBackoff);
   until False;
 end;
@@ -375,43 +412,75 @@ begin
 end;
 
 procedure TIORingRequestPool.Open(const ACapacity: Cardinal; const APayloadSize: Cardinal);
+
+  procedure RaisePoolCapacityError(const ACapacity: Cardinal);
+  begin
+    raise EIORingError.CreateFmt('Request pool capacity must be 1..%d, not %d', [IORING_POOL_MAX_CAPACITY, ACapacity]);
+  end;
+
+  procedure RaisePayloadSizeException(const APayloadSize: Cardinal);
+  begin
+    raise EIORingError.CreateFmt('Request payload size must be at most %d, not %d', [IORING_POOL_MAX_PAYLOAD_SIZE, 
+      APayloadSize]);
+  end;
+
+  procedure RaisePoolAlreadyIOpenException;
+  begin
+    raise EIORingError.Create('The request pool is already open');
+  end;
+
+  procedure RaiseRequestStrideTooBigException(const ACapacity: Cardinal; const AStride: NativeUInt);
+  begin
+    raise EIORingError.CreateFmt('Request pool of %d slots of %d bytes is too big', [ACapacity, AStride]);
+  end;
+
 var
   LIndex: Cardinal;
   LSize: UInt64;
 begin
   if (ACapacity = 0) or (ACapacity > IORING_POOL_MAX_CAPACITY) then
-    raise EIORingError.CreateFmt('Request pool capacity must be 1..%d, not %d', [IORING_POOL_MAX_CAPACITY, ACapacity]);
-  if APayloadSize > IORING_POOL_MAX_PAYLOAD_SIZE then
-    raise EIORingError.CreateFmt('Request payload size must be at most %d, not %d',
-      [IORING_POOL_MAX_PAYLOAD_SIZE, APayloadSize]);
-  if FMemory <> nil then
-    raise EIORingError.Create('The request pool is already open');
+    RaisePoolCapacityError(ACapacity);
 
-  // Index bits: enough for ACapacity - 1, at least 4, so that the generation
-  // never needs more bits than the state word has. The generation gets the
-  // rest of the handle, at most what the state word holds.
+  if APayloadSize > IORING_POOL_MAX_PAYLOAD_SIZE then
+    RaisePayloadSizeException(APayloadSize;
+
+  if FMemory <> nil then
+    RaisePoolAlreadyIOpenException;
+
+  {
+    Index bits: enough for ACapacity - 1, at least 4, so that the generation
+    never needs more bits than the state word has. The generation gets the
+    rest of the handle, at most what the state word holds.
+  }
   FIndexBits := 4;
+
   while (UInt64(1) shl FIndexBits) < ACapacity do
     Inc(FIndexBits);
+
   FIndexMask := (NativeUInt(1) shl FIndexBits) - 1;
   FGenerationBits := SizeOf(NativeUInt) * 8 - FIndexBits;
+
   if FGenerationBits > STATE_WORD_GENERATION_BITS then
     FGenerationBits := STATE_WORD_GENERATION_BITS;
+
   FGenerationMask := Cardinal((UInt64(1) shl FGenerationBits) - 1);
 
-  FStride := (SLOT_HEADER_SIZE + APayloadSize + IORING_CACHE_LINE_SIZE - 1) and
+  FStride := (SLOT_HEADER_SIZE + APayloadSize + IORING_CACHE_LINE_SIZE - 1) and 
     not NativeUInt(IORING_CACHE_LINE_SIZE - 1);
   LSize := UInt64(ACapacity) * FStride;
+
   if LSize > UInt64(High(NativeInt) div 2) then
-    raise EIORingError.CreateFmt('Request pool of %d slots of %d bytes is too big', [ACapacity, FStride]);
+    RaiseRequestStrideTooBigException(ACapacity, FStride);
 
   try
     FSlots := IORingAllocCacheAligned(NativeUInt(LSize), FMemory);
     FFreeList.Open(ACapacity);
   except
     Close;
+
     raise;
   end;
+
   FPayloads := FSlots + SLOT_HEADER_SIZE;
   FCapacity := ACapacity;
   FPayloadSize := APayloadSize;
@@ -424,8 +493,10 @@ end;
 procedure TIORingRequestPool.Close;
 begin
   FFreeList.Close;
+
   if FMemory <> nil then
     FreeMem(FMemory);
+
   FMemory := nil;
   FSlots := nil;
   FPayloads := nil;
@@ -455,6 +526,7 @@ var
   LIndex: Cardinal;
 begin
   LIndex := IndexOf(AHandle);
+
   if LIndex < FCapacity then
     Result := PCardinal(FSlots + NativeUInt(LIndex) * FStride)
   else
@@ -463,8 +535,7 @@ end;
 
 function TIORingRequestPool.Payload(const AHandle: TIORingRequestHandle): Pointer;
 begin
-  // Only fields here (no constants of the implementation part): FPC inlines
-  // it into other units then
+  // Only fields here (no constants of the implementation part): FPC inlines it into other units then
   Result := FPayloads + NativeUInt(IndexOf(AHandle)) * FStride;
 end;
 
@@ -477,14 +548,17 @@ var
   LWord: Cardinal;
 begin
   AHandle.Value := 0;
+
   if not FFreeList.TryPop(LIndex) then
     Exit(False);
-  // A free slot belongs to nobody: a plain store is enough (old handles have
-  // another generation, so they cannot change the word)
+
+  { A free slot belongs to nobody: a plain store is enough (old handles have another generation, so they cannot change 
+    the word) }
   LWordPtr := PCardinal(FSlots + NativeUInt(LIndex) * FStride);
   LWord := TAtomic.LoadAcquire(LWordPtr^);
   TAtomic.StoreRelease(LWordPtr^, (LWord and not STATE_MASK) or Cardinal(Ord(rsDefined)));
   AHandle.Value := (TIORingUserData(LWord shr GENERATION_SHIFT) shl FIndexBits) or LIndex;
+
   Result := True;
 end;
 
@@ -499,34 +573,49 @@ var
 begin
   Result := False;
   LWordPtr := StateWordOf(AHandle);
+
   if LWordPtr = nil then
     Exit;
+
   LGeneration := GenerationOf(AHandle);
   LNextGeneration := (LGeneration + 1) and FGenerationMask;
+
   if LNextGeneration = 0 then
     LNextGeneration := 1;
 
   LWord := TAtomic.LoadAcquire(LWordPtr^);
   repeat
     LState := LWord and STATE_MASK;
-    if (LWord shr GENERATION_SHIFT <> LGeneration) or
-      ((LState <> Cardinal(Ord(rsDefined))) and (LState <> Cardinal(Ord(rsCompleted)))) then
+
+    if (LWord shr GENERATION_SHIFT <> LGeneration) 
+      or ((LState <> Cardinal(Ord(rsDefined))) and (LState <> Cardinal(Ord(rsCompleted)))) then
       Exit;
+
     LSeen := TAtomic.CompareExchange(LWordPtr^, (LNextGeneration shl GENERATION_SHIFT) or Cardinal(Ord(rsFree)), LWord);
+
     if LSeen = LWord then
       Break;
+
     LWord := LSeen;
   until False;
 
   // Threads still waiting on the old handle wake up and see it stale
   if LWord and WAITING_FLAG <> 0 then
     TAtomic.WakeAll(LWordPtr^);
+
   FFreeList.Push(IndexOf(AHandle));
+
   Result := True;
 end;
 
-function TIORingRequestPool.TryChangeState(const AHandle: TIORingRequestHandle;
-  const AFrom, ATo: TIORingRequestState): Boolean;
+function TIORingRequestPool.TryChangeState(const AHandle: TIORingRequestHandle; const AFrom, 
+  ATo: TIORingRequestState): Boolean;
+
+  procedure RaiseStateMustBeDefinedException;
+  begin
+    raise EIORingError.Create('TryChangeState: states must be Defined, Queued, Submitted or Completed');
+  end;
+
 var
   LWordPtr: PCardinal;
   LGeneration: Cardinal;
@@ -535,29 +624,39 @@ var
   LSeen: Cardinal;
 begin
   if not (AFrom in [rsDefined..rsCompleted]) or not (ATo in [rsDefined..rsCompleted]) then
-    raise EIORingError.Create('TryChangeState: states must be Defined, Queued, Submitted or Completed');
+    RaiseStateMustBeDefinedException;
+
   Result := False;
   LWordPtr := StateWordOf(AHandle);
+
   if LWordPtr = nil then
     Exit;
+
   LGeneration := GenerationOf(AHandle);
 
   LWord := TAtomic.LoadAcquire(LWordPtr^);
+
   repeat
     if (LWord shr GENERATION_SHIFT <> LGeneration) or (LWord and STATE_MASK <> Cardinal(Ord(AFrom))) then
       Exit;
+
     // The waiting flag stays until Completed: the waiters sleep until then
     LNew := (LWord and not STATE_MASK) or Cardinal(Ord(ATo));
+
     if ATo = rsCompleted then
       LNew := LNew and not WAITING_FLAG;
+
     LSeen := TAtomic.CompareExchange(LWordPtr^, LNew, LWord);
+
     if LSeen = LWord then
       Break;
+
     LWord := LSeen;
   until False;
 
   if (ATo = rsCompleted) and (LWord and WAITING_FLAG <> 0) then
     TAtomic.WakeAll(LWordPtr^);
+
   Result := True;
 end;
 
@@ -567,17 +666,20 @@ var
   LWord: Cardinal;
 begin
   LWordPtr := StateWordOf(AHandle);
+
   if LWordPtr = nil then
     Exit(rsStale);
+
   LWord := TAtomic.LoadAcquire(LWordPtr^);
+
   if LWord shr GENERATION_SHIFT <> GenerationOf(AHandle) then
     Result := rsStale
   else
     Result := TIORingRequestState(LWord and STATE_MASK);
 end;
 
-function TIORingRequestPool.WaitFor(const AHandle: TIORingRequestHandle;
-  const ATimeoutMilliseconds: Cardinal): TIORingWaitResult;
+function TIORingRequestPool.WaitFor(const AHandle: TIORingRequestHandle; const ATimeoutMilliseconds: Cardinal)
+  : TIORingWaitResult;
 var
   LWordPtr: PCardinal;
   LGeneration: Cardinal;
@@ -589,14 +691,19 @@ var
   LRemaining: Cardinal;
 begin
   LWordPtr := StateWordOf(AHandle);
+
   if LWordPtr = nil then
     Exit(wrStale);
+
   LGeneration := GenerationOf(AHandle);
   LWord := TAtomic.LoadAcquire(LWordPtr^);
+
   if LWord shr GENERATION_SHIFT <> LGeneration then
     Exit(wrStale);
+
   if LWord and STATE_MASK = Cardinal(Ord(rsCompleted)) then
     Exit(wrCompleted);
+
   if ATimeoutMilliseconds = 0 then
     Exit(wrTimeout);
 
@@ -607,8 +714,10 @@ begin
 
   repeat
     LWord := TAtomic.LoadAcquire(LWordPtr^);
+
     if LWord shr GENERATION_SHIFT <> LGeneration then
       Exit(wrStale);
+
     if LWord and STATE_MASK = Cardinal(Ord(rsCompleted)) then
       Exit(wrCompleted);
 
@@ -616,9 +725,11 @@ begin
     begin
       TAtomic.CpuPause;
       Inc(LSpins);
-      if (LSpins and SPIN_CLOCK_CHECK_MASK = 0) and
-        (TIORingPlatform.TimestampMicroseconds - LStart >= LSpinMicroseconds) then
+
+      if (LSpins and SPIN_CLOCK_CHECK_MASK = 0) 
+        and (TIORingPlatform.TimestampMicroseconds - LStart >= LSpinMicroseconds) then
         LSpinMicroseconds := 0;    // spun long enough: sleep
+
       Continue;
     end;
 
@@ -627,6 +738,7 @@ begin
     begin
       if not TAtomic.TryCompareExchange(LWordPtr^, LWord or WAITING_FLAG, LWord) then
         Continue;
+
       LWord := LWord or WAITING_FLAG;
     end;
 
@@ -635,10 +747,13 @@ begin
     else
     begin
       LElapsed := (TIORingPlatform.TimestampMicroseconds - LStart) div 1000;
+
       if LElapsed >= ATimeoutMilliseconds then
         Exit(wrTimeout);
+
       LRemaining := ATimeoutMilliseconds - Cardinal(LElapsed);
     end;
+
     // Returns on a wake-up, a timeout, or at once if the word has changed;
     // the loop checks again in every case
     TAtomic.WaitWhileEqual(LWordPtr^, LWord, LRemaining);

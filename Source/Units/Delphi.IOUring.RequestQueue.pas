@@ -1,32 +1,27 @@
 ﻿unit Delphi.IOUring.RequestQueue;
 
-// The queue from the producer threads to an I/O thread (Docs/Design.md §10.5):
-// a bounded, lock-free first-in first-out queue of pointer-sized values
-// (request handles). Fixed memory, no allocation per item.
-//
-// The algorithm is Dmitry Vyukov's bounded MPMC queue: an array of cells, and
-// two position counters that only grow (enqueue and dequeue position, each on
-// its own cache line). Each cell has a sequence number that says whose turn
-// the cell is:
-//
-//   Sequence = P          free: the producer that claims position P may write it
-//   Sequence = P + 1      full: the consumer of position P may read it
-//   Sequence = P + Size   free again, for position P + Size (the next lap)
-//
-// A producer claims a position with one compare-exchange on the enqueue
-// position, writes the value, then publishes it by storing the sequence. A
-// consumer does the same on the dequeue side. Producers do not touch the
-// consumer's counter and the other way round, so a busy queue has little
-// contention between the two sides.
-//
-// Any number of producers and consumers may use the queue at the same time
-// (the engine has one consumer per queue, the I/O thread; one compare-
-// exchange per item is the price of not having to trust that). Positions
-// are NativeUInt and wrap around on Win32 after 2^32 items; the differences
-// are compared as signed numbers, so that is harmless.
-//
-// All methods are thread-safe, except Open and Close: no other thread may use
-// the queue during them.
+  {
+    The queue from the producer threads to an I/O thread (Docs/Design.md §10.5): a bounded, lock-free first-in 
+    first-out queue of pointer-sized values (request handles). Fixed memory, no allocation per item.
+
+    The algorithm is Dmitry Vyukov's bounded MPMC queue: an array of cells, and two position counters that only grow 
+    (enqueue and dequeue position, each on its own cache line). Each cell has a sequence number that says whose turn
+    the cell is:
+
+      Sequence = P          free: the producer that claims position P may write it
+      Sequence = P + 1      full: the consumer of position P may read it
+      Sequence = P + Size   free again, for position P + Size (the next lap)
+
+    A producer claims a position with one compare-exchange on the enqueue position, writes the value, then publishes 
+    it by storing the sequence. A consumer does the same on the dequeue side. Producers do not touch the consumer's 
+    counter and the other way round, so a busy queue has little contention between the two sides.
+
+    Any number of producers and consumers may use the queue at the same time (the engine has one consumer per queue, 
+    the I/O thread; one compare-exchange per item is the price of not having to trust that). Positions are NativeUInt 
+    and wrap around on Win32 after 2^32 items; the differences are compared as signed numbers, so that is harmless.
+
+    All methods are thread-safe, except Open and Close: no other thread may use the queue during them.
+  }
 
 {$I Delphi.IOUring.inc}
 
@@ -42,8 +37,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Atomics;
+  Delphi.IOUring, Delphi.IOUring.Atomics;
 
 const
   IORING_QUEUE_MAX_CAPACITY = 1 shl 20;
@@ -53,6 +47,7 @@ type
     Sequence: NativeUInt;
     Value: NativeUInt;
   end;
+
   TIORingQueueCellArray = array[0..MaxInt div SizeOf(TIORingQueueCell) - 1] of TIORingQueueCell;
   PIORingQueueCellArray = ^TIORingQueueCellArray;
 
@@ -129,6 +124,17 @@ begin
 end;
 
 procedure TIORingRequestQueue.Open(const ACapacity: Cardinal; const AFirstPosition: NativeUInt);
+
+  procedure RaiseQueueCapacityException(const ACapacity: Cardinal);
+  begin
+    raise EIORingError.CreateFmt('Request queue capacity must be 1..%d, not %d', [IORING_QUEUE_MAX_CAPACITY, ACapacity]);
+  end;
+
+  procedure RaiseQueueAlreadyOpenException;
+  begin
+    raise EIORingError.Create('The request queue is already open');;
+  end;
+
 var
   LCapacity: Cardinal;
   LBlock: PByte;
@@ -136,11 +142,13 @@ var
   LPosition: NativeUInt;
 begin
   if (ACapacity = 0) or (ACapacity > IORING_QUEUE_MAX_CAPACITY) then
-    raise EIORingError.CreateFmt('Request queue capacity must be 1..%d, not %d', [IORING_QUEUE_MAX_CAPACITY, ACapacity]);
+    RaiseQueueCapacityException(ACapacity);
+
   if FMemory <> nil then
-    raise EIORingError.Create('The request queue is already open');
+    RaiseQueueAlreadyOpenException;
 
   LCapacity := 2;
+
   while LCapacity < ACapacity do
     LCapacity := LCapacity * 2;
 
@@ -156,6 +164,7 @@ begin
   // Every cell is free for the first lap: the position that lands on it
   FEnqueuePosition^ := AFirstPosition;
   FDequeuePosition^ := AFirstPosition;
+
   for LIndex := 0 to LCapacity - 1 do
   begin
     LPosition := AFirstPosition + LIndex;
@@ -167,6 +176,7 @@ procedure TIORingRequestQueue.Close;
 begin
   if FMemory <> nil then
     FreeMem(FMemory);
+
   FMemory := nil;
   FEnqueuePosition := nil;
   FDequeuePosition := nil;
@@ -186,28 +196,34 @@ var
 begin
   if FCells = nil then
     Exit(False);
+
   LBackoff := 1;
   LPosition := TAtomic.LoadAcquire(FEnqueuePosition^);
+
   repeat
     LCell := @FCells^[LPosition and FMask];
     LDifference := NativeInt(TAtomic.LoadAcquire(LCell^.Sequence) - LPosition);
+
     if LDifference = 0 then
     begin
       // The cell is free for this position: claim the position
       if TAtomic.TryCompareExchange(FEnqueuePosition^, LPosition + 1, LPosition) then
         Break;
+
       TAtomic.BackOff(LBackoff);
     end
     else if LDifference < 0 then
       Exit(False)    // the cell still holds a value from the last lap: full
     else
       TAtomic.BackOff(LBackoff);    // another producer took this position
+
     LPosition := TAtomic.LoadAcquire(FEnqueuePosition^);
   until False;
 
   LCell^.Value := AValue;
   // Publish: now the consumer of this position may read it
   TAtomic.StoreRelease(LCell^.Sequence, LPosition + 1);
+
   Result := True;
 end;
 
@@ -219,30 +235,37 @@ var
   LBackoff: Integer;
 begin
   AValue := 0;
+
   if FCells = nil then
     Exit(False);
+
   LBackoff := 1;
   LPosition := TAtomic.LoadAcquire(FDequeuePosition^);
+
   repeat
     LCell := @FCells^[LPosition and FMask];
     LDifference := NativeInt(TAtomic.LoadAcquire(LCell^.Sequence) - (LPosition + 1));
+
     if LDifference = 0 then
     begin
       // The cell holds the value of this position: claim the position
       if TAtomic.TryCompareExchange(FDequeuePosition^, LPosition + 1, LPosition) then
         Break;
+
       TAtomic.BackOff(LBackoff);
     end
     else if LDifference < 0 then
       Exit(False)    // not written yet: empty
     else
       TAtomic.BackOff(LBackoff);    // another consumer took this position
+
     LPosition := TAtomic.LoadAcquire(FDequeuePosition^);
   until False;
 
   AValue := LCell^.Value;
   // Free the cell for the position one lap later
   TAtomic.StoreRelease(LCell^.Sequence, LPosition + FMask + 1);
+
   Result := True;
 end;
 
@@ -253,9 +276,11 @@ var
 begin
   if FCells = nil then
     Exit(0);
+
   // Dequeue position first: then the difference can be too big, never negative
   LDequeue := TAtomic.LoadAcquire(FDequeuePosition^);
   LCount := NativeInt(TAtomic.LoadAcquire(FEnqueuePosition^) - LDequeue);
+
   if LCount < 0 then
     Result := 0
   else if LCount > NativeInt(FCapacity) then

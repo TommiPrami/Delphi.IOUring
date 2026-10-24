@@ -726,36 +726,35 @@ const
   SOCKET_URING_OP_GETSOCKOPT = 2;
   SOCKET_URING_OP_SETSOCKOPT = 3;
 
-{ ---------------------------------------------------------------------------- }
-{ System call wrappers. Result: >= 0 on success, -errno on failure.            }
-{ ---------------------------------------------------------------------------- }
+  { ---------------------------------------------------------------------------- }
+  { System call wrappers. Result: >= 0 on success, -errno on failure.            }
+  { ---------------------------------------------------------------------------- }
 
-// Creates a ring with (at least) entries SQ entries. p: in: flags and the
-// other inputs; out: the sizes, features and ring offsets. Result: the ring's
-// file descriptor (close it with FpClose).
-function io_uring_setup(entries: Cardinal; p: Pio_uring_params): Integer;
+  // Creates a ring with (at least) entries SQ entries. p: in: flags and the
+  // other inputs; out: the sizes, features and ring offsets. Result: the ring's
+  // file descriptor (close it with FpClose).
+  function io_uring_setup(entries: Cardinal; p: Pio_uring_params): Integer;
 
-// Submits to_submit SQEs and/or waits for min_complete CQEs
-// (IORING_ENTER_GETEVENTS). sig: a signal mask (sigset_t) to use while
-// waiting, or nil. Result: the number of SQEs submitted.
-function io_uring_enter(fd: Cardinal; to_submit, min_complete, flags: Cardinal; sig: Pointer): Integer;
+  // Submits to_submit SQEs and/or waits for min_complete CQEs
+  // (IORING_ENTER_GETEVENTS). sig: a signal mask (sigset_t) to use while
+  // waiting, or nil. Result: the number of SQEs submitted.
+  function io_uring_enter(fd: Cardinal; to_submit, min_complete, flags: Cardinal; sig: Pointer): Integer;
 
-// io_uring_enter with the size of arg: with IORING_ENTER_EXT_ARG, arg is a
-// Pio_uring_getevents_arg and argsz = SizeOf(io_uring_getevents_arg);
-// otherwise arg is a sigset_t and argsz its size (8).
-function io_uring_enter2(fd: Cardinal; to_submit, min_complete, flags: Cardinal; arg: Pointer;
-  argsz: NativeUInt): Integer;
+  // io_uring_enter with the size of arg: with IORING_ENTER_EXT_ARG, arg is a
+  // Pio_uring_getevents_arg and argsz = SizeOf(io_uring_getevents_arg);
+  // otherwise arg is a sigset_t and argsz its size (8).
+  function io_uring_enter2(fd: Cardinal; to_submit, min_complete, flags: Cardinal; arg: Pointer;
+    argsz: NativeUInt): Integer;
 
-// Registers or unregisters files, buffers, ... (IORING_REGISTER_*), or asks
-// the kernel (IORING_REGISTER_PROBE). nr_args: the number of items arg points
-// to.
-function io_uring_register(fd: Cardinal; opcode: Cardinal; arg: Pointer; nr_args: Cardinal): Integer;
+  // Registers or unregisters files, buffers, ... (IORING_REGISTER_*), or asks
+  // the kernel (IORING_REGISTER_PROBE). nr_args: the number of items arg points
+  // to.
+  function io_uring_register(fd: Cardinal; opcode: Cardinal; arg: Pointer; nr_args: Cardinal): Integer;
 
 implementation
 
 uses
-  BaseUnix,
-  Syscall;
+  BaseUnix, Syscall;
 
 const
   // The kernel's sigset_t: 64 signals (_NSIG / 8)
@@ -789,14 +788,14 @@ end;
 function io_uring_enter2(fd: Cardinal; to_submit, min_complete, flags: Cardinal; arg: Pointer;
   argsz: NativeUInt): Integer;
 begin
-  Result := KernelResult(do_SysCall(__NR_io_uring_enter, TSysParam(fd), TSysParam(to_submit),
-    TSysParam(min_complete), TSysParam(flags), TSysParam(arg), TSysParam(argsz)));
+  Result := KernelResult(do_SysCall(__NR_io_uring_enter, TSysParam(fd), TSysParam(to_submit), TSysParam(min_complete), 
+    TSysParam(flags), TSysParam(arg), TSysParam(argsz)));
 end;
 
 function io_uring_register(fd: Cardinal; opcode: Cardinal; arg: Pointer; nr_args: Cardinal): Integer;
 begin
-  Result := KernelResult(do_SysCall(__NR_io_uring_register, TSysParam(fd), TSysParam(opcode),
-    TSysParam(arg), TSysParam(nr_args)));
+  Result := KernelResult(do_SysCall(__NR_io_uring_register, TSysParam(fd), TSysParam(opcode), TSysParam(arg), 
+    TSysParam(nr_args)));
 end;
 
 end.
