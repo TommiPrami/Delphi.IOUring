@@ -11,7 +11,7 @@
 //
 // Free Pascal on Linux only, x86-64 and AArch64. The system call numbers are
 // the same on both (io_uring came after the kernel gave all architectures one
-// numbering). AArch64 is [VERIFY]: compiled for, not yet tested on ARM.
+// numbering). Tested on both (ARM64: in CI, Docs/Design.md §12.5).
 //
 // No C library and no liburing: io_uring_setup, io_uring_enter and
 // io_uring_register call the kernel directly. Like liburing's, they return

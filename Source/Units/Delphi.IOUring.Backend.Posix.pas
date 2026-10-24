@@ -3,7 +3,7 @@
 // The Linux ring: TLinuxIORing, built on Delphi.IOUring.Backend.Posix.API
 // (the io_uring system calls, no C library; Docs/Design.md §5.7). User code
 // normally uses it through the TIORing alias in Delphi.IOUring.
-// Free Pascal, Linux 5.11 or newer, x86-64 (AArch64: [VERIFY]).
+// Free Pascal, Linux 5.11 or newer, x86-64 and AArch64.
 //
 // TLinuxIORing is a custom managed record, like TWindowsIORing: it owns the
 // ring and closes it automatically at the end of the variable's scope. It

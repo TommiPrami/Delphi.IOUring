@@ -31,10 +31,10 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Block reader `TIORingBlockReader` (`Delphi.IOUring.BlockReader`: blocks known in advance, read ahead, neighbours merged, handed out in order) | done, tested, benchmarked |
 | Overlap rule of the engine (`orKeepOrder`: per file handle, requests that touch the same bytes take effect in start order) | done, tested, measured |
 | Write stream `TSequentialWriteOnlyFileStream` and writer `TIORingSequentialWriter` (writing in the background) | done, tested, benchmarked |
-| Complete Linux io_uring API translation (`Delphi.IOUring.Backend.Posix.API`, Linux 6.8 header, Free Pascal) | done, tested on x86-64 (WSL2); AArch64 not tested yet |
-| Linux ring `TLinuxIORing` (`Delphi.IOUring.Backend.Posix`; `TIORing` on Linux), the read-ahead reader and the atomics on Linux | done, tested on x86-64 (WSL2) |
-| The engine, block reader, overlap rule and both streams on Linux | done, tested on x86-64 (WSL2); benchmarks run in WSL2 (a first look, not disk numbers) |
-| Linux extras: any io_uring operation (sockets …) and linked operations on the ring; capabilities that describe the system | done, tested on x86-64 (WSL2) |
+| Complete Linux io_uring API translation (`Delphi.IOUring.Backend.Posix.API`, Linux 6.8 header, Free Pascal) | done, tested on x86-64 (WSL2) and ARM64 (CI) |
+| Linux ring `TLinuxIORing` (`Delphi.IOUring.Backend.Posix`; `TIORing` on Linux), the read-ahead reader and the atomics on Linux | done, tested on x86-64 (WSL2) and ARM64 (CI) |
+| The engine, block reader, overlap rule and both streams on Linux | done, tested on x86-64 (WSL2) and ARM64 (CI); benchmarks run in WSL2 (a first look, not disk numbers) |
+| Linux extras: any io_uring operation (sockets …) and linked operations on the ring; capabilities that describe the system | done, tested on x86-64 (WSL2) and ARM64 (CI) |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
 
@@ -46,7 +46,7 @@ See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
 - **Delphi 13**, or **Free Pascal 3.2.2** (Lazarus 5.0). Older Delphi versions
   may work but are not tested.
 - Linux (Free Pascal only; everything except the Windows API unit):
-  **Linux 5.11 or newer**, x86-64 (AArch64 is written for but not tested),
+  **Linux 5.11 or newer**, x86-64 or AArch64,
   with io_uring not switched off. Otherwise `IORingAvailable` returns False.
   Programs need `cthreads` as the first unit (the engine uses threads).
 

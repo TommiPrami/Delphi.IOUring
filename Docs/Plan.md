@@ -284,7 +284,7 @@ Source/
   - [x] Live tests (22): setup and its errors, the ring memory, no-ops, reads and writes through the ring, end of file, errors in the completion, registered files and buffers, the probe, `io_uring_enter` errors, timeouts.
   - [x] New test program `Delphi.IOUring.UnitTests.Linux.lpr`; `Build-FPC.ps1 -Platform Linux64` builds and runs it inside WSL.
   - [x] Found on the way: FPC aligns a variant part (a C union) to the largest field in it – also the fields after the union. In the SQE the flags union moved from offset 28 to 32. Fixed with `packed` for the two records concerned (Design §6.4); the generated layout tests caught it on their first run.
-  - [ ] AArch64: written for it, not tested yet – needs an ARM machine ([VERIFY], Design §6.4).
+  - [x] AArch64: tested in CI on GitHub's ARM64 runner (Phase 23): the layout tests pass, and the generator gives the same checks there (Design §6.4).
 
   **Done 2026-10-23** – Linux: 25 tests pass in WSL2 (kernel 6.18, x86-64), with and without `-O3`. Windows: no code changes; the FPC tests (235) still pass on Win32 and Win64 with the changed `Build-FPC.ps1`.
 - **Phase 19** – One set of tests for Delphi, Free Pascal and Linux (Design §12.4): one shared unit per test topic in `Source/UnitTests/Common`, a base class over DUnitX and FPCUnit, the tests that only Delphi has ported, one Free Pascal test program for Windows and Linux. Ends with Delphi and FPC running the same tests on Windows.
@@ -298,11 +298,11 @@ Source/
 - **Phase 20** – `TLinuxIORing` record in `Delphi.IOUring.Backend.Posix` and the platform record `TLinuxIORingPlatform`; `Atomics` on Linux (futex; AArch64 acquire/release); the Linux side of the test helpers; the shared suites that need no engine (atomics, request pool and queue, ring, sequential reader) run on Linux (WSL2 is enough for x86-64 development). Decided: Design §5.7, decision 19.
   - [x] `TLinuxIORing`: the same methods as `TWindowsIORing`; one `mmap` for both rings; `Submit` repeats `io_uring_enter` until every prepared entry is in; timeouts with `IORING_ENTER_EXT_ARG`; registration as a system call with its own completion; scatter/gather segments copied and cut to the byte count; the `eventfd` only when `CompletionEventHandle` is asked for.
   - [x] `TLinuxIORingPlatform` (`O_DIRECT`, `posix_fadvise`, `statx` for the alignment, `mmap`, `AT_PAGESZ`, `clock_gettime`); `FreePages` got a size parameter on both systems. `NativeResult` is 0 or a negative error code on both systems.
-  - [x] Atomics on Linux: the futex; AArch64 barriers written ([VERIFY], no ARM machine and no cross compiler here).
+  - [x] Atomics on Linux: the futex; AArch64 barriers (tested on ARM64 in CI, Phase 23).
   - [x] `TestPlatformHelpers` for Linux: neutral open flags, `pipe()`, `mmap`, waiting on an event, `RESULT_ACCESS_DENIED`. The ring and reader tests run on both systems; new: `Flush_AllModes`, `WriteThrough_UnbufferedFile`, and two Linux-only ring tests (registration at once, scatter cut to the byte count).
   - [x] Changed plan: the read stream suite moves to Phase 21 – the stream unit also holds the write stream, which needs the engine.
   - [x] Found on the way: on Windows, write-through needs an unbuffered file (`0x800701FD` on a cached one; Design §2.1).
-  - [ ] AArch64: not compiled or run yet ([VERIFY], Design §5.7).
+  - [x] AArch64: compiled and run in CI (Phase 23); it found one bug, `O_DIRECT` (Design §12.5).
 
   **Done 2026-10-24** – Linux: 137 tests pass in WSL2 (kernel 6.18), with and without `-O3`. Windows: Delphi 244 tests (Win32 and Win64, Debug and Release), FPC 243 (Win32 and Win64, with and without `-O3`); `lazbuild` builds the test project; the benchmarks compile.
 - **Phase 21** – The engine on Linux (how its I/O thread sleeps and is woken); the block reader, overlap rule, read stream and write stream suites on Linux; the benchmarks on Linux. Decided: Design §10.14, decision 20.
@@ -312,7 +312,7 @@ Source/
   - [x] Found on the way: Free Pascal's `TThread.WaitFor` on Unix waits in 100 ms steps when called from the main thread, so freeing an engine took up to 100 ms. The engine now waits for the end of its I/O threads itself first; new test `Destroy_TenEngines_AreQuick` (Design §10.14).
   - [x] The four benchmarks build and run on Linux (`Build-FPC.ps1 -Platform Linux64 -Project …`); first WSL2 results in Benchmarks.md, marked: cold in WSL2 is not the disk.
   - [x] `Build-FPC.ps1 -Distribution`: the tests also pass in Ubuntu 26.04 (no gcc there; the linker warns about `crtbegin.o` but works).
-  - [ ] Benchmarks on a real Linux machine (not WSL2), and AArch64.
+  - [ ] Benchmarks on a real Linux machine (not WSL2), and on AArch64 (planned on the CI runners, Phase 23).
 
   **Done 2026-10-24** – Linux: 230 tests pass in WSL2 (kernel 6.18; Ubuntu 24.04 and 26.04), with and without `-O3`. Windows: Delphi 245 tests (Win32 and Win64, Debug and Release), FPC 244 (Win32 and Win64, with and without `-O3`; also FPC trunk 3.3.1, Win64); `lazbuild` builds the test project; the benchmarks compile with Delphi and FPC, and the FPC ones also on Linux.
 - **Phase 22** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only. Decided: Design §5.8, decision 21.
@@ -338,6 +338,7 @@ free, ARM64 included.)
   - [x] The test program prints `IORingCapabilities.ToString` first; `ToString` names the reason first when the ring is not available.
   - [x] `.github/workflows/ci.yml`: Linux x64 and ARM64 (tests debug and `-O3`, the layout generator against the committed file, benchmarks built), Windows Server 2025 (FPC 3.2.2 installer, cached; tests Win32 and Win64 debug and `-O3`, or built only with a warning when IoRing 4 is missing; benchmarks built); the benchmarks run when started by hand, output kept as an artifact.
   - [x] The first run: Linux x64 and Windows Server 2025 (it has IoRing 4) passed; Linux ARM64 found that FPC 3.2.2's `O_DIRECT` is the x86 value on AArch64 (there it means `O_DIRECTORY`): fixed with an own flag per CPU. Failed tests now also become annotations (readable without signing in).
+  - [x] Second run: all tests pass on ARM64 too (debug and `-O3`) – AArch64 verified. The layout check compared whole files, whose first lines name the CPU; it now compares the checks only.
   - [ ] A green run on all three runners.
   - [ ] The benchmarks once on the runners (first Linux numbers outside WSL2).
 - **Phase 24** – Packages: a Delphi runtime package (`.dpk`) and a Lazarus package (`.lpk`), so a project adds the library in one step; later maybe GetIt or Lazarus's Online Package Manager.

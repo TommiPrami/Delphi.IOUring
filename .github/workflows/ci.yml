@@ -73,15 +73,29 @@ jobs:
         run: ./.github/scripts/Invoke-Tests.ps1 -Optimize
 
       # The C header's layout on this CPU must give the same checks as the
-      # committed file (git keeps it with LF, the generator writes CRLF)
+      # committed file. Only the checks count: the first lines name the
+      # header version and the CPU (git keeps the file with LF, the generator
+      # writes CRLF). A difference becomes annotations of the run.
       - name: Layout of the Linux API translation
         if: success() || failure()
         shell: bash
         run: |
           cd Source/UnitTests/Linux
           cp Tests.Linux.Backend.Posix.API.Layout.inc "$RUNNER_TEMP/committed.inc"
-          bash Generate-PosixApiLayout.sh
-          diff <(tr -d '\r' < "$RUNNER_TEMP/committed.inc") <(tr -d '\r' < Tests.Linux.Backend.Posix.API.Layout.inc)
+          if ! bash Generate-PosixApiLayout.sh > "$RUNNER_TEMP/generate.log" 2>&1; then
+            cat "$RUNNER_TEMP/generate.log"
+            tail -n 10 "$RUNNER_TEMP/generate.log" | while IFS= read -r line; do echo "::error title=Layout generator::${line//%/%25}"; done
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/generate.log"
+          head -n 2 Tests.Linux.Backend.Posix.API.Layout.inc
+          if ! diff <(grep -F 'ACheck(' "$RUNNER_TEMP/committed.inc" | tr -d '\r') \
+                    <(grep -F 'ACheck(' Tests.Linux.Backend.Posix.API.Layout.inc | tr -d '\r') > "$RUNNER_TEMP/layout.diff"; then
+            cat "$RUNNER_TEMP/layout.diff"
+            head -n 10 "$RUNNER_TEMP/layout.diff" | while IFS= read -r line; do echo "::error title=Layout differs on this CPU::${line//%/%25}"; done
+            exit 1
+          fi
+          echo "The same $(grep -cF 'ACheck(' Tests.Linux.Backend.Posix.API.Layout.inc) checks as the committed file"
 
       - name: Build the benchmarks
         run: |

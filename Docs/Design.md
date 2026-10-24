@@ -1217,11 +1217,11 @@ plus the three syscall wrappers. x86-64 and AArch64 only.
     `-EINVAL`.
   - Waiting with `IORING_ENTER_EXT_ARG` and a timeout, and
     `IORING_OP_TIMEOUT`, end with `-ETIME`.
-- **[VERIFY] AArch64:** build and run the Linux tests on an ARM machine, and
-  run the generator there (its output must be the same, apart from the
-  comment line). Also look at the code FPC makes for the fields of the two
-  packed records: it may load them byte by byte if it thinks they could be
-  unaligned.
+- **[VERIFIED] AArch64** (Phase 23, GitHub's ARM64 runner): the Linux tests
+  build and pass there, the layout tests included, and the generator gives
+  the same 373 checks (only its comment lines differ). Still to look at:
+  the code FPC makes for the fields of the two packed records – it may load
+  them byte by byte if it thinks they could be unaligned.
 
 ---
 
@@ -2950,6 +2950,12 @@ capabilities report at the top of the test program's output (3).
   test into an annotation with the test's name. On Linux the `-O3` tests and
   the layout check run also after a failed debug run, so one run shows
   everything.
+- **[VERIFIED] The second run** (commit 8e46eac): with the `O_DIRECT` fix
+  all 243 tests pass on ARM64, in the debug build and with `-O3`. Only the
+  layout check failed, and only because the CI step compared whole files:
+  the generated file's first lines name the header version and the CPU
+  ("for AArch64"). The step now compares only the 373 checks, and reports a
+  real difference as annotations.
 
 ---
 

@@ -30,8 +30,8 @@
 // routine. Neither compiler moves or caches reads and writes of shared
 // memory across them (the tests check this with optimization on, too).
 // AArch64 (Linux, Free Pascal) does not keep that order by itself: there
-// every operation gets real barriers (DMB). [VERIFY] Written for AArch64, not
-// yet run on it (Docs/Design.md §5.7).
+// every operation gets real barriers (DMB). Tested on ARM64 in CI, with the
+// stress tests, debug and -O3 (Docs/Design.md §5.7, §12.5).
 //
 // Sleeping and waking: WaitOnAddress on Windows, the futex on Linux.
 
