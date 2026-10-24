@@ -362,7 +362,7 @@ free, ARM64 included.)
 
 Only what a benchmark has already shown:
 
-- **Phase 26** – Read straight into the caller's buffer for big aligned reads (Design §7, point 7): with cached data the read stream is 16–31 % slower than `TFileStream`, on every system measured, because of one more copy. On Linux also the clock through the C library (13 ns instead of 94 ns; Design §10.14).
+- **Phase 26** – Read straight into the caller's buffer for big aligned reads (Design §7, point 7): with cached data the read stream is 16–31 % slower than `TFileStream`, on every system measured, because of one more copy. On Linux also the clock through the C library (13 ns instead of 94 ns; Design §10.14). Proposal: Design §12.8 (measured on this machine and in WSL2); waits for the decisions marked [DECIDE].
 - **Phase 27** – The atomics on AArch64: on GitHub's ARM64 runner the lock-free structures sometimes lose to a mutex (queue with 2–3 producers in a tight loop 0.87–0.90; free list with 4 threads and work 0.88), while on x86-64 they always win. Every atomic operation there has full barriers around it, and FPC 3.2.2 does not inline its `ReadWriteBarrier` on AArch64. Measure inline barriers and lighter ordering (acquire/release instructions); keep the lock-free structures only where they win (Design §10.5).
 
 Small things, any time: run the Windows benchmarks once more (the shared
@@ -376,6 +376,6 @@ of git (they are ignored now, but still tracked).
 
 Phase 25 is done, and with it Milestone 5: CI on three runners, a Lazarus
 package, six demos, version 0.1.0 (no tag yet). Next is Milestone 6:
-**Phase 26** (read straight into the caller's buffer; the Linux clock) or
-**Phase 27** (the atomics on AArch64). Each starts with a proposal and its
-decisions, as before.
+**Phase 26** (read straight into the caller's buffer; the Linux clock): the
+proposal is in Design §12.8, with the measurements; it waits for the
+decisions marked [DECIDE]. Then Phase 27 (the atomics on AArch64).

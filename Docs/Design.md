@@ -3146,6 +3146,76 @@ and run. And there is no version anyone can point at.
 - `ToString` ends with the library line also when the ring is not
   available.
 
+### 12.8 Big reads straight into the caller's buffer (Phase 26)
+
+The read stream copies twice: the kernel copies into the reader's 1 MiB
+buffers, and `Read` copies from there into the caller's memory. With data in
+the file cache that is the gap to `TFileStream` (16–31 % in the benchmarks,
+Benchmarks.md). §7, point 7 parked the idea: when one `Read` asks for more
+than the buffers hold, read straight into the caller's memory.
+
+**Facts found before Phase 26** (a measuring program in a scratch folder,
+2026-10-24; a 4 GiB file read in `Read` calls of 64 MiB and of 8 MiB,
+median of 3 runs, MiB/s). "Direct" is the upper limit of the idea: each call
+done on a ring as 8 reads in flight straight into the caller's buffer, then
+waited for – no reading ahead between calls:
+
+| | 64 MiB calls, cold | warm | 8 MiB calls, cold | warm |
+| --- | ---: | ---: | ---: | ---: |
+| *Windows (this machine's NVMe disk)* | | | | |
+| TFileStream | 3 349 | **7 199** | 4 279 | **8 726** |
+| the stream now (copies) | **6 655** | 6 129 | **6 716** | 6 278 |
+| direct | 5 523 | 6 951 | 5 285 | 8 466 |
+| *Linux (WSL2; cold is not the disk)* | | | | |
+| TFileStream | 3 931 | **11 759** | 4 117 | **15 387** |
+| the stream now (copies) | **4 604** | 9 919 | **4 918** | 10 280 |
+| direct | 3 878 | 11 663 | 4 069 | 15 253 |
+
+- **[VERIFIED] Warm, reading straight into the caller's buffer closes the
+  gap**: 97–99 % of `TFileStream`, where the stream now gets 67–85 %.
+- **[VERIFIED] Cold, it loses 16–21 % to the stream now**, because each
+  call waits for its own reads and nothing is read ahead for the next call:
+  the disk stands still between calls. So the idea needs both – the call's
+  own bytes straight into the caller's memory, and reading ahead after the
+  end of the call as now.
+- **Big calls are common:** Delphi's `TMemoryStream.LoadFromStream` and
+  `TBytesStream` read the whole stream with one `ReadBuffer`;
+  `TStrings.LoadFromStream` does so for files up to about 336 MB;
+  `CopyFrom` works in 1 MiB pieces (the size of one buffer – no gain there).
+  Small calls (64 KiB) cannot avoid the copy; the zero-copy reader is the
+  tool for them (within 10 % of plain reads).
+- **The Linux clock** (Phase 26 in the plan: the C library's
+  `clock_gettime`, 13 instead of 94 ns): the library reads the clock only
+  on slow paths – twice per stall, and in the request pool's spin. An
+  unbuffered 1 GiB read has about 1 000 stalls: about 2 000 reads of the
+  clock, 0.16 ms per GiB saved, less than 0.1 % of the time.
+
+**Phase 26 proposal:**
+
+- **[DECIDE] 1. Build it, and keep it only if it wins.** Proposed: in
+  `TIORingSequentialReader.Read` (the stream uses it, so both get it), the
+  part of a call that the read-ahead buffers do not cover is read straight
+  into the caller's memory, in pieces of the buffer size, up to the
+  read-ahead count in flight; meanwhile the reader's buffers read ahead
+  after the end of the call. Kept only if, in the measurements above, it is
+  as fast as `TFileStream` warm and not slower than now cold, and the
+  64 KiB calls of the benchmark do not change. Other choice: do not build
+  it, and say in the README that big reads are faster with the zero-copy
+  reader.
+- **[DECIDE] 2. When a call goes straight to the caller's memory.**
+  Proposed: only the part of a call beyond what the buffers hold (by
+  default 8 MiB), so calls up to that size work as now; unbuffered only
+  when the caller's address and the part's length are multiples of the
+  sector size – otherwise as now. Other choice: from a fixed call size
+  (for example 2 MiB), with the buffers in flight drained first.
+- **[DECIDE] 3. The Linux clock stays as it is** (measured: less than
+  0.1 %); Phase 26 drops it. Other choice: change it anyway (one function,
+  the C library's `clock_gettime`).
+
+**Phase 26 decisions (decided 2026-10-24):** all three as proposed – build
+it and keep it only if it wins (1), only the part beyond what the buffers
+hold, unbuffered only when aligned (2), the Linux clock stays (3).
+
 ---
 
 ## 13. Ideas parked for later
