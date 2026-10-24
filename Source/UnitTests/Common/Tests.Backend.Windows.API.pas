@@ -21,9 +21,7 @@ uses
 {$ELSE}
   Winapi.Windows,
 {$ENDIF}
-  Delphi.IOUring.Backend.Windows.API,
-  TestPlatformHelpers,
-  Tests.Support;
+  Delphi.IOUring.Backend.Windows.API, TestPlatformHelpers, Tests.Support;
 
 type
   TCompletionArray = array of IORING_CQE;
@@ -69,11 +67,9 @@ implementation
 
 uses
 {$IFDEF FPC}
-  SysUtils,
-  Classes,
+  SysUtils, Classes,
 {$ELSE}
-  System.SysUtils,
-  System.Classes,
+  System.SysUtils, System.Classes,
 {$ENDIF}
   TestFileHelpers;
 
@@ -103,6 +99,7 @@ constructor TSubmitWaitThread.Create(const ARing: HIORING);
 begin
   FRing := ARing;
   Result := E_PENDING;
+
   inherited Create(True);
 end;
 
@@ -121,10 +118,11 @@ end;
 
 procedure TWindowsIoRingApiTests.TearDown;
 begin
-  // CloseIoRing does not cancel operations still in flight, so every test
-  // completes or cancels its own I/O before it ends
+  { CloseIoRing does not cancel operations still in flight, so every test completes or cancels
+    its own I/O before it ends }
   if FRing <> 0 then
     CloseIoRing(FRing);
+
   FRing := 0;
   FreeAndNil(FResources);
 end;
@@ -152,6 +150,7 @@ var
   LCqe: IORING_CQE;
 begin
   Result := nil;
+
   while PopIoRingCompletion(ARing, LCqe) = S_OK do
   begin
     SetLength(Result, Length(Result) + 1);
@@ -165,9 +164,11 @@ var
   LIndex: Integer;
 begin
   Result := Default(IORING_CQE);
+
   for LIndex := 0 to High(ACompletions) do
     if ACompletions[LIndex].UserData = AUserData then
       Exit(ACompletions[LIndex]);
+
   Fail(Format('No completion with UserData %d', [AUserData]));
 end;
 
@@ -199,10 +200,10 @@ begin
   AssertEquals('CQ', Int64(32), Int64(LInfo.CompletionQueueSize));
 
   LRing := NewRing(10, 100);
+
   try
     CheckResult('GetIoRingInfo', S_OK, GetIoRingInfo(LRing, LInfo));
-    Log(Format('Requested SQ=10 CQ=100 -> SQ=%d CQ=%d',
-      [LInfo.SubmissionQueueSize, LInfo.CompletionQueueSize]));
+    Log(Format('Requested SQ=10 CQ=100 -> SQ=%d CQ=%d', [LInfo.SubmissionQueueSize, LInfo.CompletionQueueSize]));
     AssertEquals('SQ', Int64(16), Int64(LInfo.SubmissionQueueSize));
     AssertEquals('CQ', Int64(128), Int64(LInfo.CompletionQueueSize));
   finally
@@ -232,8 +233,10 @@ begin
   LFlags := Default(IORING_CREATE_FLAGS);
   LResult := CreateIoRing(IORING_VERSION_4, LFlags, LCapabilities.MaxSubmissionQueueSize * 2, 0, FRing);
   Log('VERIFY: CreateIoRing with SQ = 2 x max returns ' + HrToStr(LResult));
+
   if Succeeded(LResult) then
     CloseIoRing(FRing);
+
   FRing := 0;
   CheckResult('SQ too big', IORING_E_SUBMISSION_QUEUE_TOO_BIG, LResult);
 end;
@@ -244,6 +247,7 @@ var
   LSupported: Boolean;
 begin
   FRing := NewRing;
+
   for LOp := IORING_OP_NOP to IORING_OP_WRITE_GATHER do
   begin
     LSupported := IsIoRingOpSupported(FRing, LOp);
@@ -292,8 +296,7 @@ var
   LCompletions: TCompletionArray;
   LCqe: IORING_CQE;
 begin
-  // With FPC on Win32 this is the proof that IORING_HANDLE_REF and
-  // IORING_BUFFER_REF are passed by value correctly
+  // With FPC on Win32 this is the proof that IORING_HANDLE_REF and IORING_BUFFER_REF are passed by value correctly
   FRing := NewRing;
   LFile := FResources.OpenFile(SharedPatternFile(PATTERN_FILE_SIZE));
 
@@ -308,6 +311,7 @@ begin
 
   LCompletions := PopAll(FRing);
   AssertEquals('Completions', Length(OFFSETS), Length(LCompletions));
+
   for LIndex := Low(OFFSETS) to High(OFFSETS) do
   begin
     LCqe := FindCompletion(LCompletions, NativeUInt(LIndex + 1));
@@ -327,8 +331,8 @@ begin
   LCqe.Information := 4713;
   CheckResult('Empty queue', S_FALSE, PopIoRingCompletion(FRing, LCqe));
 
-  // Learn says the cqe is not modified on S_FALSE; Windows 11 build 26300
-  // zeroes it. Either way: do not use the cqe when the result is S_FALSE.
+  { Learn says the cqe is not modified on S_FALSE; Windows 11 build 26300 zeroes it. Either way: do not use the cqe
+    when the result is S_FALSE. }
   Log(Format('VERIFY: cqe after S_FALSE: UserData=%d ResultCode=%d Information=%d',
     [LCqe.UserData, LCqe.ResultCode, LCqe.Information]));
 end;
@@ -443,6 +447,7 @@ begin
   LMemory := FResources.AllocPages(SEGMENT_COUNT * LPage);
 
   FillChar(LSegments, SizeOf(LSegments), 0);
+
   for LIndex := 0 to SEGMENT_COUNT - 1 do
     LSegments[LIndex].Buffer := UInt64(NativeUInt(LMemory + NativeUInt(SEGMENT_COUNT - 1 - LIndex) * LPage));
 
@@ -454,6 +459,7 @@ begin
   AssertEquals('Completions', 1, Length(LCompletions));
   CheckResult('Scatter read', S_OK, LCompletions[0].ResultCode);
   AssertEquals('Bytes', Int64(SEGMENT_COUNT) * Int64(LPage), Int64(LCompletions[0].Information));
+
   for LIndex := 0 to SEGMENT_COUNT - 1 do
     CheckPattern(LPage + UInt64(LIndex) * LPage, LMemory + NativeUInt(SEGMENT_COUNT - 1 - LIndex) * LPage, LPage);
 end;
@@ -477,6 +483,7 @@ begin
   LReadMemory := FResources.AllocPages(SEGMENT_COUNT * LPage);
 
   FillChar(LSegments, SizeOf(LSegments), 0);
+
   for LIndex := 0 to SEGMENT_COUNT - 1 do
   begin
     TTestFileHelpers.FillPattern(UInt64(LIndex) * LPage, (LWriteMemory + NativeUInt(LIndex) * LPage)^, LPage);
@@ -541,8 +548,10 @@ begin
   CheckResult('Submit', S_OK, SubmitIoRing(FRing, 0, 0, nil));
   Sleep(50);
   LCompletions := PopAll(FRing);
+
   if Length(LCompletions) > 0 then
     Log('VERIFY: pipe read completed at once with ' + HrToStr(LCompletions[0].ResultCode));
+
   AssertEquals('Pipe read pending', 0, Length(LCompletions));
 
   CheckResult('Build cancel', S_OK, BuildIoRingCancelRequest(FRing, IoRingHandleRefFromHandle(LClient), 1, 2));
@@ -631,6 +640,7 @@ begin
       CheckResult('Build', S_OK, BuildIoRingReadFile(FRing, IoRingHandleRefFromHandle(LFile),
         IoRingBufferRefFromPointer(@LBuffer), SizeOf(LBuffer), 0, LUserData, IOSQE_FLAGS_NONE));
     end;
+
     if LRound < Integer(LInfo.CompletionQueueSize div LInfo.SubmissionQueueSize) then
       CheckResult(Format('Round %d', [LRound]), S_OK,
         SubmitIoRing(FRing, IORING_SUBMIT_WAIT_ALL, WAIT_TIMEOUT_MS, nil));
@@ -660,6 +670,7 @@ begin
     IoRingBufferRefFromPointer(@LPipeBuffer), SizeOf(LPipeBuffer), 0, 1, IOSQE_FLAGS_NONE));
 
   LThread := TSubmitWaitThread.Create(FRing);
+
   try
     LThread.Start;
     Sleep(200);
@@ -676,6 +687,7 @@ begin
   finally
     LThread.Free;
   end;
+
   AssertEquals('Completions', 1, Length(PopAll(FRing)));
 end;
 

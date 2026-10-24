@@ -2690,6 +2690,10 @@ Where `{$IFDEF FPC}` is accepted (and only there):
 - Managed-record operator declarations.
 - `Delphi.IOUring.Atomics` internals.
 - The API unit's import mechanism (FPC has no `delayed`, §6.3).
+- The raise helpers in `Delphi.IOUring.Backend.Custom`: `noreturn` for
+  Delphi only (FPC's trunk refuses it on a routine that raises), and the
+  caller's address (Delphi `ReturnAddress`, FPC `get_caller_addr`) –
+  [CodingStyle.md](CodingStyle.md), "Raising".
 
 Found while porting (FPC 3.2.2), worth remembering:
 - `for` loop counters cannot be 64-bit on 32-bit targets.
@@ -2711,6 +2715,9 @@ tested.
 
 ### 12.3 Other conventions
 
+- The coding style – layout, the 120-character margin, comments, empty
+  lines, `inherited`, raising through the raise helpers, `const`/`var`
+  parameters – is in [CodingStyle.md](CodingStyle.md) (2026-10-24).
 - Every unit includes `Delphi.IOUring.inc` (holds `{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}`
   and shared switches).
 - OS constants as typed constants, not enums.

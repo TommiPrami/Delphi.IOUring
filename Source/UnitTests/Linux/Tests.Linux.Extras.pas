@@ -12,8 +12,7 @@
 interface
 
 uses
-  TestPlatformHelpers,
-  Tests.Support;
+  TestPlatformHelpers, Tests.Support;
 
 type
   TLinuxExtrasTests = class(TIORingTestCase)
@@ -43,11 +42,7 @@ type
 implementation
 
 uses
-  SysUtils,
-  BaseUnix,
-  Sockets,
-  Delphi.IOUring,
-  Delphi.IOUring.Backend.Posix.API;
+  SysUtils, BaseUnix, Sockets, Delphi.IOUring, Delphi.IOUring.Backend.Custom, Delphi.IOUring.Backend.Posix.API;
 
 // A pointer as a __u64 of an SQE (addr)
 function AddressOf(const APointer: Pointer): UInt64;
@@ -57,12 +52,19 @@ end;
 
 // The next completion, waiting up to 5 s for it
 function WaitCompletion(var ARing: TIORing): TIORingCompletion;
+
+  procedure RaiseNoCompletion; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(Exception, 'No completion within 5 s');
+  end;
+
 begin
   if not ARing.TryPopCompletion(Result) then
   begin
     ARing.WaitForCompletions(1, 5000);
+
     if not ARing.TryPopCompletion(Result) then
-      raise Exception.Create('No completion within 5 s');
+      RaiseNoCompletion;
   end;
 end;
 
@@ -72,6 +74,7 @@ var
   LFirst: TIORingCompletion;
 begin
   LFirst := WaitCompletion(ARing);
+
   if LFirst.UserData = AUserData1 then
   begin
     ACompletion1 := LFirst;
@@ -85,11 +88,18 @@ begin
 end;
 
 procedure PrepareNop(var ARing: TIORing; const AUserData: TIORingUserData);
+
+  procedure RaiseNoRoom; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(Exception, 'No room for a NOP');
+  end;
+
 var
   LSqe: Pio_uring_sqe;
 begin
   if not ARing.PrepareSqe(AUserData, LSqe) then
-    raise Exception.Create('No room for a NOP');
+    RaiseNoRoom;
+
   LSqe^.opcode := IORING_OP_NOP;
 end;
 
@@ -106,12 +116,19 @@ begin
 end;
 
 function TLinuxExtrasTests.FourByteFile: THandle;
+
+  procedure RaiseWriteFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(Exception, 'Could not write the test file');
+  end;
+
 const
   DATA: array[0..3] of Byte = (1, 2, 3, 4);
 begin
   Result := FResources.CreateNewFile;
+
   if FpWrite(Result, DATA, SizeOf(DATA)) <> SizeOf(DATA) then
-    raise Exception.Create('Could not write the test file');
+    RaiseWriteFailed;
 end;
 
 { PrepareSqe }
@@ -138,11 +155,14 @@ var
   LIndex: Integer;
 begin
   LRing.Open(4);
+
   for LIndex := 1 to LRing.SubmissionQueueSize do
     PrepareNop(LRing, LIndex);
+
   AssertFalse('No room', LRing.PrepareSqe(99, LSqe));
   AssertTrue('No entry', LSqe = nil);
   AssertEquals('Submitted', LRing.SubmissionQueueSize, LRing.Submit(LRing.SubmissionQueueSize));
+
   for LIndex := 1 to LRing.SubmissionQueueSize do
     AssertTrue('Succeeded', WaitCompletion(LRing).Succeeded);
 end;
@@ -342,8 +362,7 @@ var
   LNop: TIORingCompletion;
 begin
   LRing.Open(8);
-  AssertTrue(LRing.PrepareRead(TIORingFileRef.FromHandle(BAD_HANDLE), TIORingBufferRef.FromPointer(@LBuffer),
-    4, 0, 1));
+  AssertTrue(LRing.PrepareRead(TIORingFileRef.FromHandle(BAD_HANDLE), TIORingBufferRef.FromPointer(@LBuffer), 4, 0, 1));
   LRing.LinkToNext;
   PrepareNop(LRing, 2);
   LRing.Submit(2);
@@ -381,8 +400,7 @@ var
   LNop: TIORingCompletion;
 begin
   LRing.Open(8);
-  AssertTrue(LRing.PrepareRead(TIORingFileRef.FromHandle(BAD_HANDLE), TIORingBufferRef.FromPointer(@LBuffer),
-    4, 0, 1));
+  AssertTrue(LRing.PrepareRead(TIORingFileRef.FromHandle(BAD_HANDLE), TIORingBufferRef.FromPointer(@LBuffer), 4, 0, 1));
   LRing.LinkToNext(True);
   PrepareNop(LRing, 2);
   LRing.Submit(2);
@@ -396,6 +414,7 @@ procedure TLinuxExtrasTests.LinkToNext_NothingPrepared_Raises;
   function Raises(var ARing: TIORing): Boolean;
   begin
     Result := False;
+
     try
       ARing.LinkToNext;
     except

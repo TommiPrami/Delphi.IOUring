@@ -22,14 +22,11 @@ uses
   cthreads,          // Free Pascal on Linux: threads (the library uses them)
 {$ENDIF}
 {$IFDEF FPC}
-  SysUtils,
-  Classes,
+  SysUtils, Classes,
 {$ELSE}
-  System.SysUtils,
-  System.Classes,
+  System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring.SequentialReader,
-  Demo.Common in '..\Common\Demo.Common.pas';
+  Delphi.IOUring.SequentialReader, Demo.Common in '..\Common\Demo.Common.pas';
 
 type
   TAdler32 = record
@@ -57,9 +54,12 @@ begin
   while ALength > 0 do
   begin
     LCount := ALength;
+
     if LCount > NMAX then
       LCount := NMAX;
+
     Dec(ALength, LCount);
+
     while LCount > 0 do
     begin
       Inc(A, AData^);
@@ -67,6 +67,7 @@ begin
       Inc(AData);
       Dec(LCount);
     end;
+
     A := A mod MOD_ADLER;
     B := B mod MOD_ADLER;
   end;
@@ -77,8 +78,8 @@ begin
   Result := (B shl 16) or A;
 end;
 
-// The library's way: the reader hands out its own buffers (no copy) in file
-// order; give each one back with ReleaseChunk so it can be read into again
+{ The library's way: the reader hands out its own buffers (no copy) in file order; give each one back with ReleaseChunk
+  so it can be read into again }
 function ChecksumWithReader(const AFileName: string; const AUnbuffered: Boolean;
   out ABytes: Int64; out AStalls: UInt64): Cardinal;
 var
@@ -89,19 +90,24 @@ var
   LAdler: TAdler32;
 begin
   LOptions := [];
+
   if AUnbuffered then
     Include(LOptions, sroUnbuffered);
+
   LAdler.Init;
   ABytes := 0;
   LReader.Open(AFileName, LOptions);   // default: 8 buffers of 1 MiB
+
   while LReader.TryAcquireChunk(LData, LLength) do
   begin
     LAdler.Add(LData, LLength);
     Inc(ABytes, LLength);
     LReader.ReleaseChunk;
   end;
+
   // How often the checksum had to wait for data
   AStalls := LReader.Stats.Stalls;
+
   Result := LAdler.Value;
 end;
 
@@ -118,6 +124,7 @@ begin
   SetLength(LBuffer, CHUNK);
   LAdler.Init;
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
+
   try
     repeat
       LRead := LStream.Read(LBuffer[0], CHUNK);
@@ -126,6 +133,7 @@ begin
   finally
     LStream.Free;
   end;
+
   Result := LAdler.Value;
 end;
 
@@ -144,12 +152,15 @@ begin
   try
     LFileName := '';
     LUnbuffered := False;
+
     for LIndex := 1 to ParamCount do
       if ParamStr(LIndex) = '--unbuffered' then
         LUnbuffered := True
       else
         LFileName := ParamStr(LIndex);
+
     LTemporary := LFileName = '';
+
     if LTemporary then
     begin
       LFileName := DemoFileName('Checksum.dat');
@@ -169,6 +180,7 @@ begin
       LMilliseconds := DemoMilliseconds - LStart;
       Writeln(Format('TFileStream:      the same %d bytes in %d ms (%s)',
         [LBytes, LMilliseconds, MiBPerSecond(LBytes, LMilliseconds)]));
+
       if LStreamSum <> LReaderSum then
       begin
         Writeln(Format('Different checksums: %.8x with TFileStream!', [LStreamSum]));

@@ -51,17 +51,12 @@ implementation
 
 uses
 {$IFDEF FPC}
-  SysUtils,
-  Classes,
+  SysUtils, Classes,
 {$ELSE}
-  System.SysUtils,
-  System.Classes,
+  System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Atomics,
-  Delphi.IOUring.Engine,
-  Delphi.IOUring.BlockReader,
-  Bench.Common;
+  Delphi.IOUring, Delphi.IOUring.Atomics, Delphi.IOUring.Backend.Custom, Delphi.IOUring.Engine,
+  Delphi.IOUring.BlockReader, Bench.Common;
 
 {$IFDEF FPC}
 const
@@ -107,8 +102,8 @@ const
     'Block reader, read-ahead 32, MaxGap 32 KiB',
     'Block reader, read-ahead 32, synchronous handle');
   READ_AHEAD: array[TContender] of Cardinal = (0, 0, 0, 1, 8, 32, 128, 128, 128, 128, 128, 32, 32);
-  // The engine a block reader uses: its I/O threads, and whether it keeps the
-  // order of overlapping requests (orKeepOrder; one file then uses one I/O thread)
+  { The engine a block reader uses: its I/O threads, and whether it keeps the order of overlapping requests
+    (orKeepOrder; one file then uses one I/O thread) }
   IO_THREADS: array[TContender] of Integer = (0, 0, 0, 1, 1, 1, 1, 2, 4, 1, 4, 1, 1);
   KEEP_ORDER: array[TContender] of Boolean = (False, False, False, False, False, False, False, False, False,
     True, True, False, False);
@@ -121,9 +116,8 @@ type
     Bytes: Int64;
   end;
 
-  // One thread of the "8 threads" contender: every THREAD_COUNT-th block,
-  // with a synchronous handle of its own (one shared synchronous handle
-  // would let only one thread read at a time)
+  { One thread of the "8 threads" contender: every THREAD_COUNT-th block, with a synchronous handle of its own (one
+    shared synchronous handle would let only one thread read at a time) }
   TReadFileThread = class(TThread)
   private
     FFileName: string;
@@ -163,6 +157,7 @@ begin
   AState := AState xor (AState shl 13);
   AState := AState xor (AState shr 17);
   AState := AState xor (AState shl 5);
+
   Result := AState;
 end;
 
@@ -178,9 +173,11 @@ begin
   SetLength(Result, GBlockCount);
   LBlocksInFile := Cardinal(AFileSize div BLOCK_SIZE);
   LOffset := 0;
+
   for LIndex := 0 to GBlockCount - 1 do
   begin
     Result[LIndex].Length := BLOCK_SIZE;
+
     if AKind = lkRandom then
       Result[LIndex].Offset := UInt64(NextRandom(LRandom) mod LBlocksInFile) * BLOCK_SIZE
     else
@@ -192,11 +189,11 @@ begin
   end;
 end;
 
-// Files are opened with BenchOpenForReading. AOverlapped = False on Windows:
-// a synchronous handle - positioned ReadFile waits for the data. Windows runs
-// the I/O of such a handle one at a time, also from several threads and also
-// through IoRing; the block reader needs AOverlapped = True to have many reads
-// in flight.
+{
+  Files are opened with BenchOpenForReading. AOverlapped = False on Windows: a synchronous handle - positioned ReadFile
+  waits for the data. Windows runs the I/O of such a handle one at a time, also from several threads and also through
+  IoRing; the block reader needs AOverlapped = True to have many reads in flight.
+}
 
 { TReadFileThread }
 
@@ -210,6 +207,7 @@ begin
   FReady := AReady;
   FEnded := AEnded;
   Consumer.Init(0);
+
   inherited Create(True);
 end;
 
@@ -223,11 +221,15 @@ begin
     // Page-aligned, as unbuffered reads need
     LBuffer := TIORingPlatform.AllocPages(BLOCK_SIZE);
     LFile := BenchOpenForReading(FFileName, False, FUnbuffered);
+
     try
       TAtomic.Increment(FReady^);
+
       while TAtomic.LoadAcquire(FReady^) < THREAD_COUNT do
         TThread.Yield;
+
       LIndex := FFirst;
+
       while LIndex <= High(FBlocks) do
       begin
         BenchReadAt(LFile, LBuffer^, FBlocks[LIndex].Length, FBlocks[LIndex].Offset);
@@ -253,6 +255,7 @@ var
   LIndex: Integer;
 begin
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
+
   try
     for LIndex := 0 to High(ABlocks) do
     begin
@@ -272,6 +275,7 @@ var
 begin
   // Page-aligned, as unbuffered reads need
   LBuffer := TIORingPlatform.AllocPages(BLOCK_SIZE);
+
   try
     for LIndex := 0 to High(ABlocks) do
     begin
@@ -285,6 +289,12 @@ end;
 
 procedure ReadWithThreads(const AFileName: string; const AUnbuffered: Boolean; const ABlocks: TBlockList;
   var AConsumer: TBenchConsumer);
+
+  procedure RaiseThreadFailed(const AMessage: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseErrorFmt(Exception, 'Read thread failed: %s', [AMessage]);
+  end;
+
 var
   LThreads: array[0..THREAD_COUNT - 1] of TReadFileThread;
   LReady: Integer;
@@ -294,27 +304,34 @@ var
 begin
   LReady := 0;
   LEnded := 0;
+
   for LIndex := 0 to THREAD_COUNT - 1 do
     LThreads[LIndex] := TReadFileThread.Create(AFileName, AUnbuffered, ABlocks, LIndex, @LReady, @LEnded);
+
   try
     for LIndex := 0 to THREAD_COUNT - 1 do
       LThreads[LIndex].Start;
-    // Free Pascal on Unix: WaitFor from the main thread waits in 100 ms steps
-    // unless the thread has finished already (as TIORingIOThread.WaitUntilEnded
-    // in the engine): wait for the ends of Execute first, then for Finished
+
+    { Free Pascal on Unix: WaitFor from the main thread waits in 100 ms steps unless the thread has finished already (as
+      TIORingIOThread.WaitUntilEnded in the engine): wait for the ends of Execute first, then for Finished }
     LValue := TAtomic.LoadAcquire(LEnded);
+
     while LValue < THREAD_COUNT do
     begin
       TAtomic.WaitWhileEqual(LEnded, LValue);
       LValue := TAtomic.LoadAcquire(LEnded);
     end;
+
     for LIndex := 0 to THREAD_COUNT - 1 do
     begin
       while not LThreads[LIndex].Finished do
         TThread.Yield;
+
       LThreads[LIndex].WaitFor;
+
       if LThreads[LIndex].FatalException <> nil then
-        raise Exception.Create('Read thread failed: ' + Exception(LThreads[LIndex].FatalException).Message);
+        RaiseThreadFailed(Exception(LThreads[LIndex].FatalException).Message);
+
       AConsumer.Merge(LThreads[LIndex].Consumer);
     end;
   finally
@@ -332,6 +349,7 @@ var
   LLength: Cardinal;
 begin
   LReader.Open(AEngine, AFile, ABlocks, AReadAhead, IORING_BLOCK_READER_DEFAULT_BUFFER_SIZE, AMaxGap);
+
   while LReader.TryGetBlock(LBlock, LData, LLength) do
   begin
     AConsumer.Consume(LData, LLength);
@@ -367,8 +385,8 @@ begin
     case IO_THREADS[AContender] of
       2: Result := GEngine2;
       4: Result := GEngine4;
-    else
-      Result := GEngine;
+      else
+        Result := GEngine;
     end;
 end;
 
@@ -382,29 +400,30 @@ var
 begin
   if ACache = csCold then
     PurgeFileCache(AFileName);
+
   LUnbuffered := ACache = csUnbuffered;
   LConsumer.Init(0);
   // The block readers need an overlapped handle on Windows (see above)
-  LFile := BenchOpenForReading(AFileName, (READ_AHEAD[AContender] > 0) and (AContender <> cnReader32Sync),
-    LUnbuffered);
+  LFile := BenchOpenForReading(AFileName, (READ_AHEAD[AContender] > 0) and (AContender <> cnReader32Sync), LUnbuffered);
+
   try
     LMeasurement.Start;
+
     case AContender of
-      cnFileStream:
-        ReadWithFileStream(AFileName, ABlocks, LConsumer);
-      cnReadFile:
-        ReadWithReadFile(LFile, ABlocks, LConsumer);
-      cnReadFileThreads:
-        ReadWithThreads(AFileName, LUnbuffered, ABlocks, LConsumer);
+      cnFileStream: ReadWithFileStream(AFileName, ABlocks, LConsumer);
+      cnReadFile: ReadWithReadFile(LFile, ABlocks, LConsumer);
+      cnReadFileThreads: ReadWithThreads(AFileName, LUnbuffered, ABlocks, LConsumer);
       cnReader32Gap:
         ReadWithBlockReader(EngineFor(AContender), LFile, ABlocks, READ_AHEAD[AContender], MAX_GAP, LConsumer);
-    else
-      ReadWithBlockReader(EngineFor(AContender), LFile, ABlocks, READ_AHEAD[AContender], 0, LConsumer);
+      else
+        ReadWithBlockReader(EngineFor(AContender), LFile, ABlocks, READ_AHEAD[AContender], 0, LConsumer);
     end;
+
     LMeasurement.Stop;
   finally
     BenchCloseFile(LFile);
   end;
+
   Result.Seconds := LMeasurement.Seconds;
   Result.CpuMilliseconds := LMeasurement.UserMilliseconds + LMeasurement.KernelMilliseconds;
   Result.Checksum := LConsumer.Checksum;
@@ -421,19 +440,24 @@ var
   LValue: Double;
 begin
   SetLength(LSorted, Length(AValues));
+
   for LIndex := 0 to High(AValues) do
     LSorted[LIndex] := AValues[LIndex];
+
   for LIndex := 1 to High(LSorted) do
   begin
     LValue := LSorted[LIndex];
     LOther := LIndex - 1;
+
     while (LOther >= 0) and (LSorted[LOther] > LValue) do
     begin
       LSorted[LOther + 1] := LSorted[LOther];
       Dec(LOther);
     end;
+
     LSorted[LOther + 1] := LValue;
   end;
+
   Result := LSorted[High(LSorted) div 2];
 end;
 
@@ -445,15 +469,20 @@ var
 begin
   if GCsvFile = '' then
     Exit;
+
   LNew := not FileExists(GCsvFile);
   AssignFile(LFile, GCsvFile);
+
   if LNew then
     Rewrite(LFile)
   else
     Append(LFile);
+
   try
     if LNew then
-      Writeln(LFile, 'timestamp,compiler,platform,blocks,scenario,cache,contender,run,seconds,blocks_per_s,mib_per_s,cpu_ms,checksum_ok');
+      Writeln(LFile, 'timestamp,compiler,platform,blocks,scenario,cache,contender,run,seconds,blocks_per_s,' +
+        'mib_per_s,cpu_ms,checksum_ok');
+
     Writeln(LFile, Format('%s,%s,%s,%d,%s,%s,"%s",%d,%.4f,%.0f,%.1f,%.1f,%s',
       [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now, GInvariant), COMPILER_NAME, BenchPlatformName, GBlockCount,
        LIST_NAMES[AKind], CACHE_NAMES[ACache], CONTENDER_NAMES[AContender], ARun, AResult.Seconds,
@@ -465,15 +494,28 @@ begin
 end;
 
 procedure ParseOptions;
+
+  procedure RaiseUnknownOption(const AIndex: Integer); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseErrorFmt(Exception, 'Unknown option: %s', [ParamStr(AIndex)]);
+  end;
+
+  procedure RaiseBadCounts; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(Exception, '--runs, --blocks and --size-gib must be at least 1');
+  end;
+
 var
   LIndex: Integer;
   LName: string;
 begin
   GFolder := DefaultBenchFolder;
   LIndex := 1;
+
   while LIndex <= ParamCount do
   begin
     LName := LowerCase(ParamStr(LIndex));
+
     if (LName = '--dir') and (LIndex < ParamCount) then
     begin
       Inc(LIndex);
@@ -502,11 +544,13 @@ begin
     else if LName = '--keep' then
       GKeep := True
     else
-      raise Exception.CreateFmt('Unknown option: %s', [ParamStr(LIndex)]);
+      RaiseUnknownOption(LIndex);
+
     Inc(LIndex);
   end;
+
   if (GRuns < 1) or (GBlockCount < 1) or (GSizeGiB < 1) then
-    raise Exception.Create('--runs, --blocks and --size-gib must be at least 1');
+    RaiseBadCounts;
 end;
 
 procedure RunBlockBenchmarks;
@@ -534,12 +578,14 @@ begin
   LFileName := IncludeTrailingPathDelimiter(GFolder) + Format('blocks-%dGiB.dat', [GSizeGiB]);
   Writeln(Format('Blocks known in advance: %s %s, %s', [COMPILER_NAME, BenchPlatformName,
     FormatDateTime('yyyy-mm-dd hh:nn', Now, GInvariant)], GInvariant));
+
   if FileSizeOf(LFileName) <> LSize then
   begin
     Write(Format('Creating %s (%d GiB) ... ', [LFileName, GSizeGiB]));
     CreateBenchFile(LFileName, LSize);
     Writeln('done');
   end;
+
   Writeln(Format('%d blocks of %d bytes per list; median of %d runs', [GBlockCount, BLOCK_SIZE, GRuns], GInvariant));
 
   GEngine := TIORingEngine.Create;
@@ -549,53 +595,68 @@ begin
     1, orKeepOrder);
   GEngine4Keep := TIORingEngine.Create(IORING_ENGINE_DEFAULT_MAX_REQUESTS, IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE,
     4, orKeepOrder);
+
   try
     for LKind := Low(TListKind) to High(TListKind) do
     begin
       LBlocks := MakeList(LKind, LSize);
+
       for LCache := Low(TCacheState) to High(TCacheState) do
       begin
         Writeln;
         Writeln(Format('%s, %s cache', [LIST_NAMES[LKind], CACHE_NAMES[LCache]]));
         Writeln(Format('  %-54s %11s %9s %9s', ['Contender', 'K blocks/s', 'MiB/s', 'CPU ms'], GInvariant));
+
         if LCache = csWarm then
           RunContender(cnReadFile, LFileName, LBlocks, csWarm);    // bring the blocks into the cache
+
         LHaveExpected := False;
         LExpected := 0;
+
         for LContender := Low(TContender) to High(TContender) do
         begin
           SetLength(LSeconds[LContender], GRuns);
           SetLength(LCpu[LContender], GRuns);
           LAllOK[LContender] := True;
         end;
+
         // The contenders take turns, so that a slow moment of the machine hits all of them
         for LRun := 1 to GRuns do
           for LContender := Low(TContender) to High(TContender) do
           begin
             if not Runs(LContender, LKind, LCache) then
               Continue;
+
             LResult := RunContender(LContender, LFileName, LBlocks, LCache);
+
             if not LHaveExpected then
             begin
               LExpected := LResult.Checksum;
               LHaveExpected := True;
             end;
+
             LChecksumOK := LResult.Checksum = LExpected;
+
             if not LChecksumOK then
               LAllOK[LContender] := False;
+
             LSeconds[LContender][LRun - 1] := LResult.Seconds;
             LCpu[LContender][LRun - 1] := LResult.CpuMilliseconds;
             AppendCsv(LKind, LCache, LContender, LRun, LResult, LChecksumOK);
           end;
+
         for LContender := Low(TContender) to High(TContender) do
         begin
           if not Runs(LContender, LKind, LCache) then
             Continue;
+
           LMedian := Median(LSeconds[LContender]);
+
           if LAllOK[LContender] then
             LMark := ''
           else
             LMark := '  CHECKSUM!';
+
           Writeln(Format('  %-54s %11.1f %9.1f %9.0f%s', [CONTENDER_NAMES[LContender], GBlockCount / LMedian / 1000,
             GBlockCount * BLOCK_SIZE / LMedian / MiB, Median(LCpu[LContender]), LMark], GInvariant));
         end;
@@ -608,6 +669,7 @@ begin
     GEngine2.Free;
     GEngine.Free;
   end;
+
   if not GKeep then
     DeleteFile(LFileName);
 end;

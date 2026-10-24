@@ -1,29 +1,28 @@
 ﻿unit Delphi.IOUring.BlockReader;
 
-// Reads blocks that are known in advance - (offset, length) pairs that a
-// provider gives - through a shared engine (Docs/Design.md §10.4, Phase 14).
-//
-//   var
-//     LReader: TIORingBlockReader;               // closed at the end of scope
-//   begin
-//     LReader.Open(LEngine, LFile, NextBlock);   // or a list of blocks
-//     while LReader.TryGetBlock(LBlock, LData, LLength) do
-//     begin
-//       Process(LBlock, LData, LLength);         // zero-copy
-//       LReader.ReleaseBlock;
-//     end;
-//   end;
-//
-// Up to ReadAhead reads are in flight while the caller works on the current
-// block. Neighbouring blocks (touching, or with at most MaxGap bytes between
-// them) are read with one read, if it fits into one buffer. The blocks come
-// out in the provider's order, whatever order the reads complete in.
-//
-// One thread at a time. The engine and the file handle belong to the caller:
-// close the reader before destroying the engine or closing the file. Open
-// the file with FILE_FLAG_OVERLAPPED (TIORingPlatform.OpenFileForRead does):
-// on a handle opened without it, Windows reads one block at a time, whatever
-// the read-ahead.
+{
+  Reads blocks that are known in advance - (offset, length) pairs that a provider gives - through a shared engine
+  (Docs/Design.md §10.4, Phase 14).
+
+    var
+      LReader: TIORingBlockReader;               // closed at the end of scope
+    begin
+      LReader.Open(LEngine, LFile, NextBlock);   // or a list of blocks
+      while LReader.TryGetBlock(LBlock, LData, LLength) do
+      begin
+        Process(LBlock, LData, LLength);         // zero-copy
+        LReader.ReleaseBlock;
+      end;
+    end;
+
+  Up to ReadAhead reads are in flight while the caller works on the current block. Neighbouring blocks (touching, or
+  with at most MaxGap bytes between them) are read with one read, if it fits into one buffer. The blocks come out in the
+  provider's order, whatever order the reads complete in.
+
+  One thread at a time. The engine and the file handle belong to the caller: close the reader before destroying the
+  engine or closing the file. Open the file with FILE_FLAG_OVERLAPPED (TIORingPlatform.OpenFileForRead does): on a
+  handle opened without it, Windows reads one block at a time, whatever the read-ahead.
+}
 
 {$I Delphi.IOUring.inc}
 
@@ -49,9 +48,8 @@ type
     class function Create(const AOffset: UInt64; const ALength: Cardinal): TIORingBlock; static;
   end;
 
-  // Gives the next block the reader will need. False: no more blocks.
-  // Called on the reader's thread, at most one block ahead of the reads
-  // already started.
+  { Gives the next block the reader will need. False: no more blocks. Called on the reader's thread, at most one block
+    ahead of the reads already started. }
   TIORingBlockProvider = function(out ABlock: TIORingBlock): Boolean of object;
 
   TIORingBlockReaderStats = record
@@ -78,8 +76,7 @@ type
     BlockCount: Integer;
   end;
 
-  // Custom managed record: owns the buffer memory and waits for its reads
-  // at the end of scope. Not copyable.
+  // Custom managed record: owns the buffer memory and waits for its reads at the end of scope. Not copyable.
   TIORingBlockReader = record
   private
     FEngine: TIORingEngine;
@@ -101,9 +98,9 @@ type
     FBlockAcquired: Boolean;
     FStats: TIORingBlockReaderStats;
 
-    procedure OpenCommon(const AEngine: TIORingEngine; const AFile: THandle; const AReadAhead, ABufferSize, 
+    procedure OpenCommon(const AEngine: TIORingEngine; const AFile: THandle; const AReadAhead, ABufferSize,
       AMaxGap: Cardinal);
-    function FetchBlock(out ABlock: TIORingBlock): Boolean;
+    function FetchBlock(var ABlock: TIORingBlock): Boolean;
     function CanJoin(const ASlot: PIORingBlockSlot; const ABlock: TIORingBlock): Boolean;
     procedure StartReads;
     function CompleteHead(const AWait: Boolean): Boolean;
@@ -119,11 +116,11 @@ type
     class operator Assign(var ADest: TIORingBlockReader; const [ref] ASource: TIORingBlockReader);
 {$ENDIF}
 
-    // Starts reading the blocks AProvider gives, from AFile (opened with read
-    // access) through AEngine. AReadAhead buffers of ABufferSize bytes: a
-    // block may be at most ABufferSize long. The engine must allow at least
-    // AReadAhead requests (TIORingEngine.MaxRequests). Raises EIORingError
-    // for bad arguments or if already open.
+    {
+      Starts reading the blocks AProvider gives, from AFile (opened with read access) through AEngine. AReadAhead
+      buffers of ABufferSize bytes: a block may be at most ABufferSize long. The engine must allow at least AReadAhead
+      requests (TIORingEngine.MaxRequests). Raises EIORingError for bad arguments or if already open.
+    }
     procedure Open(const AEngine: TIORingEngine; const AFile: THandle; const AProvider: TIORingBlockProvider;
       const AReadAhead: Cardinal = IORING_BLOCK_READER_DEFAULT_READ_AHEAD;
       const ABufferSize: Cardinal = IORING_BLOCK_READER_DEFAULT_BUFFER_SIZE;
@@ -133,16 +130,15 @@ type
       const AReadAhead: Cardinal = IORING_BLOCK_READER_DEFAULT_READ_AHEAD;
       const ABufferSize: Cardinal = IORING_BLOCK_READER_DEFAULT_BUFFER_SIZE;
       const AMaxGap: Cardinal = 0); overload;
-    // Waits for the reads in flight, then releases everything. Does nothing
-    // if not open.
+    // Waits for the reads in flight, then releases everything. Does nothing if not open.
     procedure Close;
     function IsOpen: Boolean;
 
-    // The next block, in the provider's order. AData: ALength bytes of it,
-    // valid until ReleaseBlock; ALength is shorter than ABlock.Length only at
-    // the end of the file (0 for a block that starts at or after it). False:
-    // no more blocks (Finished), or - with AWait = False - the data is not
-    // there yet. A failed read raises EIORingError.
+    {
+      The next block, in the provider's order. AData: ALength bytes of it, valid until ReleaseBlock; ALength is shorter
+      than ABlock.Length only at the end of the file (0 for a block that starts at or after it). False: no more blocks
+      (Finished), or - with AWait = False - the data is not there yet. A failed read raises EIORingError.
+    }
     function TryGetBlock(out ABlock: TIORingBlock; out AData: PByte; out ALength: Cardinal;
       const AWait: Boolean = True): Boolean;
     procedure ReleaseBlock;
@@ -156,6 +152,9 @@ type
   end;
 
 implementation
+
+uses
+  Delphi.IOUring.Backend.Custom;
 
 { TIORingBlock }
 
@@ -200,18 +199,35 @@ class operator TIORingBlockReader.Copy(constref ASource: TIORingBlockReader; var
 {$ELSE}
 class operator TIORingBlockReader.Assign(var ADest: TIORingBlockReader; const [ref] ASource: TIORingBlockReader);
 {$ENDIF}
+
+  procedure RaiseCannotCopy; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(EInvalidOpException, 'A block reader cannot be copied. Pass it as var or const [ref].');
+  end;
+
 begin
-  raise EInvalidOpException.Create('A block reader cannot be copied. Pass it as var or const [ref].');
+  RaiseCannotCopy;
+end;
+
+procedure RaiseAlreadyOpen; {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseIORingError('The block reader is already open');
 end;
 
 procedure TIORingBlockReader.Open(const AEngine: TIORingEngine; const AFile: THandle;
   const AProvider: TIORingBlockProvider; const AReadAhead, ABufferSize, AMaxGap: Cardinal);
+
+  procedure RaiseNoProvider; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('Block reader: no block provider');
+  end;
+
 begin
   if IsOpen then
-    raise EIORingError.Create('The block reader is already open');
+    RaiseAlreadyOpen;
 
   if not Assigned(AProvider) then
-    raise EIORingError.Create('Block reader: no block provider');
+    RaiseNoProvider;
 
   FProvider := AProvider;
   FUseList := False;
@@ -224,7 +240,7 @@ var
   LIndex: Integer;
 begin
   if IsOpen then
-    raise EIORingError.Create('The block reader is already open');
+    RaiseAlreadyOpen;
 
   SetLength(FList, Length(ABlocks));
 
@@ -238,29 +254,53 @@ end;
 
 procedure TIORingBlockReader.OpenCommon(const AEngine: TIORingEngine; const AFile: THandle;
   const AReadAhead, ABufferSize, AMaxGap: Cardinal);
+
+  procedure RaiseNoEngine; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('Block reader: no engine');
+  end;
+
+  procedure RaiseReadAheadOutOfRange(const ACount: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('Read-ahead %d is not between 1 and %d', [ACount, IORING_BLOCK_READER_MAX_READ_AHEAD]);
+  end;
+
+  procedure RaiseReadAheadTooBig(const ACount: Cardinal; const AMaxRequests: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('Read-ahead %d is more than the engine''s %d requests', [ACount, AMaxRequests]);
+  end;
+
+  procedure RaiseBufferSizeZero; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('Block reader: the buffer size must not be 0');
+  end;
+
+  procedure RaiseBuffersTooBig(const ACount: Cardinal; const ASize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('%d buffers of %d bytes do not fit in memory', [ACount, ASize]);
+  end;
+
 var
   LTotalSize: UInt64;
   LIndex: Integer;
 begin
   try
     if AEngine = nil then
-      raise EIORingError.Create('Block reader: no engine');
+      RaiseNoEngine;
 
     if (AReadAhead = 0) or (AReadAhead > IORING_BLOCK_READER_MAX_READ_AHEAD) then
-      raise EIORingError.CreateFmt('Read-ahead %d is not between 1 and %d',
-        [AReadAhead, IORING_BLOCK_READER_MAX_READ_AHEAD]);
+      RaiseReadAheadOutOfRange(AReadAhead);
 
     if AReadAhead > AEngine.MaxRequests then
-      raise EIORingError.CreateFmt('Read-ahead %d is more than the engine''s %d requests',
-        [AReadAhead, AEngine.MaxRequests]);
+      RaiseReadAheadTooBig(AReadAhead, AEngine.MaxRequests);
 
     if ABufferSize = 0 then
-      raise EIORingError.Create('Block reader: the buffer size must not be 0');
+      RaiseBufferSizeZero;
 
     LTotalSize := UInt64(AReadAhead) * ABufferSize;
 
     if LTotalSize > UInt64(High(NativeInt) div 2) then
-      raise EIORingError.CreateFmt('%d buffers of %d bytes do not fit in memory', [AReadAhead, ABufferSize]);
+      RaiseBuffersTooBig(AReadAhead, ABufferSize);
 
     FMemorySize := NativeUInt(LTotalSize);
     FMemory := TIORingPlatform.AllocPages(FMemorySize);
@@ -300,6 +340,7 @@ begin
   if FEngine <> nil then
     for LIndex := 0 to High(FSlots) do
       if FSlots[LIndex].State = bssInFlight then
+
       try
         FEngine.Wait(FSlots[LIndex].Request, LCompletion);
       except
@@ -337,7 +378,15 @@ end;
 
 { TIORingBlockReader - reading }
 
-function TIORingBlockReader.FetchBlock(out ABlock: TIORingBlock): Boolean;
+function TIORingBlockReader.FetchBlock(var ABlock: TIORingBlock): Boolean;
+
+  procedure RaiseBadBlockLength(const ALength: Cardinal; const AOffset: UInt64; const ABufferSize: Cardinal);
+      {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('Block of %d bytes at offset %d: the length must be 1..%d (the buffer size)',
+      [ALength, AOffset, ABufferSize]);
+  end;
+
 begin
   if FUseList then
   begin
@@ -355,16 +404,14 @@ begin
     Result := FProvider(ABlock);
 
   if Result and ((ABlock.Length = 0) or (ABlock.Length > FBufferSize)) then
-    raise EIORingError.CreateFmt('Block of %d bytes at offset %d: the length must be 1..%d (the buffer size)',
-      [ABlock.Length, ABlock.Offset, FBufferSize]);
+    RaiseBadBlockLength(ABlock.Length, ABlock.Offset, FBufferSize);
 end;
 
 function TIORingBlockReader.CanJoin(const ASlot: PIORingBlockSlot; const ABlock: TIORingBlock): Boolean;
 var
   LEnd: UInt64;
 begin
-  // At or after the read's end, at most MaxGap bytes after it, and the read
-  // still fits into one buffer
+  // At or after the read's end, at most MaxGap bytes after it, and the read still fits into one buffer
   LEnd := ASlot^.Offset + ASlot^.Length;
   Result := (ABlock.Offset >= LEnd) and (ABlock.Offset - LEnd <= FMaxGap) and
     (ABlock.Offset + ABlock.Length - ASlot^.Offset <= FBufferSize);
@@ -379,6 +426,7 @@ begin
 
   // All reads of this round wake the I/O thread once
   FEngine.BeginBatch;
+
   try
     while FHaveNext and (FOutstanding < Length(FSlots)) do
     begin
@@ -427,8 +475,9 @@ begin
     FEngine.Wait(LSlot^.Request, LCompletion);
     Inc(FStats.StallMicroseconds, TIORingPlatform.TimestampMicroseconds - LStart);
   end;
-  // The request is finished either way: the slot no longer waits for it.
-  // A failure is kept: every block of this read raises it.
+
+  { The request is finished either way: the slot no longer waits for it. A failure is kept: every
+    block of this read raises it. }
   LSlot^.State := bssReady;
 
   if LCompletion.IsEndOfFile then
@@ -440,11 +489,28 @@ begin
     LSlot^.BytesRead := Cardinal(LCompletion.BytesTransferred);
 
   Inc(FStats.BytesRead, LSlot^.BytesRead);
+
   Result := True;
 end;
 
 function TIORingBlockReader.TryGetBlock(out ABlock: TIORingBlock; out AData: PByte; out ALength: Cardinal;
   const AWait: Boolean): Boolean;
+
+  procedure RaiseNotOpen; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('The block reader is not open');
+  end;
+
+  procedure RaiseBlockNotReleased; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('TryGetBlock: call ReleaseBlock first');
+  end;
+
+  procedure RaiseReadFailed(const AResult: Integer; const AOffset: UInt64); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNativeFmt(AResult, 'Block read at offset %d', [AOffset]);
+  end;
+
 var
   LSlot: PIORingBlockSlot;
   LStart: UInt64;
@@ -454,10 +520,10 @@ begin
   ALength := 0;
 
   if not IsOpen then
-    raise EIORingError.Create('The block reader is not open');
+    RaiseNotOpen;
 
   if FBlockAcquired then
-    raise EIORingError.Create('TryGetBlock: call ReleaseBlock first');
+    RaiseBlockNotReleased;
 
   StartReads;
 
@@ -470,7 +536,7 @@ begin
     Exit(False);
 
   if LSlot^.NativeResult < 0 then
-    raise EIORingError.CreateNative(LSlot^.NativeResult, Format('Block read at offset %d', [LSlot^.Offset]));
+    RaiseReadFailed(LSlot^.NativeResult, LSlot^.Offset);
 
   ABlock := LSlot^.Blocks[FHeadBlock];
   LStart := ABlock.Offset - LSlot^.Offset;
@@ -486,15 +552,23 @@ begin
 
   FBlockAcquired := True;
   Inc(FStats.Blocks);
+
   Result := True;
 end;
 
 procedure TIORingBlockReader.ReleaseBlock;
+
+  procedure RaiseNoBlock; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('ReleaseBlock without a block from TryGetBlock');
+  end;
+
 var
   LSlot: PIORingBlockSlot;
+
 begin
   if not FBlockAcquired then
-    raise EIORingError.Create('ReleaseBlock without a block from TryGetBlock');
+    RaiseNoBlock;
 
   FBlockAcquired := False;
   LSlot := @FSlots[FHead];

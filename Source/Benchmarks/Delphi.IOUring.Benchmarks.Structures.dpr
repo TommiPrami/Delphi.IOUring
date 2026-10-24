@@ -11,9 +11,7 @@
 {$APPTYPE CONSOLE}
 
 uses
-  System.SysUtils,
-  Bench.Common in 'Bench.Common.pas',
-  Bench.Structures in 'Bench.Structures.pas';
+  System.SysUtils, Bench.Common in 'Bench.Common.pas', Bench.Structures in 'Bench.Structures.pas';
 
 begin
   try

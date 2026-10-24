@@ -20,6 +20,7 @@ uses
 
 begin
   Writeln(IORingCapabilities.ToString);
+
   if not IORingAvailable then
     ExitCode := 1;
 end.

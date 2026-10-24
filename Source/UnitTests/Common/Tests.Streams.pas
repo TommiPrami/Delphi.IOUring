@@ -16,8 +16,7 @@ uses
 {$ELSE}
   System.Classes,
 {$ENDIF}
-  TestPlatformHelpers,
-  Tests.Support;
+  TestPlatformHelpers, Tests.Support;
 
 type
   TSequentialReadOnlyFileStreamTests = class(TIORingTestCase)
@@ -48,8 +47,7 @@ type
     procedure Content_SameAsFileStream;
     procedure Content_Unbuffered;
 {$IFNDEF FPC}
-    // TStream.Read(TBytes, ...), Read64 and ReadData: Free Pascal 3.2.2's
-    // TStream does not have them
+    // TStream.Read(TBytes, ...), Read64 and ReadData: Free Pascal 3.2.2's TStream does not have them
     procedure ReadOverloads_Work;
 {$ENDIF}
     procedure ReadBuffer_PastEnd_RaisesEReadError;
@@ -78,10 +76,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.SequentialReader,
-  Delphi.IOUring.Streams,
-  TestFileHelpers;
+  Delphi.IOUring, Delphi.IOUring.SequentialReader, Delphi.IOUring.Streams, TestFileHelpers;
 
 const
   SMALL_BUFFER = 64 * 1024;
@@ -105,12 +100,14 @@ var
   LRaised: Boolean;
 begin
   LRaised := False;
+
   try
     AMethod;
   except
     on EIORingStreamError do
       LRaised := True;
   end;
+
   AssertTrue(AMessage + ' must raise EIORingStreamError', LRaised);
 end;
 
@@ -204,10 +201,13 @@ begin
   SetLength(LActualBuffer, AChunkSize);
 
   LExpected := TFileStream.Create(SharedPatternFile(ASize), fmOpenRead or fmShareDenyNone);
+
   try
     LActual := TSequentialReadOnlyFileStream.Create(SharedPatternFile(ASize), [], SMALL_BUFFER, ABufferCount);
+
     try
       AssertEquals(LContext + ': Size', LExpected.Size, LActual.Size);
+
       repeat
         LExpectedRead := LExpected.Read(LExpectedBuffer[0], AChunkSize);
         LActualRead := LActual.Read(LActualBuffer[0], AChunkSize);
@@ -247,10 +247,12 @@ begin
     LSizes[4] := B + 1;
     LSizes[5] := Int64(B) * LCount;
     LSizes[6] := Int64(B) * LCount + 1;
+
     for LSizeIndex := 0 to High(LSizes) do
     begin
       for LChunkIndex := Low(CHUNKS) to High(CHUNKS) do
         CheckSameAsFileStream(LSizes[LSizeIndex], CHUNKS[LChunkIndex], LCount);
+
       CheckSameAsFileStream(LSizes[LSizeIndex], Integer(LSizes[LSizeIndex]) + 10, LCount);
     end;
   end;
@@ -300,12 +302,14 @@ var
 begin
   FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(100), [], SMALL_BUFFER, 1);
   LRaised := False;
+
   try
     FStream.ReadBuffer(LBuffer, SizeOf(LBuffer));
   except
     on EReadError do
       LRaised := True;
   end;
+
   AssertTrue('ReadBuffer must raise EReadError when the data ends', LRaised);
 end;
 
@@ -328,6 +332,7 @@ begin
 
   while FStream.Read(LBuffer[0], Length(LBuffer)) > 0 do
     ;
+
   AssertEquals('Position at end', Int64(FILE_SIZE), FStream.Position);
   AssertEquals('Size at end', Int64(FILE_SIZE), FStream.Size);
 end;
@@ -341,15 +346,18 @@ var
 begin
   SetLength(LBuffer, FILE_SIZE);
   FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 2);
+
   for LStep := 0 to 2 do
   begin
     AssertEquals('soCurrent', FStream.Position, FStream.Seek(Int64(0), soCurrent));
     AssertEquals('soBeginning', FStream.Position, FStream.Seek(FStream.Position, soBeginning));
     AssertEquals('soEnd', FStream.Position, FStream.Seek(FStream.Position - FStream.Size, soEnd));
     FStream.Position := FStream.Position;
+
     if LStep < 2 then
       FStream.ReadBuffer(LBuffer[0], FILE_SIZE div 2);
   end;
+
   AssertEquals('At the end', Int64(FILE_SIZE), FStream.Position);
 end;
 
@@ -398,12 +406,14 @@ var
 begin
   FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(SMALL_BUFFER), [], SMALL_BUFFER, 1);
   LCaught := False;
+
   try
     WriteBytes;
   except
     on EStreamError do
       LCaught := True;
   end;
+
   AssertTrue('Code that catches EStreamError must catch it', LCaught);
 end;
 
@@ -417,6 +427,7 @@ var
 begin
   FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 2);
   LTarget := TMemoryStream.Create;
+
   try
     AssertEquals('Copied', Int64(FILE_SIZE), LTarget.CopyFrom(FStream, 0));
     AssertEquals('Size', Int64(FILE_SIZE), LTarget.Size);
@@ -435,6 +446,7 @@ var
 begin
   FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 2);
   LTarget := TMemoryStream.Create;
+
   try
     LTarget.CopyFrom(FStream, 1000);
     LTarget.CopyFrom(FStream, 50000);
@@ -444,12 +456,14 @@ begin
 
     // A second CopyFrom(Source, 0) would have to rewind
     LRaised := False;
+
     try
       LTarget.CopyFrom(FStream, 0);
     except
       on EIORingStreamError do
         LRaised := True;
     end;
+
     AssertTrue('Rewind raises', LRaised);
   finally
     LTarget.Free;
@@ -464,6 +478,7 @@ var
 begin
   FStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 2);
   LTarget := TBytesStream.Create;
+
   try
     LTarget.LoadFromStream(FStream);
     AssertEquals('Size', Int64(FILE_SIZE), LTarget.Size);
@@ -483,6 +498,7 @@ begin
   LStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 4);
   FStream := LStream;
   LTarget := TMemoryStream.Create;
+
   try
     LTarget.LoadFromStream(LStream);
     AssertEquals('Size', Int64(FILE_SIZE), LTarget.Size);
@@ -508,9 +524,11 @@ begin
   FResources.AddFile(LFileName);
 
   LLines := TStringList.Create;
+
   try
     for LIndex := 1 to LINE_COUNT do
       LLines.Add(Format('Line %d: %s', [LIndex, StringOfChar(Char(Ord('a') + LIndex mod 26), LIndex mod 97)]));
+
 {$IFDEF FPC}
     LLines.SaveToFile(LFileName);
 {$ELSE}
@@ -525,9 +543,11 @@ begin
 {$ELSE}
     LReader := TStreamReader.Create(FStream, TEncoding.UTF8);
 {$ENDIF}
+
     try
       for LIndex := 0 to LINE_COUNT - 1 do
         AssertEquals(Format('Line %d', [LIndex + 1]), LLines[LIndex], LReader.ReadLine);
+
 {$IFDEF FPC}
       AssertTrue('End', LReader.EOF);
 {$ELSE}
@@ -548,6 +568,7 @@ var
   LRaised: Boolean;
 begin
   LRaised := False;
+
   try
     TSequentialReadOnlyFileStream.Create(TTestFileHelpers.NewTestFileName('Missing')).Free;
   except
@@ -557,6 +578,7 @@ begin
       Log(E.Message);
     end;
   end;
+
   AssertTrue('Like TFileStream, a missing file raises EFOpenError', LRaised);
 end;
 
@@ -565,12 +587,14 @@ var
   LRaised: Boolean;
 begin
   LRaised := False;
+
   try
     TSequentialReadOnlyFileStream.Create(SharedPatternFile(SMALL_BUFFER), [], 1000, 2).Free;
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Bad buffer size raises EIORingError', LRaised);
 
   // The failed constructor released the file handle: an exclusive open works

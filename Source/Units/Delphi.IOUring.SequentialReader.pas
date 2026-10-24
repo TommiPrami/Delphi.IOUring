@@ -1,29 +1,29 @@
 ﻿unit Delphi.IOUring.SequentialReader;
 
-  {
-    Reads a file front to back with read-ahead (Docs/Design.md §7).
+{
+  Reads a file front to back with read-ahead (Docs/Design.md §7).
 
-    BufferCount buffers of BufferSize bytes form a circular queue. Reads for the next buffers are in flight while the 
-    caller works on the current one, so in the best case Read only copies data that is already there.
+  BufferCount buffers of BufferSize bytes form a circular queue. Reads for the next buffers are in flight while the
+  caller works on the current one, so in the best case Read only copies data that is already there.
 
-       var
-         LReader: TIORingSequentialReader;
+     var
+       LReader: TIORingSequentialReader;
+     begin
+       LReader.Open('big.dat');                       // closed at the end of scope
+       while LReader.TryAcquireChunk(LData, LLength) do
        begin
-         LReader.Open('big.dat');                       // closed at the end of scope
-         while LReader.TryAcquireChunk(LData, LLength) do
-         begin
-           Process(LData, LLength);                     // zero-copy
-           LReader.ReleaseChunk;
-         end;
+         Process(LData, LLength);                     // zero-copy
+         LReader.ReleaseChunk;
        end;
+     end;
 
-    The size is taken when the file is opened: data appended later is not read. If the file turns out shorter, the 
-    reader stops there (end of file). One thread at a time.
+  The size is taken when the file is opened: data appended later is not read. If the file turns out shorter, the
+  reader stops there (end of file). One thread at a time.
 
-    Big Read calls (Docs/Design.md §12.8): the part of a call that the buffers have not asked for yet is read straight 
-    into the caller's memory - one copy less. The buffers read ahead after the end of the call once all of those
-    reads have started. Unbuffered, only when the caller's memory and the part's length are whole sectors.
-  }
+  Big Read calls (Docs/Design.md §12.8): the part of a call that the buffers have not asked for yet is read straight
+  into the caller's memory - one copy less. The buffers read ahead after the end of the call once all of those
+  reads have started. Unbuffered, only when the caller's memory and the part's length are whole sectors.
+}
 
 {$I Delphi.IOUring.inc}
 
@@ -40,8 +40,8 @@ uses
 const
   IORING_READER_DEFAULT_BUFFER_SIZE = 1024 * 1024;
   IORING_READER_DEFAULT_BUFFER_COUNT = 8;
-  // BufferSize must be a multiple of this (page size; also covers the sector
-  // size needed for unbuffered reads on usual disks)
+  { BufferSize must be a multiple of this (page size; also covers the sector size needed for
+    unbuffered reads on usual disks) }
   IORING_READER_BUFFER_SIZE_UNIT = 4096;
   IORING_READER_MAX_BUFFER_COUNT = 1024;
 
@@ -87,8 +87,8 @@ type
     Length: Cardinal;
   end;
 
-  // Custom managed record: owns the file handle (if asked), the ring and the
-  // buffer memory, and releases them at the end of scope. Not copyable.
+  { Custom managed record: owns the file handle (if asked), the ring and the buffer memory, and releases them at the
+    end of scope. Not copyable. }
   TIORingSequentialReader = record
   private
     FRing: TIORing;
@@ -131,12 +131,12 @@ type
     function PrepareHead(const AWait: Boolean): Boolean;
     procedure ReleaseHead;
     function CopyFromBuffers(var ATarget: PByte; const AMaxCount: NativeInt): NativeInt;
-    function PlanDirectRead(const ATarget: PByte; const ACount: NativeInt; out AStart, AEnd: Int64): Boolean;
+    function PlanDirectRead(const ATarget: PByte; const ACount: NativeInt; var AStart, AEnd: Int64): Boolean;
     procedure IssueDirectReads;
     procedure DirectReadDone(const ACompletion: TIORingCompletion);
     procedure WaitForDirectReads;
     procedure AbandonDirectReads;
-    procedure RaiseDirectFailure;
+    procedure RaiseDirectFailure; {$IFNDEF FPC} noreturn; {$ENDIF}
   public
 {$IFDEF FPC}
     class operator Initialize(var ADest: TIORingSequentialReader);
@@ -148,14 +148,13 @@ type
     class operator Assign(var ADest: TIORingSequentialReader; const [ref] ASource: TIORingSequentialReader);
 {$ENDIF}
 
-    // Opens the file and starts reading ahead. ABufferSize: multiple of
-    // IORING_READER_BUFFER_SIZE_UNIT. ABufferCount: 1..IORING_READER_MAX_BUFFER_COUNT.
-    procedure Open(const AFileName: string; const AOptions: TIORingSequentialReaderOptions = []; 
+    { Opens the file and starts reading ahead. ABufferSize: multiple of IORING_READER_BUFFER_SIZE_UNIT. ABufferCount:
+      1..IORING_READER_MAX_BUFFER_COUNT. }
+    procedure Open(const AFileName: string; const AOptions: TIORingSequentialReaderOptions = [];
       const ABufferSize: Cardinal = IORING_READER_DEFAULT_BUFFER_SIZE;
       const ABufferCount: Cardinal = IORING_READER_DEFAULT_BUFFER_COUNT); overload;
-    // Reads from a handle opened by the caller (read access; for sroUnbuffered
-    // it must have been opened unbuffered). With AOwnsHandle the reader closes
-    // it, also when Open fails. sroNoSequentialScanHint has no effect here.
+    { Reads from a handle opened by the caller (read access; for sroUnbuffered it must have been opened unbuffered).
+      With AOwnsHandle the reader closes it, also when Open fails. sroNoSequentialScanHint has no effect here. }
     procedure Open(const AHandle: THandle; const AOwnsHandle: Boolean;
       const AOptions: TIORingSequentialReaderOptions = [];
       const ABufferSize: Cardinal = IORING_READER_DEFAULT_BUFFER_SIZE;
@@ -167,9 +166,8 @@ type
     // Copies up to ACount bytes; returns fewer only at the end of the file
     function Read(var ABuffer; const ACount: NativeInt): NativeInt;
 
-    // Zero-copy: the rest of the current buffer, valid until ReleaseChunk.
-    // False at the end of the file, or (AWait = False) when the data is not
-    // there yet - check Eof to tell them apart.
+    { Zero-copy: the rest of the current buffer, valid until ReleaseChunk. False at the end of the file, or (AWait =
+      False) when the data is not there yet - check Eof to tell them apart. }
     function TryAcquireChunk(out AData: PByte; out ALength: NativeInt; const AWait: Boolean = True): Boolean;
     procedure ReleaseChunk;
 
@@ -185,6 +183,9 @@ type
   end;
 
 implementation
+
+uses
+  Delphi.IOUring.Backend.Custom;
 
 const
   // UserData of the registration entries; slot indexes are below IORING_READER_MAX_BUFFER_COUNT
@@ -237,14 +238,25 @@ begin
 end;
 
 {$IFDEF FPC}
-class operator TIORingSequentialReader.Copy(constref ASource: TIORingSequentialReader; 
+class operator TIORingSequentialReader.Copy(constref ASource: TIORingSequentialReader;
   var ADest: TIORingSequentialReader);
 {$ELSE}
-class operator TIORingSequentialReader.Assign(var ADest: TIORingSequentialReader; 
+class operator TIORingSequentialReader.Assign(var ADest: TIORingSequentialReader;
   const [ref] ASource: TIORingSequentialReader);
 {$ENDIF}
+
+  procedure RaiseCannotCopy; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(EInvalidOpException, 'A sequential reader cannot be copied. Pass it as var or const [ref].');
+  end;
+
 begin
-  raise EInvalidOpException.Create('A sequential reader cannot be copied. Pass it as var or const [ref].');
+  RaiseCannotCopy;
+end;
+
+procedure RaiseReaderAlreadyOpen; {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseIORingError('The reader is already open');
 end;
 
 procedure TIORingSequentialReader.Open(const AFileName: string; const AOptions: TIORingSequentialReaderOptions;
@@ -253,7 +265,7 @@ var
   LHandle: THandle;
 begin
   if IsOpen then
-    raise EIORingError.Create('The reader is already open');
+    RaiseReaderAlreadyOpen;
 
   LHandle := TIORingPlatform.OpenFileForRead(AFileName, sroUnbuffered in AOptions,
     not (sroNoSequentialScanHint in AOptions));
@@ -263,31 +275,24 @@ end;
 procedure TIORingSequentialReader.Open(const AHandle: THandle; const AOwnsHandle: Boolean;
   const AOptions: TIORingSequentialReaderOptions; const ABufferSize, ABufferCount: Cardinal);
 
-  procedure RaiseReaderAlreadyOpenException;
+  procedure RaiseBufferSizeNotMultiple(const ASize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.Create('The reader is already open');;
+    RaiseIORingErrorFmt('Buffer size %d is not a multiple of %d', [ASize, IORING_READER_BUFFER_SIZE_UNIT]);
   end;
 
-  procedure RaiseBufferSizeNotMultipleOfException(const ABufferSize: Cardinal);
+  procedure RaiseBufferCountOutOfRange(const ACount: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.CreateFmt('Buffer size %d is not a multiple of %d', [ABufferSize, 
-      IORING_READER_BUFFER_SIZE_UNIT]);
+    RaiseIORingErrorFmt('Buffer count %d is not between 1 and %d', [ACount, IORING_READER_MAX_BUFFER_COUNT]);
   end;
 
-  procedure RaiseBufferSizeNotInRange(const ABufferCount: Cardinal);
+  procedure RaiseBuffersTooBig(const ACount: Cardinal; const ASize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.CreateFmt('Buffer count %d is not between 1 and %d', [ABufferCount, 
-      IORING_READER_MAX_BUFFER_COUNT]);
+    RaiseIORingErrorFmt('%d buffers of %d bytes do not fit in memory', [ACount, ASize]);
   end;
 
-  procedure RaiseBufferDoesNotFitIntoMemoryException(const ABufferCount, ABufferSize: Cardinal)
+  procedure RaiseNotSectorMultiple(const ASectorSize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.CreateFmt('%d buffers of %d bytes do not fit in memory', [ABufferCount, ABufferSize]);
-  end;
-
-  procedure RaiseBufferNotMultipleOfSectorSizeException(const ASectorSize: Cardinal);
-  begin
-    raise EIORingError.CreateFmt('Unbuffered reading needs a buffer size that is a multiple of the sector size %d',
+    RaiseIORingErrorFmt('Unbuffered reading needs a buffer size that is a multiple of the sector size %d',
       [ASectorSize]);
   end;
 
@@ -299,22 +304,23 @@ var
   LRegistration: TIORingCompletion;
 begin
   if IsOpen then
-    RaiseReaderAlreadyOpenException;
+    RaiseReaderAlreadyOpen;
 
   FFile := AHandle;
   FHasFile := True;
   FOwnsFile := AOwnsHandle;
+
   try
     if (ABufferSize = 0) or (ABufferSize mod IORING_READER_BUFFER_SIZE_UNIT <> 0) then
-      RaiseBufferSizeNotMultipleOfException(ABufferSize);
+      RaiseBufferSizeNotMultiple(ABufferSize);
 
     if (ABufferCount = 0) or (ABufferCount > IORING_READER_MAX_BUFFER_COUNT) then
-      RaiseBufferSizeNotInRange(ABufferCount);
+      RaiseBufferCountOutOfRange(ABufferCount);
 
     LTotalSize := UInt64(ABufferSize) * ABufferCount;
 
     if LTotalSize > UInt64(High(NativeInt) div 2) then
-      RaiseBufferDoesNotFitIntoMemoryException(const ABufferCount, ABufferSize);
+      RaiseBuffersTooBig(ABufferCount, ABufferSize);
 
     FAlignment := 1;
 
@@ -323,7 +329,7 @@ begin
       LSectorSize := TIORingPlatform.GetSectorSize(AHandle);
 
       if ABufferSize mod LSectorSize <> 0 then
-        RaiseBufferNotMultipleOfSectorSizeException(LSectorSize);
+        RaiseNotSectorMultiple(LSectorSize);
 
       FAlignment := LSectorSize;
     end;
@@ -359,10 +365,9 @@ begin
       LBufferInfo.Length := Cardinal(LTotalSize);
       FRing.PrepareRegisterFiles([AHandle], REGISTRATION_USER_DATA);
       FRing.PrepareRegisterBuffers([LBufferInfo], REGISTRATION_USER_DATA);
-      // Windows: submitted together with the first reads; registration is a
-      // barrier for them. Linux: registration is a system call, its results
-      // are there already - if it failed (for example RLIMIT_MEMLOCK), read
-      // without it.
+
+      { Windows: submitted together with the first reads; registration is a barrier for them. Linux: registration is a
+        system call, its results are there already - if it failed (for example RLIMIT_MEMLOCK), read without it. }
       while FRing.TryPopCompletion(LRegistration) do
         if not LRegistration.Succeeded then
           FRegistered := False;
@@ -400,8 +405,7 @@ end;
 
 procedure TIORingSequentialReader.Close;
 begin
-  // The ring first: it waits for the reads still in flight, so the kernel is
-  // done with the buffers before they are freed
+  // The ring first: it waits for the reads still in flight, so the kernel is done with the buffers before they are freed
   FRing.Close;
 
   FSlots := nil;
@@ -429,9 +433,16 @@ begin
 end;
 
 procedure TIORingSequentialReader.CheckOpen;
+
+  procedure RaiseNotOpen; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('The reader is not open');
+  end;
+
 begin
   if not FHasFile then
-    raise EIORingError.Create('The reader is not open');
+    RaiseNotOpen;
+
 end;
 
 { TIORingSequentialReader - read-ahead engine }
@@ -442,9 +453,8 @@ var
   LSlot: PIORingReaderSlot;
   LPrepared: Boolean;
 begin
-  // A big Read: no reading ahead after the call until all of its reads
-  // straight into the caller's memory have started, so the file is read in
-  // order (the OS reads ahead too when it sees that)
+  { A big Read: no reading ahead after the call until all of its reads straight into the caller's memory have started,
+    so the file is read in order (the OS reads ahead too when it sees that) }
   if FDirectNext < FDirectEnd then
     Exit;
 
@@ -453,8 +463,8 @@ begin
     LIndex := (FHead + FOutstanding) mod FBufferCount;
     LSlot := @FSlots[LIndex];
 
-    // Always the whole buffer: unbuffered reads need sector multiples, and the
-    // read at the end of the file simply returns fewer bytes
+    { Always the whole buffer: unbuffered reads need sector multiples, and the read at the end of the file
+      simply returns fewer bytes }
     if FRegistered then
       LPrepared := FRing.PrepareRead(TIORingFileRef.FromIndex(0),
         TIORingBufferRef.FromRegistered(0, LIndex * FBufferSize), FBufferSize, UInt64(FNextReadOffset), LIndex)
@@ -568,13 +578,14 @@ end;
 
 function TIORingSequentialReader.PrepareHead(const AWait: Boolean): Boolean;
 
-  procedure RaiseNaticeResultException(const ANativeResult: Integer; const AFileOffset: Int64);
+  procedure RaiseReadFailed(const AResult: Integer; const AOffset: Int64); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-        raise EIORingError.CreateNative(ANativeResult, Format('Read at offset %d', [AFileOffset]));
+    RaiseIORingErrorNativeFmt(AResult, 'Read at offset %d', [AOffset]);
   end;
 
 var
   LSlot: PIORingReaderSlot;
+
 begin
   if FDirectFailed then
     RaiseDirectFailure;
@@ -601,7 +612,7 @@ begin
   end;
 
   if LSlot.NativeResult < 0 then
-    RaiseNaticeResultException(LSlot.NativeResult, LSlot.FileOffset);
+    RaiseReadFailed(LSlot.NativeResult, LSlot.FileOffset);
 
   // Shorter than expected: the file got shorter after Open; this is its end now
   if LSlot.BytesRead < LSlot.Expected then
@@ -651,11 +662,10 @@ begin
   end;
 end;
 
-// The part of a call the buffers have not asked for yet: from FNextReadOffset
-// to the end of the call. Worth it from one buffer size on; unbuffered only in
-// whole sectors, into memory that starts on a sector boundary.
-function TIORingSequentialReader.PlanDirectRead(const ATarget: PByte; const ACount: NativeInt; out AStart, AEnd: 
-  Int64): Boolean;
+{ The part of a call the buffers have not asked for yet: from FNextReadOffset to the end of the call. Worth it from one
+  buffer size on; unbuffered only in whole sectors, into memory that starts on a sector boundary. }
+function TIORingSequentialReader.PlanDirectRead(const ATarget: PByte; const ACount: NativeInt;
+  var AStart, AEnd: Int64): Boolean;
 begin
   AStart := FNextReadOffset;
 
@@ -672,8 +682,7 @@ begin
 
   if FAlignment > 1 then
   begin
-    // FNextReadOffset is always on a sector boundary here (buffer sizes and
-    // earlier direct parts are whole sectors)
+    // FNextReadOffset is always on a sector boundary here (buffer sizes and earlier direct parts are whole sectors)
     AEnd := AStart + ((AEnd - AStart) div FAlignment) * FAlignment;
 
     if NativeUInt(ATarget + NativeInt(AStart - FPosition)) mod FAlignment <> 0 then
@@ -683,8 +692,8 @@ begin
   Result := AEnd - AStart >= FBufferSize;
 end;
 
-// Starts reads straight into the caller's memory, in pieces of the buffer
-// size, up to as many in flight as there are buffers
+{ Starts reads straight into the caller's memory, in pieces of the buffer size, up to as many in
+  flight as there are buffers }
 procedure TIORingSequentialReader.IssueDirectReads;
 var
   LIndex: Cardinal;
@@ -760,8 +769,7 @@ begin
     FDirectFailed := True;
   end;
 
-  // Short: the file ends there (it got shorter after Open); the data stops
-  // there, and no more pieces are started
+  // Short: the file ends there (it got shorter after Open); the data stops there, and no more pieces are started
   if LBytes < LRead.Length then
   begin
     LEnd := LRead.FileOffset + LBytes;
@@ -779,13 +787,14 @@ end;
 // Until every piece has been read; counts as a stall if it has to wait
 procedure TIORingSequentialReader.WaitForDirectReads;
 
-  procedure RaiseReadsCouldNotBeStartedException;
+  procedure RaiseCouldNotStart; {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.Create('Reads straight into the caller''s memory could not be started');
+    RaiseIORingError('Reads straight into the caller''s memory could not be started');
   end;
 
 var
   LStart: UInt64;
+
   LStalled: Boolean;
 begin
   LStalled := False;
@@ -800,10 +809,9 @@ begin
       if FDirectNext >= FDirectEnd then
         Break;
 
-      { Nothing in flight and nothing could be started: should not happen (the ring has room for every buffer and 
+      { Nothing in flight and nothing could be started: should not happen (the ring has room for every buffer and
         every piece) }
-      RaiseReadsCouldNotBeStartedException
-
+      RaiseCouldNotStart;
     end;
 
     if not LStalled then
@@ -820,7 +828,7 @@ begin
     Inc(FStats.StallMicroseconds, TIORingPlatform.TimestampMicroseconds - LStart);
 end;
 
-{ After an exception: no more pieces, and wait for those in flight - they write into the caller's memory, which may be 
+{ After an exception: no more pieces, and wait for those in flight - they write into the caller's memory, which may be
   gone once Read has returned }
 procedure TIORingSequentialReader.AbandonDirectReads;
 begin
@@ -836,27 +844,28 @@ end;
 procedure TIORingSequentialReader.RaiseDirectFailure;
 begin
   if FDirectError < 0 then
-    raise EIORingError.CreateNative(FDirectError, Format('Read at offset %d', [FDirectErrorOffset]));
+    RaiseIORingErrorNativeFmt(FDirectError, 'Read at offset %d', [FDirectErrorOffset]);
 
-  raise EIORingError.Create('An earlier big Read failed; the reader cannot continue');
+  RaiseIORingError('An earlier big Read failed; the reader cannot continue');
 end;
 
 function TIORingSequentialReader.Read(var ABuffer; const ACount: NativeInt): NativeInt;
 
-  procedure RaiseVCallBeforeReadException;
+  procedure RaiseChunkAcquired; {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EInvalidOpException.Create('Call ReleaseChunk before Read');
+    RaiseError(EInvalidOpException, 'Call ReleaseChunk before Read');
   end;
 
 var
   LTarget: PByte;
+
   LDirectStart: Int64;
   LDirectEnd: Int64;
 begin
   CheckOpen;
 
   if FChunkAcquired then
-    RaiseVCallBeforeReadException;
+    RaiseChunkAcquired;
 
   if FDirectFailed then
     RaiseDirectFailure;
@@ -869,9 +878,8 @@ begin
   if not PlanDirectRead(LTarget, ACount, LDirectStart, LDirectEnd) then
     Exit(CopyFromBuffers(LTarget, ACount));
 
-  // A big call: [LDirectStart, LDirectEnd) is read straight into the
-  // caller's memory; the buffers read ahead after LDirectEnd as soon as all
-  // of those reads have started
+  { A big call: [LDirectStart, LDirectEnd) is read straight into the caller's memory; the buffers read ahead after
+    LDirectEnd as soon as all of those reads have started }
   FDirectTarget := LTarget + NativeInt(LDirectStart - FPosition);
   FDirectStart := LDirectStart;
   FDirectEnd := LDirectEnd;
@@ -905,6 +913,7 @@ begin
   begin
     // A piece came back short: the file ends there now
     FEnd := FDirectEnd;
+
     Exit;
   end;
 
@@ -912,11 +921,12 @@ begin
   Inc(Result, CopyFromBuffers(LTarget, ACount - Result));
 end;
 
-function TIORingSequentialReader.TryAcquireChunk(out AData: PByte; out ALength: NativeInt; const AWait: Boolean): Boolean;
+function TIORingSequentialReader.TryAcquireChunk(out AData: PByte; out ALength: NativeInt;
+  const AWait: Boolean): Boolean;
 
-  procedure RaiseCallBeforeAcquiringException;
+  procedure RaiseChunkAcquired; {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EInvalidOpException.Create('Call ReleaseChunk before acquiring the next chunk');
+    RaiseError(EInvalidOpException, 'Call ReleaseChunk before acquiring the next chunk');
   end;
 
 var
@@ -925,7 +935,7 @@ begin
   CheckOpen;
 
   if FChunkAcquired then
-    RaiseCallBeforeAcquiringException;
+    RaiseChunkAcquired;
 
   AData := nil;
   ALength := 0;
@@ -937,19 +947,20 @@ begin
   AData := LSlot.Data + FHeadOffset;
   ALength := LSlot.BytesRead - FHeadOffset;
   FChunkAcquired := True;
+
   Result := True;
 end;
 
 procedure TIORingSequentialReader.ReleaseChunk;
 
-  procedure RaiseNoChunkAcquiredException;
+  procedure RaiseNoChunk; {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EInvalidOpException.Create('No chunk is acquired');
+    RaiseError(EInvalidOpException, 'No chunk is acquired');
   end;
 
 begin
   if not FChunkAcquired then
-    RaiseNoChunkAcquiredException;
+    RaiseNoChunk;
 
   FChunkAcquired := False;
   Inc(FPosition, FSlots[FHead].BytesRead - FHeadOffset);
@@ -964,6 +975,7 @@ begin
     Exit(True);
 
   ProcessCompletions;
+
   Result := FSlots[FHead].State = rssReady;
 end;
 

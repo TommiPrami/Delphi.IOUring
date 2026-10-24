@@ -19,11 +19,7 @@ uses
 {$ELSE}
   System.Classes,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Engine,
-  Delphi.IOUring.BlockReader,
-  TestPlatformHelpers,
-  Tests.Support;
+  Delphi.IOUring, Delphi.IOUring.Engine, Delphi.IOUring.BlockReader, TestPlatformHelpers, Tests.Support;
 
 type
   TBlockArray = array of TIORingBlock;
@@ -69,8 +65,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring.Atomics,
-  TestFileHelpers;
+  Delphi.IOUring.Atomics, TestFileHelpers;
 
 const
   PATTERN_FILE_SIZE = 4 * 1024 * 1024;
@@ -83,6 +78,7 @@ begin
   AState := AState xor (AState shl 13);
   AState := AState xor (AState shr 17);
   AState := AState xor (AState shl 5);
+
   Result := AState;
 end;
 
@@ -95,6 +91,7 @@ begin
   LRandom := ASeed;
   Result := nil;
   SetLength(Result, ACount);
+
   for LIndex := 0 to ACount - 1 do
   begin
     Result[LIndex].Length := 1 + NextRandom(LRandom) mod AMaxLength;
@@ -108,6 +105,7 @@ var
 begin
   Result := nil;
   SetLength(Result, Length(ABlocks));
+
   for LIndex := 0 to High(ABlocks) do
     Result[LIndex] := ABlocks[LIndex];
 end;
@@ -134,6 +132,7 @@ end;
 function TBlockReaderTests.NextBlock(out ABlock: TIORingBlock): Boolean;
 begin
   Result := FProvidedCount < Length(FProvided);
+
   if Result then
   begin
     ABlock := FProvided[FProvidedCount];
@@ -159,6 +158,7 @@ begin
     CheckPattern(LBlock.Offset, LData, LLength, Format('Block %d', [LIndex]));
     AReader.ReleaseBlock;
   end;
+
   AssertFalse('No more blocks', AReader.TryGetBlock(LBlock, LData, LLength));
   AssertTrue('Finished', AReader.Finished);
 end;
@@ -189,6 +189,7 @@ begin
   LReader.Open(FEngine, FFile, NextBlock, READ_AHEAD);
   AssertEquals('Open asks for the read-ahead plus one block', READ_AHEAD + 1, FProvidedCount);
   LDelivered := 0;
+
   while LReader.TryGetBlock(LBlock, LData, LLength) do
   begin
     CheckEqualsU64('Order', FProvided[LDelivered].Offset, LBlock.Offset);
@@ -198,6 +199,7 @@ begin
       FProvidedCount - LDelivered <= READ_AHEAD + 1);
     LReader.ReleaseBlock;
   end;
+
   AssertEquals('All blocks', 200, LDelivered);
 end;
 
@@ -210,8 +212,10 @@ begin
   // 100 touching blocks of 1000 bytes; a 64 KiB buffer holds 65 of them
   LBlocks := nil;
   SetLength(LBlocks, 100);
+
   for LIndex := 0 to 99 do
     LBlocks[LIndex] := TIORingBlock.Create(5000 + UInt64(LIndex) * 1000, 1000);
+
   LReader.Open(FEngine, FFile, LBlocks, 8, 64 * 1024);
   ReadAndCheck(LReader, LBlocks);
   CheckEqualsU64('Two reads for 100 blocks', 2, LReader.Stats.Reads);
@@ -226,8 +230,10 @@ begin
   // 20 blocks of 500 bytes with 100-byte gaps
   LBlocks := nil;
   SetLength(LBlocks, 20);
+
   for LIndex := 0 to 19 do
     LBlocks[LIndex] := TIORingBlock.Create(UInt64(LIndex) * 600, 500);
+
   LReader.Open(FEngine, FFile, LBlocks, 8, 64 * 1024, 0);
   ReadAndCheck(LReader, LBlocks);
   CheckEqualsU64('MaxGap 0: one read per block', 20, LReader.Stats.Reads);
@@ -327,12 +333,14 @@ procedure TBlockReaderTests.BadArguments_Raise;
     LRaised: Boolean;
   begin
     LRaised := False;
+
     try
       LReader.Open(AEngine, FFile, [ABlock], AReadAhead, ABufferSize);
     except
       on EIORingError do
         LRaised := True;
     end;
+
     AssertTrue(AMessage, LRaised);
   end;
 
@@ -347,6 +355,7 @@ begin
   CheckOpenRaises('Block longer than the buffer', FEngine, TIORingBlock.Create(0, 5000), 8, 4096);
   CheckOpenRaises('Block of 0 bytes', FEngine, TIORingBlock.Create(0, 0), 8, 4096);
   LSmall := TIORingEngine.Create(4, 4);
+
   try
     CheckOpenRaises('More read-ahead than the engine has requests', LSmall, TIORingBlock.Create(0, 1), 8, 4096);
   finally
@@ -355,12 +364,14 @@ begin
 
   LReader.Open(FEngine, FFile, [TIORingBlock.Create(0, 1)]);
   LRaised := False;
+
   try
     LReader.Open(FEngine, FFile, [TIORingBlock.Create(0, 1)]);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Opened twice', LRaised);
 end;
 
@@ -374,32 +385,38 @@ var
   LRaised: Boolean;
 begin
   LRaised := False;
+
   try
     LOther.TryGetBlock(LBlock, LData, LLength);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Not open', LRaised);
 
   LReader.Open(FEngine, FFile, [TIORingBlock.Create(0, 10), TIORingBlock.Create(100, 10)]);
   LRaised := False;
+
   try
     LReader.ReleaseBlock;
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('ReleaseBlock before TryGetBlock', LRaised);
 
   AssertTrue(LReader.TryGetBlock(LBlock, LData, LLength));
   LRaised := False;
+
   try
     LReader.TryGetBlock(LBlock, LData, LLength);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('TryGetBlock twice without ReleaseBlock', LRaised);
   LReader.ReleaseBlock;
 end;
@@ -415,15 +432,18 @@ var
 begin
   // A handle that is not open: the read fails
   LReader.Open(FEngine, BAD_HANDLE, [TIORingBlock.Create(0, 10)]);
+
   for LTry := 1 to 2 do
   begin
     LRaised := False;
+
     try
       LReader.TryGetBlock(LBlock, LData, LLength);
     except
       on EIORingError do
         LRaised := True;
     end;
+
     AssertTrue(Format('Try %d: the error stays', [LTry]), LRaised);
   end;
 end;
@@ -439,6 +459,7 @@ begin
   FResources.OpenPipePair(LServer, LClient);
   LReader.Open(FEngine, LClient, [TIORingBlock.Create(0, 1)], 4, 4096);
   LWriter := TDelayedPipeWriter.Create(LServer, 100, 1);
+
   try
     LWriter.Start;
     LStart := TThread.GetTickCount64;
@@ -449,6 +470,7 @@ begin
   finally
     LWriter.Free;
   end;
+
   AssertFalse('Closed', LReader.IsOpen);
 end;
 
@@ -462,8 +484,10 @@ begin
   // 3 touching blocks (one read) and 2 far apart (two reads)
   LReader.Open(FEngine, FFile, [TIORingBlock.Create(0, 100), TIORingBlock.Create(100, 100),
     TIORingBlock.Create(200, 100), TIORingBlock.Create(100000, 50), TIORingBlock.Create(300000, 50)], 8, 4096);
+
   while LReader.TryGetBlock(LBlock, LData, LLength) do
     LReader.ReleaseBlock;
+
   CheckEqualsU64('Blocks', 5, LReader.Stats.Blocks);
   CheckEqualsU64('Reads', 3, LReader.Stats.Reads);
   CheckEqualsU64('Bytes', 400, LReader.Stats.BytesRead);
@@ -492,6 +516,7 @@ var
 begin
   LBlocks := RandomBlocks(SHARED_BLOCKS, 32 * 1024, Cardinal(AIndex + 1) * 2654435761);
   LReader.Open(FEngine, FFile, LBlocks, 32, 32 * 1024);
+
   for LIndex := 0 to SHARED_BLOCKS - 1 do
   begin
     if not LReader.TryGetBlock(LBlock, LData, LLength) or (LBlock.Offset <> LBlocks[LIndex].Offset) or
@@ -499,10 +524,13 @@ begin
       not TTestFileHelpers.CheckPattern(LBlock.Offset, LData^, LLength, LBadOffset) then
     begin
       TAtomic.Increment(FFailures);
+
       Exit;
     end;
+
     LReader.ReleaseBlock;
   end;
+
   if not LReader.Finished then
     TAtomic.Increment(FFailures);
 end;

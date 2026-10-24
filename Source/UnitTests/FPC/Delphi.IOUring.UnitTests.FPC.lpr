@@ -23,33 +23,18 @@ uses
 {$IFDEF UNIX}
   cthreads,           // threads on Linux: must come first
 {$ENDIF}
-  SysUtils,
-  Classes,
+  SysUtils, Classes,
 {$IFDEF UNIX}
   BaseUnix,
 {$ENDIF}
-  fpcunit,
-  testregistry,
-  Delphi.IOUring,
-  Tests.Support,
+  fpcunit, testregistry, Delphi.IOUring, Tests.Support,
 {$IFDEF MSWINDOWS}
-  Tests.Backend.Windows.API.Layout,
-  Tests.Backend.Windows.API,
+  Tests.Backend.Windows.API.Layout, Tests.Backend.Windows.API,
 {$ENDIF}
-  Tests.Ring,
-  Tests.SequentialReader,
-  Tests.Streams,
-  Tests.Atomics,
-  Tests.RequestPool,
-  Tests.RequestQueue,
-  Tests.Engine,
-  Tests.BlockReader,
-  Tests.EngineOverlap,
-  Tests.SequentialWriter,
+  Tests.Ring, Tests.SequentialReader, Tests.Streams, Tests.Atomics, Tests.RequestPool, Tests.RequestQueue, Tests.Engine,
+  Tests.BlockReader, Tests.EngineOverlap, Tests.SequentialWriter,
 {$IFDEF LINUX}
-  Tests.Linux.Backend.Posix.API.Layout,
-  Tests.Linux.Backend.Posix.API,
-  Tests.Linux.Extras,
+  Tests.Linux.Backend.Posix.API.Layout, Tests.Linux.Backend.Posix.API, Tests.Linux.Extras,
 {$ENDIF}
   Tests.TestFileHelpers;
 
@@ -77,6 +62,7 @@ procedure TConsoleListener.AddError(ATest: TTest; AError: TTestFailure);
 begin
   FTestFailed := True;
   Writeln('  ERROR: ', AError.ExceptionClassName, ': ', AError.ExceptionMessage);
+
   if AError.LocationInfo <> '' then
     Writeln('    at ', AError.LocationInfo);
 end;
@@ -118,13 +104,13 @@ begin
   Writeln('Delphi.IOUring tests (Free Pascal ', {$I %FPCVERSION%}, ', ', {$I %FPCTARGETCPU%}, '-',
     {$I %FPCTARGETOS%}, {$IFDEF UNIX}', kernel ', KernelRelease, {$ENDIF}')');
   Writeln;
-  // What this system offers (in CI: what each runner has; the reason, if the
-  // ring is not available)
+  // What this system offers (in CI: what each runner has; the reason, if the ring is not available)
   Writeln(IORingCapabilities.ToString);
   Writeln;
 
   LResult := TTestResult.Create;
   LListener := TConsoleListener.Create(nil);
+
   try
     LResult.AddListener(LListener);
     GetTestRegistry.Run(LResult);

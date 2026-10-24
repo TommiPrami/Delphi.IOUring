@@ -1,32 +1,29 @@
 ﻿unit Delphi.IOUring.SequentialWriter;
 
-// Writes a file front to back in the background (Docs/Design.md §8.2).
-//
-// BufferCount buffers of BufferSize bytes are used in turn. Write copies into
-// the current buffer; a full buffer goes to an engine (TIORingEngine), whose
-// I/O thread writes it while the caller fills the next one. The writes go
-// through the engine and not through a ring of the caller's thread because
-// Windows does buffered writes - and unbuffered writes that extend a file -
-// inside the submit call (Design §2.1): the caller would do all the work
-// itself.
-//
-//   var
-//     LWriter: TIORingSequentialWriter;
-//   begin
-//     LWriter.Open('big.dat');
-//     LWriter.Write(LData, LLength);         // as often as needed
-//     LWriter.Close;                         // waits for the writes; raises if one failed
-//   end;
-//
-// A write fails after Write has returned, so its error comes later: the next
-// Write, CommitBuffer or Flush that runs into it, and Close, raise EIORingError
-// - and every later call again (the file's content is then unknown). At the
-// end of scope without Close the rest is still written, but errors are lost.
-//
-// By default the writer has its own engine (one I/O thread). A shared engine
-// (Open's AEngine) must allow at least BufferCount requests and live longer
-// than the writer.
-// One thread at a time.
+{
+  Writes a file front to back in the background (Docs/Design.md §8.2).
+
+  BufferCount buffers of BufferSize bytes are used in turn. Write copies into the current buffer; a full buffer goes to
+  an engine (TIORingEngine), whose I/O thread writes it while the caller fills the next one. The writes go through the
+  engine and not through a ring of the caller's thread because Windows does buffered writes - and unbuffered writes that
+  extend a file - inside the submit call (Design §2.1): the caller would do all the work itself.
+
+    var
+      LWriter: TIORingSequentialWriter;
+    begin
+      LWriter.Open('big.dat');
+      LWriter.Write(LData, LLength);         // as often as needed
+      LWriter.Close;                         // waits for the writes; raises if one failed
+    end;
+
+  A write fails after Write has returned, so its error comes later: the next
+  Write, CommitBuffer or Flush that runs into it, and Close, raise EIORingError
+  - and every later call again (the file's content is then unknown). At the
+  end of scope without Close the rest is still written, but errors are lost.
+
+  By default the writer has its own engine (one I/O thread). A shared engine (Open's AEngine) must allow at least
+  BufferCount requests and live longer than the writer. One thread at a time.
+}
 
 {$I Delphi.IOUring.inc}
 
@@ -43,8 +40,8 @@ uses
 const
   IORING_WRITER_DEFAULT_BUFFER_SIZE = 1024 * 1024;
   IORING_WRITER_DEFAULT_BUFFER_COUNT = 8;
-  // BufferSize must be a multiple of this (page size; also covers the sector
-  // size needed for unbuffered writes on usual disks)
+  { BufferSize must be a multiple of this (page size; also covers the sector size needed for
+    unbuffered writes on usual disks) }
   IORING_WRITER_BUFFER_SIZE_UNIT = 4096;
   IORING_WRITER_MAX_BUFFER_COUNT = 1024;
 
@@ -72,9 +69,8 @@ type
     Request: TIORingRequestHandle;
   end;
 
-  // Custom managed record: owns the file handle (if asked), its engine (if it
-  // made one) and the buffer memory, and releases them at the end of scope.
-  // Not copyable.
+  { Custom managed record: owns the file handle (if asked), its engine (if it made one) and the buffer memory, and
+    releases them at the end of scope. Not copyable. }
   TIORingSequentialWriter = record
   private
     FEngine: TIORingEngine;
@@ -89,8 +85,8 @@ type
     FSlots: array of TIORingWriterSlot;
     FBufferSize: Cardinal;
     FBufferCount: Cardinal;
-    // The slots in flight are the oldest FInFlight ones from FInFlightHead;
-    // the slot after them is being filled (FFill bytes so far)
+    { The slots in flight are the oldest FInFlight ones from FInFlightHead; the slot after them is being
+      filled (FFill bytes so far) }
     FInFlightHead: Cardinal;
     FInFlight: Cardinal;
     FFill: Cardinal;
@@ -106,7 +102,7 @@ type
 
     procedure CheckOpen;
     procedure CheckUsable;
-    procedure RaiseFailure;
+    procedure RaiseFailure; {$IFNDEF FPC} noreturn; {$ENDIF}
     function CurrentSlot: PIORingWriterSlot;
     function WaitedFor(const ASlot: PIORingWriterSlot; const AWait: Boolean): Boolean;
     procedure CollectFinished;
@@ -126,39 +122,37 @@ type
     class operator Assign(var ADest: TIORingSequentialWriter; const [ref] ASource: TIORingSequentialWriter);
 {$ENDIF}
 
-    // Creates the file, or empties it if it exists. ABufferSize: multiple of
-    // IORING_WRITER_BUFFER_SIZE_UNIT (with swoUnbuffered also of the sector
-    // size). ABufferCount: 1..IORING_WRITER_MAX_BUFFER_COUNT. AEngine = nil:
-    // the writer makes its own engine.
+    {
+      Creates the file, or empties it if it exists. ABufferSize: multiple of IORING_WRITER_BUFFER_SIZE_UNIT (with
+      swoUnbuffered also of the sector size). ABufferCount: 1..IORING_WRITER_MAX_BUFFER_COUNT. AEngine = nil: the
+      writer makes its own engine.
+    }
     procedure Open(const AFileName: string; const AOptions: TIORingSequentialWriterOptions = [];
       const ABufferSize: Cardinal = IORING_WRITER_DEFAULT_BUFFER_SIZE;
       const ABufferCount: Cardinal = IORING_WRITER_DEFAULT_BUFFER_COUNT;
       const AEngine: TIORingEngine = nil); overload;
-    // Writes to a handle opened by the caller (write access, overlapped; for
-    // swoUnbuffered opened unbuffered), from offset 0 on. With AOwnsHandle the
-    // writer closes it, also when Open fails.
+    { Writes to a handle opened by the caller (write access, overlapped; for swoUnbuffered opened unbuffered), from
+      offset 0 on. With AOwnsHandle the writer closes it, also when Open fails. }
     procedure Open(const AHandle: THandle; const AOwnsHandle: Boolean;
       const AOptions: TIORingSequentialWriterOptions = [];
       const ABufferSize: Cardinal = IORING_WRITER_DEFAULT_BUFFER_SIZE;
       const ABufferCount: Cardinal = IORING_WRITER_DEFAULT_BUFFER_COUNT;
       const AEngine: TIORingEngine = nil); overload;
-    // Writes the rest, waits for all writes, cuts the file to its size
-    // (unbuffered) and releases everything. With ARaiseError a failed write
-    // raises EIORingError - after everything is released. Does nothing if not
-    // open.
+    { Writes the rest, waits for all writes, cuts the file to its size (unbuffered) and releases everything. With
+      ARaiseError a failed write raises EIORingError - after everything is released. Does nothing if not open. }
     procedure Close(const ARaiseError: Boolean = True);
     function IsOpen: Boolean;
 
     // Copies ACount bytes; full buffers are written at once
     procedure Write(const ABuffer; const ACount: NativeInt);
 
-    // Zero-copy: the free part of the current buffer (ACapacity > 0). Fill
-    // some of it, then CommitBuffer with the number of bytes filled.
+    { Zero-copy: the free part of the current buffer (ACapacity > 0). Fill some of it, then CommitBuffer with
+      the number of bytes filled. }
     procedure AcquireBuffer(out AData: PByte; out ACapacity: NativeInt);
     procedure CommitBuffer(const ALength: NativeInt);
 
-    // Writes what has been written so far, also a partly filled buffer, and
-    // waits until it is in the file. AToDisk: also FlushFileBuffers (slow).
+    { Writes what has been written so far, also a partly filled buffer, and waits until it is in the file. AToDisk:
+      also FlushFileBuffers (slow). }
     procedure Flush(const AToDisk: Boolean = False);
 
     // A write has failed (and raises at the next call)
@@ -172,6 +166,9 @@ type
   end;
 
 implementation
+
+uses
+  Delphi.IOUring.Backend.Custom;
 
 { TIORingSequentialWriter - life cycle }
 
@@ -211,14 +208,25 @@ begin
 end;
 
 {$IFDEF FPC}
-class operator TIORingSequentialWriter.Copy(constref ASource: TIORingSequentialWriter; 
+class operator TIORingSequentialWriter.Copy(constref ASource: TIORingSequentialWriter;
   var ADest: TIORingSequentialWriter);
 {$ELSE}
 class operator TIORingSequentialWriter.Assign(var ADest: TIORingSequentialWriter;
   const [ref] ASource: TIORingSequentialWriter);
 {$ENDIF}
+
+  procedure RaiseCannotCopy; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(EInvalidOpException, 'A sequential writer cannot be copied. Pass it as var or const [ref].');
+  end;
+
 begin
-  raise EInvalidOpException.Create('A sequential writer cannot be copied. Pass it as var or const [ref].');
+  RaiseCannotCopy;
+end;
+
+procedure RaiseWriterAlreadyOpen; {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseIORingError('The writer is already open');
 end;
 
 procedure TIORingSequentialWriter.Open(const AFileName: string; const AOptions: TIORingSequentialWriterOptions;
@@ -227,7 +235,7 @@ var
   LHandle: THandle;
 begin
   if IsOpen then
-    raise EIORingError.Create('The writer is already open');
+    RaiseWriterAlreadyOpen;
 
   LHandle := TIORingPlatform.CreateFileForWrite(AFileName, swoUnbuffered in AOptions);
   Open(LHandle, True, AOptions, ABufferSize, ABufferCount, AEngine);
@@ -236,31 +244,58 @@ end;
 procedure TIORingSequentialWriter.Open(const AHandle: THandle; const AOwnsHandle: Boolean;
   const AOptions: TIORingSequentialWriterOptions; const ABufferSize, ABufferCount: Cardinal;
   const AEngine: TIORingEngine);
+
+  procedure RaiseBufferSizeNotMultiple(const ASize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('Buffer size %d is not a multiple of %d', [ASize, IORING_WRITER_BUFFER_SIZE_UNIT]);
+  end;
+
+  procedure RaiseBufferCountOutOfRange(const ACount: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('Buffer count %d is not between 1 and %d', [ACount, IORING_WRITER_MAX_BUFFER_COUNT]);
+  end;
+
+  procedure RaiseBuffersTooBig(const ACount: Cardinal; const ASize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('%d buffers of %d bytes do not fit in memory', [ACount, ASize]);
+  end;
+
+  procedure RaiseEngineTooSmall(const ACount: Cardinal; const AMaxRequests: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('%d buffers need an engine of at least %d requests, not %d', [ACount, ACount, AMaxRequests]);
+  end;
+
+  procedure RaiseNotSectorMultiple(const ASectorSize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('Unbuffered writing needs a buffer size that is a multiple of the sector size %d',
+      [ASectorSize]);
+  end;
+
 var
   LTotalSize: UInt64;
   LIndex: Cardinal;
 begin
   if IsOpen then
-    raise EIORingError.Create('The writer is already open');
+    RaiseWriterAlreadyOpen;
 
   FFile := AHandle;
   FHasFile := True;
   FOwnsFile := AOwnsHandle;
+
   try
     if (ABufferSize = 0) or (ABufferSize mod IORING_WRITER_BUFFER_SIZE_UNIT <> 0) then
-      raise EIORingError.CreateFmt('Buffer size %d is not a multiple of %d', [ABufferSize, IORING_WRITER_BUFFER_SIZE_UNIT]);
+      RaiseBufferSizeNotMultiple(ABufferSize);
 
     if (ABufferCount = 0) or (ABufferCount > IORING_WRITER_MAX_BUFFER_COUNT) then
-      raise EIORingError.CreateFmt('Buffer count %d is not between 1 and %d', [ABufferCount, IORING_WRITER_MAX_BUFFER_COUNT]);
+      RaiseBufferCountOutOfRange(ABufferCount);
 
     LTotalSize := UInt64(ABufferSize) * ABufferCount;
 
     if LTotalSize > UInt64(High(NativeInt) div 2) then
-      raise EIORingError.CreateFmt('%d buffers of %d bytes do not fit in memory', [ABufferCount, ABufferSize]);
+      RaiseBuffersTooBig(ABufferCount, ABufferSize);
 
     if (AEngine <> nil) and (AEngine.MaxRequests < ABufferCount) then
-      raise EIORingError.CreateFmt('%d buffers need an engine of at least %d requests, not %d',
-        [ABufferCount, ABufferCount, AEngine.MaxRequests]);
+      RaiseEngineTooSmall(ABufferCount, AEngine.MaxRequests);
 
     FUnbuffered := swoUnbuffered in AOptions;
 
@@ -269,8 +304,7 @@ begin
       FSectorSize := TIORingPlatform.GetSectorSize(AHandle);
 
       if ABufferSize mod FSectorSize <> 0 then
-        raise EIORingError.CreateFmt('Unbuffered writing needs a buffer size that is a multiple of the sector size %d',
-          [FSectorSize]);
+        RaiseNotSectorMultiple(FSectorSize);
     end;
 
     FBufferSize := ABufferSize;
@@ -324,9 +358,9 @@ begin
     if FEngine <> nil then
       WaitForAll;
 
-    // The rest (not after a failure: the file is not right anyway). A buffer
-    // acquired but not committed is not written.
+    // The rest (not after a failure: the file is not right anyway). A buffer acquired but not committed is not written.
     if not FFailed and (FEngine <> nil) and (FFill > 0) then
+
     try
       WritePartOfCurrent;
     except
@@ -339,6 +373,7 @@ begin
     end;
 
     if FUnbuffered and not FFailed and (FMemory <> nil) then
+
     try
       TIORingPlatform.SetFileSize(FFile, FPosition);
     except
@@ -382,9 +417,16 @@ begin
 end;
 
 procedure TIORingSequentialWriter.CheckOpen;
+
+  procedure RaiseNotOpen; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('The writer is not open');
+  end;
+
 begin
   if not FHasFile then
-    raise EIORingError.Create('The writer is not open');
+    RaiseNotOpen;
+
 end;
 
 procedure TIORingSequentialWriter.CheckUsable;
@@ -400,9 +442,9 @@ begin
   FErrorReported := True;
 
   if FFailCode <> 0 then
-    raise EIORingError.CreateNative(FFailCode, FFailContext)
+    RaiseIORingErrorNative(FFailCode, FFailContext)
   else
-    raise EIORingError.Create(FFailContext);
+    RaiseIORingError(FFailContext);
 end;
 
 { TIORingSequentialWriter - the buffers }
@@ -443,7 +485,7 @@ begin
   begin
     FFailed := True;
     FFailCode := 0;
-    FFailContext := Format('Write at offset %d: only %d of %d bytes written', [ASlot^.FileOffset, 
+    FFailContext := Format('Write at offset %d: only %d of %d bytes written', [ASlot^.FileOffset,
       LCompletion.BytesTransferred, ASlot^.Length]);
   end;
 end;
@@ -506,9 +548,8 @@ var
   LSlot: PIORingWriterSlot;
   LLength: Cardinal;
 begin
-  // The buffer stays the current one: when it is full, it is written again,
-  // whole, at the same offset - so every write starts where a buffer starts
-  // (sector-aligned for unbuffered writes)
+  { The buffer stays the current one: when it is full, it is written again, whole, at the same offset - so every write
+    starts where a buffer starts (sector-aligned for unbuffered writes) }
   LSlot := CurrentSlot;
   LLength := FFill;
 
@@ -529,15 +570,22 @@ end;
 { TIORingSequentialWriter - writing }
 
 procedure TIORingSequentialWriter.Write(const ABuffer; const ACount: NativeInt);
+
+  procedure RaiseBufferAcquired; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(EInvalidOpException, 'Call CommitBuffer before Write');
+  end;
+
 var
   LSource: PByte;
+
   LRemaining: NativeInt;
   LChunk: NativeInt;
 begin
   CheckUsable;
 
   if FBufferAcquired then
-    raise EInvalidOpException.Create('Call CommitBuffer before Write');
+    RaiseBufferAcquired;
 
   if ACount <= 0 then
     Exit;
@@ -572,13 +620,20 @@ begin
 end;
 
 procedure TIORingSequentialWriter.AcquireBuffer(out AData: PByte; out ACapacity: NativeInt);
+
+  procedure RaiseBufferAcquired; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(EInvalidOpException, 'Call CommitBuffer before acquiring the next buffer');
+  end;
+
 begin
   AData := nil;
+
   ACapacity := 0;
   CheckUsable;
 
   if FBufferAcquired then
-    raise EInvalidOpException.Create('Call CommitBuffer before acquiring the next buffer');
+    RaiseBufferAcquired;
 
   MakeCurrentFree;
 
@@ -591,14 +646,25 @@ begin
 end;
 
 procedure TIORingSequentialWriter.CommitBuffer(const ALength: NativeInt);
+
+  procedure RaiseLengthTooBig(const ACount: NativeInt; const AFree: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('CommitBuffer: %d bytes do not fit (0..%d)', [ACount, AFree]);
+  end;
+
+  procedure RaiseNoBuffer; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(EInvalidOpException, 'No buffer is acquired');
+  end;
+
 begin
   CheckOpen;
 
   if not FBufferAcquired then
-    raise EInvalidOpException.Create('No buffer is acquired');
+    RaiseNoBuffer;
 
   if (ALength < 0) or (ALength > NativeInt(FBufferSize - FFill)) then
-    raise EIORingError.CreateFmt('CommitBuffer: %d bytes do not fit (0..%d)', [ALength, FBufferSize - FFill]);
+    RaiseLengthTooBig(ALength, FBufferSize - FFill);
 
   FBufferAcquired := False;
   Inc(FFill, ALength);
@@ -612,13 +678,20 @@ begin
 end;
 
 procedure TIORingSequentialWriter.Flush(const AToDisk: Boolean);
+
+  procedure RaiseBufferAcquired; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(EInvalidOpException, 'Call CommitBuffer before Flush');
+  end;
+
 var
   LCompletion: TIORingCompletion;
+
 begin
   CheckUsable;
 
   if FBufferAcquired then
-    raise EInvalidOpException.Create('Call CommitBuffer before Flush');
+    RaiseBufferAcquired;
 
   WaitForAll;
 

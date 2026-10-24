@@ -21,10 +21,7 @@ uses
 {$ELSE}
   System.Classes,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Engine,
-  TestPlatformHelpers,
-  Tests.Support;
+  Delphi.IOUring, Delphi.IOUring.Engine, TestPlatformHelpers, Tests.Support;
 
 type
   TIORingEngineTests = class(TIORingTestCase)
@@ -108,16 +105,14 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring.Atomics,
-  TestFileHelpers;
+  Delphi.IOUring.Atomics, Delphi.IOUring.Backend.Custom, TestFileHelpers;
 
 const
   PATTERN_FILE_SIZE = 4 * 1024 * 1024;
   MAX_READ_SIZE = 64 * 1024;
 
-  // Stress: requests each producer keeps - 8 x 5 = 40 > 36 in the pool, so
-  // the pool runs full; but a producer keeps at most 4 while it waits for a
-  // new one, and 8 x 4 < 36, so one of them always gets one (Tests.Engine)
+  { Stress: requests each producer keeps - 8 x 5 = 40 > 36 in the pool, so the pool runs full; but a producer keeps at
+    most 4 while it waits for a new one, and 8 x 4 < 36, so one of them always gets one (Tests.Engine) }
   STRESS_PRODUCERS = 8;
   STRESS_READS = 1500;
   STRESS_IN_FLIGHT = 5;
@@ -140,6 +135,7 @@ begin
   AState := AState xor (AState shl 13);
   AState := AState xor (AState shr 17);
   AState := AState xor (AState shl 5);
+
   Result := AState;
 end;
 
@@ -182,15 +178,17 @@ procedure TIORingEngineTests.RecordCompletion(const ACompletion: TIORingCompleti
 begin
   FCallbackThreadId := TThread.CurrentThread.ThreadID;
   FCallbackCompletion := ACompletion;
+
   if ACompletion.IsCancelled then
     TAtomic.Increment(FCancelledCount);
+
   TAtomic.Increment(FCallbackCount);
 end;
 
 procedure TIORingEngineTests.RaiseInCallback(const ACompletion: TIORingCompletion);
 begin
   TAtomic.Increment(FCallbackCount);
-  raise Exception.Create('A callback that fails');
+  RaiseError(Exception, 'A callback that fails');
 end;
 
 procedure TIORingEngineTests.CheckCallbackRead(const ACompletion: TIORingCompletion);
@@ -199,10 +197,12 @@ var
   LBadOffset: UInt64;
 begin
   LRead := PCallbackRead(ACompletion.UserData);
+
   if not ACompletion.Succeeded or (ACompletion.BytesTransferred <> LRead^.Count) or
     not TTestFileHelpers.CheckPattern(LRead^.Offset, LRead^.Buffer, LRead^.Count, LBadOffset) or
     not FEngine.IsIOThread(TThread.CurrentThread.ThreadID) then
     TAtomic.Increment(FFailures);
+
   Dispose(LRead);
   TAtomic.Increment(FCallbackCount);
 end;
@@ -217,8 +217,10 @@ var
   LDeadline: UInt64;
 begin
   LDeadline := TThread.GetTickCount64 + 5000;
+
   while (TAtomic.LoadAcquire(AValue) <> AExpected) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
+
   Result := TAtomic.LoadAcquire(AValue) = AExpected;
 end;
 
@@ -227,6 +229,7 @@ var
   LIndex: Integer;
 begin
   Result := 0;
+
   for LIndex := 0 to FEngine.IOThreadCount - 1 do
     if FEngine.IOThreadStats(LIndex).Requests > 0 then
       Inc(Result);
@@ -264,10 +267,13 @@ begin
   // A ring of 8 entries for 500 requests: most wait in the queue
   FEngine := TIORingEngine.Create(1024, 8);
   SetLength(LBuffers, READS * READ_SIZE);
+
   for LIndex := 0 to READS - 1 do
     LHandles[LIndex] := FEngine.ReadAsync(FFile, LBuffers[LIndex * READ_SIZE], READ_SIZE,
       UInt64(LIndex) * 7919, NativeUInt(LIndex));
+
   FEngine.WaitAll(LHandles, LCompletions);
+
   for LIndex := 0 to READS - 1 do
   begin
     AssertTrue(LCompletions[LIndex].ErrorMessage, LCompletions[LIndex].Succeeded);
@@ -293,9 +299,12 @@ begin
   LFile := FResources.CreateNewFile;
   SetLength(LOut, 3 * BLOCK);
   TTestFileHelpers.FillPattern(0, LOut[0], Length(LOut));
+
   for LIndex := 0 to 2 do
     LHandles[LIndex] := FEngine.WriteAsync(LFile, LOut[LIndex * BLOCK], BLOCK, UInt64(LIndex) * BLOCK);
+
   FEngine.WaitAll(LHandles, LCompletions);
+
   for LIndex := 0 to 2 do
   begin
     AssertTrue('Write: ' + LCompletions[LIndex].ErrorMessage, LCompletions[LIndex].Succeeded);
@@ -389,11 +398,14 @@ begin
   AssertFalse('Pending', FEngine.TryGetResult(LHandle, LCompletion));
   WriteByteToPipe(LServer, 7);
   LDeadline := TThread.GetTickCount64 + 5000;
+
   repeat
     LDone := FEngine.TryGetResult(LHandle, LCompletion);
+
     if not LDone then
       Sleep(1);
   until LDone or (TThread.GetTickCount64 > LDeadline);
+
   AssertTrue('Done after the write', LDone);
   AssertEquals('Byte', 7, LByte);
 end;
@@ -410,22 +422,26 @@ begin
   AssertTrue(FEngine.Wait(LHandle, LCompletion));
 
   LRaised := False;
+
   try
     FEngine.Wait(LHandle, LCompletion);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Second Wait for the same request', LRaised);
 
   LHandle.Value := 0;
   LRaised := False;
+
   try
     FEngine.Wait(LHandle, LCompletion);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Empty handle', LRaised);
 end;
 
@@ -457,8 +473,10 @@ begin
   FEngine := TIORingEngine.Create;
   FEngine.ReadAsync(FFile, LBuffer, SizeOf(LBuffer), 0, 0, RaiseInCallback);
   LDeadline := TThread.GetTickCount64 + 5000;
+
   while (FEngine.Stats.CallbackErrors = 0) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
+
   CheckEqualsU64('Counted', 1, FEngine.Stats.CallbackErrors);
   // The I/O thread survived
   AssertTrue(FEngine.Wait(FEngine.ReadAsync(FFile, LBuffer, SizeOf(LBuffer), 0), LCompletion));
@@ -483,10 +501,11 @@ begin
   LSubmitsBefore := FEngine.Stats.Submits;
 
   FEngine.BeginBatch;
+
   try
     for LIndex := 0 to READS - 1 do
-      LHandles[LIndex] := FEngine.ReadAsync(FFile, LBuffers[LIndex * READ_SIZE], READ_SIZE,
-        UInt64(LIndex) * READ_SIZE);
+      LHandles[LIndex] := FEngine.ReadAsync(FFile, LBuffers[LIndex * READ_SIZE], READ_SIZE, UInt64(LIndex) * READ_SIZE);
+
     Sleep(50);
     AssertFalse('Not started before EndBatch', FEngine.TryGetResult(LHandles[0], LCompletion));
   finally
@@ -494,11 +513,13 @@ begin
   end;
 
   FEngine.WaitAll(LHandles, LCompletions);
+
   for LIndex := 0 to READS - 1 do
   begin
     AssertTrue(LCompletions[LIndex].ErrorMessage, LCompletions[LIndex].Succeeded);
     CheckData(UInt64(LIndex) * READ_SIZE, @LBuffers[LIndex * READ_SIZE], READ_SIZE);
   end;
+
   CheckEqualsU64('All 20 in one submit', 1, FEngine.Stats.Submits - LSubmitsBefore);
 end;
 
@@ -509,25 +530,30 @@ var
 begin
   FEngine := TIORingEngine.Create(16, 8);
   LRaised := False;
+
   try
     FEngine.EndBatch;
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('EndBatch without BeginBatch', LRaised);
 
   LOther := TIORingEngine.Create(16, 8);
+
   try
     FEngine.BeginBatch;
     FEngine.BeginBatch;    // nested: fine
     LRaised := False;
+
     try
       LOther.BeginBatch;
     except
       on EIORingError do
         LRaised := True;
     end;
+
     AssertTrue('Batch of another engine', LRaised);
     FEngine.EndBatch;
     FEngine.EndBatch;
@@ -556,6 +582,7 @@ var
 begin
   // Two requests at most, both pending on pipes
   FEngine := TIORingEngine.Create(2, 8);
+
   for LIndex := 0 to 1 do
   begin
     FResources.OpenPipePair(LServer[LIndex], LClient[LIndex]);
@@ -563,6 +590,7 @@ begin
   end;
 
   LThread := TWorkerThread.Create(0, 1, nil, WorkStartThirdRead);
+
   try
     LThread.Start;
     Sleep(100);
@@ -576,6 +604,7 @@ begin
   finally
     LThread.Free;
   end;
+
   AssertTrue('Third request', FEngine.Wait(FThirdHandle, LCompletion, 5000));
   AssertTrue(LCompletion.ErrorMessage, LCompletion.Succeeded);
   CheckData(0, @FThirdBuffer[0], SizeOf(FThirdBuffer));
@@ -590,12 +619,14 @@ var
   LStats: TIORingEngineStats;
 begin
   FEngine := TIORingEngine.Create;
-  // An idle engine sleeps. (While requests keep coming it may never sleep:
-  // the next one is there before it would - so Sleeps is checked here.)
+  { An idle engine sleeps. (While requests keep coming it may never sleep: the next one is there before it would -
+    so Sleeps is checked here.) }
   Sleep(20);
   AssertTrue('Sleeps when idle', FEngine.Stats.Sleeps >= 1);
+
   for LIndex := 1 to 10 do
     FEngine.Wait(FEngine.ReadAsync(FFile, LBuffer, SizeOf(LBuffer), LIndex * 1000), LCompletion);
+
   FEngine.Wait(FEngine.ReadAsync(BAD_HANDLE, LBuffer, SizeOf(LBuffer), 0), LCompletion);   // fails
   LStats := FEngine.Stats;
   CheckEqualsU64('Requests', 11, LStats.Requests);
@@ -616,11 +647,13 @@ var
   LIndex: Integer;
 begin
   FEngine := TIORingEngine.Create(16, 8);
+
   for LIndex := 0 to 2 do
   begin
     FResources.OpenPipePair(LServer[LIndex], LClient[LIndex]);
     FEngine.ReadAsync(LClient[LIndex], LBytes[LIndex], 1, 0, LIndex, RecordCompletion);
   end;
+
   Sleep(50);    // they are in the ring now
   AssertEquals('Pending', 0, TAtomic.LoadAcquire(FCallbackCount));
 
@@ -645,6 +678,7 @@ begin
   FResources.OpenPipePair(LServer, LClient);
   FWaitHandle := FEngine.ReadAsync(LClient, LByte, 1, 0, 55);
   LThread := TWorkerThread.Create(0, 1, nil, WorkWait);
+
   try
     LThread.Start;
     Sleep(50);    // it sleeps in Wait now
@@ -653,6 +687,7 @@ begin
   finally
     LThread.Free;
   end;
+
   AssertTrue('Wait returned with a result', FWaited);
   AssertTrue('Cancelled: ' + FWaitResult.ErrorMessage, FWaitResult.IsCancelled);
   CheckEqualsU64('UserData', 55, FWaitResult.UserData);
@@ -676,15 +711,16 @@ var
   LStart: UInt64;
   LIndex: Integer;
 begin
-  // Free Pascal on Unix: TThread.WaitFor from the main thread waits in 100 ms
-  // steps, so this took at least 1 s before the engine waited on its own
-  // (TIORingIOThread.WaitUntilEnded)
+  { Free Pascal on Unix: TThread.WaitFor from the main thread waits in 100 ms steps, so this took at least 1 s before
+    the engine waited on its own (TIORingIOThread.WaitUntilEnded) }
   LStart := TThread.GetTickCount64;
+
   for LIndex := 1 to 10 do
   begin
     FEngine := TIORingEngine.Create(IORING_ENGINE_DEFAULT_MAX_REQUESTS, IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE, 4);
     FreeAndNil(FEngine);
   end;
+
   AssertTrue(Format('Took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 500);
 end;
 
@@ -695,30 +731,36 @@ var
   LRaised: Boolean;
 begin
   LRaised := False;
+
   try
     TIORingEngine.Create(16, 8, 0).Free;
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('0 I/O threads', LRaised);
   LRaised := False;
+
   try
     TIORingEngine.Create(16, 8, IORING_ENGINE_MAX_IO_THREADS + 1).Free;
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Too many I/O threads', LRaised);
   FEngine := TIORingEngine.Create(16, 8, 4);
   AssertEquals('IOThreadCount', 4, FEngine.IOThreadCount);
   LRaised := False;
+
   try
     FEngine.IOThreadStats(4);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('No I/O thread 4', LRaised);
 end;
 
@@ -734,19 +776,20 @@ var
   LCompletions: array of TIORingCompletion;
   LIndex: Integer;
 begin
-  // Unbuffered reads: each costs the I/O thread several µs inside the submit
-  // call, plus the disk's time. With cached reads one I/O thread sometimes
-  // finished all of them before a woken sibling got the CPU (3 of 25 runs),
-  // and the test failed for no fault of the engine.
+  {
+    Unbuffered reads: each costs the I/O thread several µs inside the submit call, plus the disk's time. With cached
+    reads one I/O thread sometimes finished all of them before a woken sibling got the CPU (3 of 25 runs), and the test
+    failed for no fault of the engine.
+  }
   LFile := FResources.OpenFile(SharedPatternFile(PATTERN_FILE_SIZE), [tofUnbuffered]);
   LBuffers := FResources.AllocPages(READS * READ_SIZE);
   FEngine := TIORingEngine.Create(READS, 64, 4);
   SetLength(LHandles, READS);
   SetLength(LCompletions, READS);
   Sleep(20);    // all I/O threads asleep
-  // EndBatch wakes one I/O thread; it takes a share and wakes the next one,
-  // which does the same
+  // EndBatch wakes one I/O thread; it takes a share and wakes the next one, which does the same
   FEngine.BeginBatch;
+
   try
     for LIndex := 0 to READS - 1 do
       LHandles[LIndex] := FEngine.ReadAsync(LFile, LBuffers[LIndex * READ_SIZE], READ_SIZE,
@@ -754,12 +797,15 @@ begin
   finally
     FEngine.EndBatch;
   end;
+
   FEngine.WaitAll(LHandles, LCompletions);
+
   for LIndex := 0 to READS - 1 do
   begin
     AssertTrue(LCompletions[LIndex].ErrorMessage, LCompletions[LIndex].Succeeded);
     CheckData(UInt64(LIndex mod BLOCKS_IN_FILE) * READ_SIZE, @LBuffers[LIndex * READ_SIZE], READ_SIZE);
   end;
+
   CheckEqualsU64('Requests of all I/O threads', READS, FEngine.Stats.Requests);
   AssertTrue(Format('%d I/O threads took requests', [BusyIOThreads]), BusyIOThreads >= 2);
 end;
@@ -774,14 +820,15 @@ var
 begin
   FEngine := TIORingEngine.Create(16, 8, 4);
   Sleep(20);
-  // One request at a time: the first I/O thread is enough, and the others
-  // are not woken. (Rarely one is: a producer can come just while the first
-  // one wakes up.)
+
+  { One request at a time: the first I/O thread is enough, and the others are not woken. (Rarely one is: a producer can
+    come just while the first one wakes up.) }
   for LIndex := 1 to READS do
   begin
     AssertTrue('Wait', FEngine.Wait(FEngine.ReadAsync(FFile, LBuffer, SizeOf(LBuffer), LIndex * 1000), LCompletion));
     AssertTrue(LCompletion.ErrorMessage, LCompletion.Succeeded);
   end;
+
   AssertTrue(Format('The first I/O thread took %d of %d', [FEngine.IOThreadStats(0).Requests, READS]),
     FEngine.IOThreadStats(0).Requests >= READS * 9 div 10);
 end;
@@ -796,17 +843,21 @@ var
   LIndex: Integer;
   LDeadline: UInt64;
 begin
-  // Rings of 8: one ring cannot hold them all, so they spread over the I/O
-  // threads (a thread with a full ring wakes a sibling)
+  { Rings of 8: one ring cannot hold them all, so they spread over the I/O threads (a thread with a
+    full ring wakes a sibling) }
   FEngine := TIORingEngine.Create(64, 8, 4);
+
   for LIndex := 0 to PIPES - 1 do
   begin
     FResources.OpenPipePair(LServer[LIndex], LClient[LIndex]);
     FEngine.ReadAsync(LClient[LIndex], LBytes[LIndex], 1, 0, LIndex, RecordCompletion);
   end;
+
   LDeadline := TThread.GetTickCount64 + 5000;
+
   while (FEngine.Stats.Requests < PIPES) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
+
   CheckEqualsU64('All taken by the I/O threads', PIPES, FEngine.Stats.Requests);
   AssertTrue(Format('%d I/O threads took requests', [BusyIOThreads]), BusyIOThreads >= 2);
   AssertEquals('Pending', 0, TAtomic.LoadAcquire(FCallbackCount));
@@ -832,18 +883,23 @@ begin
   FillChar(LHandles, SizeOf(LHandles), 0);
   FillChar(LOffsets, SizeOf(LOffsets), 0);
   FillChar(LCounts, SizeOf(LCounts), 0);
+
   for LSlot := 0 to STRESS_IN_FLIGHT - 1 do
     SetLength(LBuffers[LSlot], MAX_READ_SIZE);
+
   for LRead := 0 to STRESS_READS - 1 do
   begin
     LSlot := LRead mod STRESS_IN_FLIGHT;
+
     if (LRead >= STRESS_IN_FLIGHT) and
       not ReadWasRight(FEngine, LHandles[LSlot], LOffsets[LSlot], @LBuffers[LSlot][0], LCounts[LSlot]) then
       TAtomic.Increment(FFailures);
+
     LCounts[LSlot] := 1 + NextRandom(LRandom) mod MAX_READ_SIZE;
     LOffsets[LSlot] := NextRandom(LRandom) mod (PATTERN_FILE_SIZE - LCounts[LSlot] + 1);
     LHandles[LSlot] := FEngine.ReadAsync(FFile, LBuffers[LSlot][0], LCounts[LSlot], LOffsets[LSlot]);
   end;
+
   for LSlot := 0 to STRESS_IN_FLIGHT - 1 do
     if not ReadWasRight(FEngine, LHandles[LSlot], LOffsets[LSlot], @LBuffers[LSlot][0], LCounts[LSlot]) then
       TAtomic.Increment(FFailures);
@@ -879,17 +935,18 @@ var
 begin
   LRandom := Cardinal(AIndex + 7) * 2654435761;
   SetLength(LBuffer, MAX_READ_SIZE);
+
   for LRead := 0 to MIXED_READS - 1 do
   begin
     LCount := 1 + NextRandom(LRandom) mod MAX_READ_SIZE;
     LOffset := NextRandom(LRandom) mod (PATTERN_FILE_SIZE - LCount + 1);
+
     if Odd(LRead) then
     begin
       New(LCallbackRead);
       LCallbackRead^.Offset := LOffset;
       LCallbackRead^.Count := LCount;
-      FEngine.ReadAsync(FFile, LCallbackRead^.Buffer, LCount, LOffset, NativeUInt(LCallbackRead),
-        CheckCallbackRead);
+      FEngine.ReadAsync(FFile, LCallbackRead^.Buffer, LCount, LOffset, NativeUInt(LCallbackRead), CheckCallbackRead);
     end
     else if not ReadWasRight(FEngine, FEngine.ReadAsync(FFile, LBuffer[0], LCount, LOffset), LOffset,
       @LBuffer[0], LCount) then
@@ -909,8 +966,8 @@ end;
 
 procedure TIORingEngineTests.RunCallbacksAndWaits(const AIOThreads: Integer);
 begin
-  // Every second request has a callback, which checks the data (and that it
-  // runs on an I/O thread); the others are waited for by the producer
+  { Every second request has a callback, which checks the data (and that it runs on an I/O thread); the others are
+    waited for by the producer }
   FEngine := TIORingEngine.Create(16, 8, AIOThreads);
   RunThreads(MIXED_PRODUCERS, WorkMixed);
   AssertTrue('All callbacks ran', WaitForCount(FCallbackCount, MIXED_PRODUCERS * MIXED_READS div 2));

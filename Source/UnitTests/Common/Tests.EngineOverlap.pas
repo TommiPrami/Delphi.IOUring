@@ -20,16 +20,11 @@ interface
 
 uses
 {$IFDEF FPC}
-  Classes,
-  SysUtils,
+  Classes, SysUtils,
 {$ELSE}
-  System.Classes,
-  System.SysUtils,
+  System.Classes, System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Engine,
-  TestPlatformHelpers,
-  Tests.Support;
+  Delphi.IOUring, Delphi.IOUring.Engine, TestPlatformHelpers, Tests.Support;
 
 type
   TEngineOverlapTests = class(TIORingTestCase)
@@ -37,8 +32,7 @@ type
     FResources: TTestResources;
     FEngine: TIORingEngine;
     FFailures: Integer;
-    // Filled by RecordCompletion: the UserData of the completed requests, in
-    // the order they completed
+    // Filled by RecordCompletion: the UserData of the completed requests, in the order they completed
     FOrder: array[0..63] of NativeUInt;
     FOrderCount: Integer;
     FCancelledCount: Integer;
@@ -49,8 +43,8 @@ type
     function WaitForHeldBack(const AExpected: UInt64): Boolean;
     function WaitForRequests(const AExpected: UInt64): Boolean;
     function WaitForCompleted(const AExpected: Integer): Boolean;
-    // Random reads and writes in [ARegion, ARegion + MODEL_SIZE) of AFile,
-    // checked against a model; returns the number of wrong results
+    { Random reads and writes in [ARegion, ARegion + MODEL_SIZE) of AFile, checked against a model; returns
+      the number of wrong results }
     function RunModel(const AFile: THandle; const ARegion: UInt64; const ASeed: Cardinal): Integer;
     procedure WorkModel(AIndex: Integer);
   protected
@@ -70,8 +64,8 @@ type
 {$ENDIF}
     procedure HeldBackRequests_StartInOrder;
 {$IFDEF MSWINDOWS}
-    // Windows only: a pending pipe write and a flush of a pipe (Linux: a
-    // large socket write does not wait, and a flush there is EINVAL)
+    { Windows only: a pending pipe write and a flush of a pipe (Linux: a large socket write does not wait,
+      and a flush there is EINVAL) }
     procedure Flush_WaitsForAnEarlierWrite;
 {$ENDIF}
     procedure Destroy_CancelsHeldBackRequests;
@@ -112,6 +106,7 @@ begin
   AState := AState xor (AState shl 13);
   AState := AState xor (AState shr 17);
   AState := AState xor (AState shl 5);
+
   Result := AState;
 end;
 
@@ -141,6 +136,7 @@ begin
   // Callbacks of one file handle all run on its I/O thread, one at a time
   if ACompletion.IsCancelled then
     TAtomic.Increment(FCancelledCount);
+
   LIndex := FOrderCount;
   FOrder[LIndex] := ACompletion.UserData;
   TAtomic.StoreRelease(FOrderCount, LIndex + 1);
@@ -156,8 +152,10 @@ var
   LDeadline: UInt64;
 begin
   LDeadline := TThread.GetTickCount64 + WAIT_MILLISECONDS;
+
   while (FEngine.Stats.HeldBack <> AExpected) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
+
   Result := FEngine.Stats.HeldBack = AExpected;
 end;
 
@@ -166,8 +164,10 @@ var
   LDeadline: UInt64;
 begin
   LDeadline := TThread.GetTickCount64 + WAIT_MILLISECONDS;
+
   while (FEngine.Stats.Requests <> AExpected) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
+
   Result := FEngine.Stats.Requests = AExpected;
 end;
 
@@ -176,8 +176,10 @@ var
   LDeadline: UInt64;
 begin
   LDeadline := TThread.GetTickCount64 + WAIT_MILLISECONDS;
+
   while (CompletedCount <> AExpected) and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
+
   Result := CompletedCount = AExpected;
 end;
 
@@ -200,6 +202,7 @@ begin
   LFile := FResources.CreateNewFile;
   SetLength(LOut, SIZE);
   SetLength(LIn, SIZE);
+
   for LRound := 1 to ROUNDS do
   begin
     // Started together, not waited for in between
@@ -232,6 +235,7 @@ begin
   SetLength(LFirst, SIZE);
   SetLength(LSecond, SIZE);
   SetLength(LIn, SIZE + SIZE div 2);
+
   for LRound := 1 to ROUNDS do
   begin
     // The second write covers the second half of the first one
@@ -243,6 +247,7 @@ begin
     AssertTrue('Writes', LCompletions[0].Succeeded and LCompletions[1].Succeeded);
     AssertTrue('Read', FEngine.Wait(FEngine.ReadAsync(LFile, LIn[0], Length(LIn), 0), LCompletion) and
       LCompletion.Succeeded);
+
     for LIndex := 0 to High(LIn) do
       if (LIndex < SIZE div 2) and (LIn[LIndex] <> Byte(LRound)) or
         (LIndex >= SIZE div 2) and (LIn[LIndex] <> Byte(LRound + 100)) then
@@ -270,6 +275,7 @@ begin
   SetLength(LIn, SIZE);
   FillChar(LOut[0], SIZE, 0);
   AssertTrue('First write', FEngine.Wait(FEngine.WriteAsync(LFile, LOut[0], SIZE, 0), LCompletion));
+
   for LRound := 1 to ROUNDS do
   begin
     // The file holds Byte(LRound - 1); the read is started before the write
@@ -278,6 +284,7 @@ begin
     LWrite := FEngine.WriteAsync(LFile, LOut[0], SIZE, 0);
     AssertTrue('Read', FEngine.Wait(LRead, LCompletion) and LCompletion.Succeeded);
     AssertTrue('Write', FEngine.Wait(LWrite, LCompletion) and LCompletion.Succeeded);
+
     for LIndex := 0 to SIZE - 1 do
       if LIn[LIndex] <> Byte(LRound - 1) then
         Fail(Format('Round %d: the read saw the later write at %d', [LRound, LIndex]));
@@ -363,8 +370,8 @@ var
   LIn: array[0..1] of Byte;
   LOut: array[0..1] of Byte;
 begin
-  // Read 1 (pending) < write 2 (waits for 1) < read 3 (waits for 2) <
-  // write 4 (waits for 2 and 3); all on bytes 0..0 of one handle
+  { Read 1 (pending) < write 2 (waits for 1) < read 3 (waits for 2) < write 4 (waits for 2 and 3); all
+    on bytes 0..0 of one handle }
   FEngine := TIORingEngine.Create(16, 8, 1, orKeepOrder);
   FResources.OpenPipePair(LServer, LClient);
   LOut[0] := 2;
@@ -429,8 +436,10 @@ begin
   FResources.OpenPipePair(LServer, LClient);
   FillChar(LOut, SizeOf(LOut), 3);
   FEngine.ReadAsync(LClient, LIn, 1, 0, 100, RecordCompletion);
+
   for LIndex := 0 to 2 do
     FEngine.WriteAsync(LClient, LOut[LIndex], 1, 0, LIndex, RecordCompletion);
+
   AssertTrue('Three held back', WaitForHeldBack(3));
 
   FreeAndNil(FEngine);    // returns only when all have completed
@@ -472,19 +481,24 @@ begin
   LFile := FResources.CreateNewFile;
   FillChar(LBuffer, SizeOf(LBuffer), 1);
   FEngine.BeginBatch;
+
   try
     for LIndex := 0 to 49 do
       FEngine.WriteAsync(LFile, LBuffer, SizeOf(LBuffer), UInt64(LIndex) * SizeOf(LBuffer), 0, RecordCompletion);
   finally
     FEngine.EndBatch;
   end;
+
   for LIndex := 0 to 49 do
     AssertTrue('Read', FEngine.Wait(FEngine.ReadAsync(LFile, LBuffer, SizeOf(LBuffer),
       UInt64(LIndex) * SizeOf(LBuffer)), LCompletion) and LCompletion.Succeeded);
+
   LBusy := 0;
+
   for LIndex := 0 to FEngine.IOThreadCount - 1 do
     if FEngine.IOThreadStats(LIndex).Requests > 0 then
       Inc(LBusy);
+
   AssertEquals('All requests of the handle on one I/O thread', 1, LBusy);
 end;
 
@@ -516,21 +530,24 @@ begin
   LRandom := ASeed;
   SetLength(LModel, MODEL_SIZE);
   FillChar(LModel[0], MODEL_SIZE, 0);
+
   if not FEngine.Wait(FEngine.WriteAsync(AFile, LModel[0], MODEL_SIZE, ARegion), LCompletion) or
     not LCompletion.Succeeded then
+
     Exit(1);
 
   for LIndex := 0 to MODEL_OPERATIONS + MODEL_IN_FLIGHT - 1 do
   begin
-    // In batches of MODEL_BATCH: more than an I/O thread's share, so that
-    // a sibling helps and requests run on two threads at once. (The request
-    // waited for below is MODEL_IN_FLIGHT > MODEL_BATCH older: never in the
-    // open batch.)
+    { In batches of MODEL_BATCH: more than an I/O thread's share, so that a sibling helps and requests run on two
+      threads at once. (The request waited for below is MODEL_IN_FLIGHT > MODEL_BATCH older: never in the open batch.) }
     if (LIndex mod MODEL_BATCH = 0) and (LIndex < MODEL_OPERATIONS) then
       FEngine.BeginBatch;
+
     LSlot := LIndex mod MODEL_IN_FLIGHT;
+
     if LIndex >= MODEL_IN_FLIGHT then
       Finish(LOperations[LSlot]);
+
     if LIndex >= MODEL_OPERATIONS then
       Continue;
 
@@ -538,13 +555,17 @@ begin
     LOperations[LSlot].IsWrite := Odd(NextRandom(LRandom));
     LOperations[LSlot].Offset := NextRandom(LRandom) mod MODEL_SIZE;
     LOperations[LSlot].Count := 1 + NextRandom(LRandom) mod MODEL_MAX_LENGTH;
+
     if LOperations[LSlot].Count > MODEL_SIZE - LOperations[LSlot].Offset then
       LOperations[LSlot].Count := MODEL_SIZE - LOperations[LSlot].Offset;
+
     SetLength(LOperations[LSlot].Data, LOperations[LSlot].Count);
+
     if LOperations[LSlot].IsWrite then
     begin
       for LByte := 0 to LOperations[LSlot].Count - 1 do
         LOperations[LSlot].Data[LByte] := Byte(NextRandom(LRandom));
+
       Move(LOperations[LSlot].Data[0], LModel[LOperations[LSlot].Offset], LOperations[LSlot].Count);
       LOperations[LSlot].Handle := FEngine.WriteAsync(AFile, LOperations[LSlot].Data[0], LOperations[LSlot].Count,
         ARegion + LOperations[LSlot].Offset);
@@ -555,9 +576,11 @@ begin
       LOperations[LSlot].Handle := FEngine.ReadAsync(AFile, LOperations[LSlot].Data[0], LOperations[LSlot].Count,
         ARegion + LOperations[LSlot].Offset);
     end;
+
     if (LIndex mod MODEL_BATCH = MODEL_BATCH - 1) or (LIndex = MODEL_OPERATIONS - 1) then
       FEngine.EndBatch;
   end;
+
   Result := LWrong;
 end;
 
@@ -575,8 +598,8 @@ end;
 
 procedure TEngineOverlapTests.Model_FourProducersOnOneHandle;
 begin
-  // Each producer has its own part of the file and its own model; all go
-  // through one handle, so through one I/O thread and one list
+  { Each producer has its own part of the file and its own model; all go through one handle, so through
+    one I/O thread and one list }
   FEngine := TIORingEngine.Create(MODEL_PRODUCERS * MODEL_IN_FLIGHT + 8, 64, 4, orKeepOrder);
   FModelFile := FResources.CreateNewFile;
   RunThreads(MODEL_PRODUCERS, WorkModel);

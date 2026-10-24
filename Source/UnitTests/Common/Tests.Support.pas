@@ -33,9 +33,7 @@ interface
 
 uses
 {$IFDEF FPC}
-  SysUtils,
-  Classes,
-  fpcunit;
+  SysUtils, Classes, fpcunit;
 {$ELSE}
   System.SysUtils,
   System.Classes,
@@ -49,9 +47,8 @@ type
 {$IFDEF FPC}
   TIORingTestCaseBase = TTestCase;
 {$ELSE}
-  // The FPCUnit side for DUnitX: DUnitX runs the published methods of a
-  // registered class as tests, and the [Setup]/[TearDown] methods of this
-  // base class around each of them.
+  { The FPCUnit side for DUnitX: DUnitX runs the published methods of a registered class as tests, and the
+    [Setup]/[TearDown] methods of this base class around each of them. }
   {$M+}
   TIORingTestCaseBase = class
   public
@@ -81,12 +78,11 @@ type
   // A thread body: a method of the test case
   TWorkMethod = procedure(AIndex: Integer) of object;
 
-  // A name of its own: in units that use Windows, its PINTEGER would hide
-  // PInteger
+  // A name of its own: in units that use Windows, its PINTEGER would hide PInteger
   PReadyCount = ^Integer;
 
-  // Runs FWork(FIndex). With AReady <> nil it first waits until all ACount
-  // threads of its group have started, so that they run at the same moment.
+  { Runs FWork(FIndex). With AReady <> nil it first waits until all ACount threads of its group have started, so that
+    they run at the same moment. }
   TWorkerThread = class(TThread)
   private
     FIndex: Integer;
@@ -101,12 +97,12 @@ type
 
   TIORingTestCase = class(TIORingTestCaseBase)
   protected
-    // Runs AWork(Index) in ACount threads (Index 0..ACount-1) that start at
-    // the same moment; returns when all are done. Fails if a thread raised an
-    // exception, or if the threads are not done after
-    // RUN_THREADS_TIMEOUT_MILLISECONDS (an endless loop: those threads cannot
-    // be stopped and are left running). AWork must not use Assert*/Fail:
-    // count failures and check them after RunThreads.
+    {
+      Runs AWork(Index) in ACount threads (Index 0..ACount-1) that start at the same moment; returns when all are done.
+      Fails if a thread raised an exception, or if the threads are not done after RUN_THREADS_TIMEOUT_MILLISECONDS (an
+      endless loop: those threads cannot be stopped and are left running). AWork must not use Assert*/Fail: count
+      failures and check them after RunThreads.
+    }
     procedure RunThreads(const ACount: Integer; const AWork: TWorkMethod);
     // Prints a line between the test results (findings worth seeing)
     procedure Log(const AText: string);
@@ -118,12 +114,11 @@ type
 
   TIORingTestCaseClass = class of TIORingTestCase;
 
-// Registers the published methods of AClass as tests (FPCUnit's RegisterTest,
-// DUnitX's RegisterTestFixture). Call it in the initialization section.
+{ Registers the published methods of AClass as tests (FPCUnit's RegisterTest, DUnitX's RegisterTestFixture). Call it in
+  the initialization section. }
 procedure RegisterTests(const AClass: TIORingTestCaseClass);
 
-// A pattern file of ASize bytes; created on first use, deleted when the
-// program ends
+// A pattern file of ASize bytes; created on first use, deleted when the program ends
 function SharedPatternFile(const ASize: Int64): string;
 
 // Busy for AMicroseconds, without giving up the CPU
@@ -138,8 +133,7 @@ uses
   Windows,
   {$ENDIF}
   {$IFDEF LINUX}
-  unixtype,
-  Linux,
+  unixtype, Linux,
   {$ENDIF}
 {$ELSE}
   Winapi.Windows,
@@ -152,8 +146,8 @@ uses
 
 procedure TIORingTestCaseBase.RunSetUp;
 begin
-  // FPCUnit makes a new object for every test, DUnitX runs all tests of a
-  // class on one object. Start every test with zeroed fields, as in FPCUnit.
+  { FPCUnit makes a new object for every test, DUnitX runs all tests of a class on one object. Start every test with
+    zeroed fields, as in FPCUnit. }
   CleanupInstance;
   ClassType.InitInstance(Self);
   SetUp;
@@ -176,6 +170,7 @@ end;
 function ComparisonMessage(const AMessage, AExpected, AActual: string): string;
 begin
   Result := 'expected: <' + AExpected + '> but was: <' + AActual + '>';
+
   if AMessage <> '' then
     Result := '"' + AMessage + '" ' + Result;
 end;
@@ -239,6 +234,7 @@ begin
   FCount := ACount;
   FReady := AReady;
   FWork := AWork;
+
   inherited Create(True);
 end;
 
@@ -246,18 +242,21 @@ procedure TWorkerThread.Execute;
 begin
   if FReady <> nil then
   begin
-    // The RTL's interlocked calls (Delphi.IOUring.Atomics is not for Linux
-    // yet); a compare-exchange that changes nothing is a full-barrier read
+    { The RTL's interlocked calls (Delphi.IOUring.Atomics is not for Linux yet); a compare-exchange that changes
+      nothing is a full-barrier read }
 {$IFDEF FPC}
     InterLockedIncrement(FReady^);
+
     while InterlockedCompareExchange(FReady^, 0, 0) < FCount do
       TThread.Yield;
 {$ELSE}
     AtomicIncrement(FReady^);
+
     while AtomicCmpExchange(FReady^, 0, 0) < FCount do
       TThread.Yield;
 {$ENDIF}
   end;
+
   FWork(FIndex);
 end;
 
@@ -271,6 +270,7 @@ begin
   LNow := 0;
   QueryPerformanceFrequency(LFrequency);
   QueryPerformanceCounter(LStart);
+
   repeat
     QueryPerformanceCounter(LNow);
   until (LNow - LStart) * 1000000 >= AMicroseconds * LFrequency;
@@ -283,6 +283,7 @@ var
   LTime: TTimeSpec;
 begin
   clock_gettime(CLOCK_MONOTONIC, @LTime);
+
   Result := Int64(LTime.tv_sec) * 1000000 + LTime.tv_nsec div 1000;
 end;
 
@@ -291,6 +292,7 @@ var
   LStart: Int64;
 begin
   LStart := MonotonicMicroseconds;
+
   repeat
   until MonotonicMicroseconds - LStart >= AMicroseconds;
 end;
@@ -313,8 +315,10 @@ begin
   Result := WaitForSingleObject(AThread.Handle, AMilliseconds) = WAIT_OBJECT_0;
 {$ELSE}
   LDeadline := TThread.GetTickCount64 + AMilliseconds;
+
   while not AThread.Finished and (TThread.GetTickCount64 < LDeadline) do
     Sleep(1);
+
   Result := AThread.Finished;
 {$ENDIF}
 end;
@@ -330,15 +334,19 @@ begin
   New(LReady);
   LReady^ := 0;
   SetLength(LThreads, ACount);
+
   for LIndex := 0 to ACount - 1 do
     LThreads[LIndex] := TWorkerThread.Create(LIndex, ACount, LReady, AWork);
+
   for LIndex := 0 to ACount - 1 do
     LThreads[LIndex].Start;
 
   LDeadline := TThread.GetTickCount64 + RUN_THREADS_TIMEOUT_MILLISECONDS;
+
   for LIndex := 0 to ACount - 1 do
   begin
     LNow := TThread.GetTickCount64;
+
     if (LNow >= LDeadline) or not WaitForThread(LThreads[LIndex], Cardinal(LDeadline - LNow)) then
       // Left running on purpose (and not freed: freeing waits for them)
       Fail(Format('Thread %d still runs after %d s: an endless loop?',
@@ -352,6 +360,7 @@ begin
   finally
     for LIndex := 0 to ACount - 1 do
       LThreads[LIndex].Free;
+
     Dispose(LReady);
   end;
 end;
@@ -414,6 +423,7 @@ var
 begin
   for LIndex := 0 to High(GSharedFiles) do
     TTestFileHelpers.DeleteTestFile(GSharedFiles[LIndex]);
+
   GSharedFiles := nil;
   GSharedSizes := nil;
 end;

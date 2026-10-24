@@ -24,14 +24,11 @@ uses
   cthreads,          // Free Pascal on Linux: threads (the library uses them)
 {$ENDIF}
 {$IFDEF FPC}
-  SysUtils,
-  Classes,
+  SysUtils, Classes,
 {$ELSE}
-  System.SysUtils,
-  System.Classes,
+  System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring.Streams,
-  Demo.Common in '..\Common\Demo.Common.pas';
+  Delphi.IOUring.Streams, Demo.Common in '..\Common\Demo.Common.pas';
 
 procedure CopyWithStreams(const ASource, ATarget: string);
 var
@@ -39,8 +36,10 @@ var
   LTarget: TSequentialWriteOnlyFileStream;
 begin
   LSource := TSequentialReadOnlyFileStream.Create(ASource);
+
   try
     LTarget := TSequentialWriteOnlyFileStream.Create(ATarget);   // creates or empties the file
+
     try
       LTarget.CopyFrom(LSource, 0);      // 0: the whole stream, as with any TStream
     finally
@@ -65,15 +64,20 @@ begin
   SetLength(LBuffer1, CHUNK);
   SetLength(LBuffer2, CHUNK);
   LStream1 := TFileStream.Create(AFileName1, fmOpenRead or fmShareDenyWrite);
+
   try
     LStream2 := TFileStream.Create(AFileName2, fmOpenRead or fmShareDenyWrite);
+
     try
       Result := LStream1.Size = LStream2.Size;
+
       while Result do
       begin
         LRead := LStream1.Read(LBuffer1[0], CHUNK);
+
         if LRead = 0 then
           Break;
+
         LStream2.ReadBuffer(LBuffer2[0], LRead);
         Result := CompareMem(@LBuffer1[0], @LBuffer2[0], LRead);
       end;
@@ -95,6 +99,7 @@ var
 begin
   try
     LTemporary := ParamCount = 0;
+
     if LTemporary then
     begin
       LSource := DemoFileName('CopyFile.source');
@@ -110,6 +115,7 @@ begin
     begin
       Writeln('Usage: CopyFile <source> <target>   (no arguments: a temporary file)');
       ExitCode := 2;
+
       Exit;
     end;
 

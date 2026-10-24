@@ -22,8 +22,7 @@ uses
 {$ELSE}
   System.Classes,
 {$ENDIF}
-  Delphi.IOUring.RequestQueue,
-  Tests.Support;
+  Delphi.IOUring.RequestQueue, Tests.Support;
 
 type
   TRequestQueueTests = class(TIORingTestCase)
@@ -40,11 +39,12 @@ type
     FConsumers: Integer;
     FItems: Integer;
     FProducerPauses: Integer;
-    // Runs AProducers producers that each put AItems values into a queue of
-    // ACapacity cells, and AConsumers consumers that take them all out; then
-    // checks that every value came out once (and in order, with one consumer).
-    // AProducerPauses: CPU pauses a producer waits between two values (slow
-    // producers: the consumers wait at the empty queue).
+    {
+      Runs AProducers producers that each put AItems values into a queue of ACapacity cells, and AConsumers
+      consumers that take them all out; then checks that every value came out once (and in order, with one
+      consumer). AProducerPauses: CPU pauses a producer waits between two values (slow producers: the consumers
+      wait at the empty queue).
+    }
     procedure RunProducersAndConsumers(const AProducers, AConsumers, AItems: Integer;
       const ACapacity: Cardinal; const AFirstPosition: NativeUInt = 0; const AProducerPauses: Integer = 0);
     procedure WorkQueue(AIndex: Integer);
@@ -76,11 +76,10 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Atomics;
+  Delphi.IOUring, Delphi.IOUring.Atomics;
 
-// A value that says who put it in and when: producer in the bits 24..30,
-// its sequence number below (fits NativeUInt on Win32 too)
+{ A value that says who put it in and when: producer in the bits 24..30, its sequence number below
+  (fits NativeUInt on Win32 too) }
 function EncodeValue(const AProducer, ASequence: Integer): NativeUInt;
 begin
   Result := (NativeUInt(AProducer) shl 24) or NativeUInt(ASequence);
@@ -118,31 +117,37 @@ var
   LRaised: Boolean;
 begin
   LRaised := False;
+
   try
     FQueue.Open(0);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Capacity 0', LRaised);
 
   LRaised := False;
+
   try
     FQueue.Open(IORING_QUEUE_MAX_CAPACITY + 1);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Capacity too big', LRaised);
 
   FQueue.Open(4);
   LRaised := False;
+
   try
     FQueue.Open(4);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Opened twice', LRaised);
 end;
 
@@ -152,8 +157,10 @@ var
   LIndex: Integer;
 begin
   FQueue.Open(8);
+
   for LIndex := 1 to 8 do
     AssertTrue('Enqueue ' + IntToStr(LIndex), FQueue.TryEnqueue(LIndex * 10));
+
   AssertFalse('Full', FQueue.TryEnqueue(90));
   AssertEquals('Count when full', 8, Int64(FQueue.Count));
 
@@ -162,6 +169,7 @@ begin
     AssertTrue('Dequeue ' + IntToStr(LIndex), FQueue.TryDequeue(LValue));
     CheckEqualsU64('Order', LIndex * 10, LValue);
   end;
+
   AssertFalse('Empty', FQueue.TryDequeue(LValue));
   CheckEqualsU64('Empty gives 0', 0, LValue);
   AssertEquals('Count when empty', 0, Int64(FQueue.Count));
@@ -181,8 +189,10 @@ var
   LValue: NativeUInt;
 begin
   FQueue.Open(4);
+
   for LIndex := 0 to High(VALUES) do
     AssertTrue(FQueue.TryEnqueue(VALUES[LIndex]));
+
   for LIndex := 0 to High(VALUES) do
   begin
     AssertTrue(FQueue.TryDequeue(LValue));
@@ -202,6 +212,7 @@ begin
   FQueue.Open(4);
   LNext := 0;
   LExpected := 0;
+
   for LLap := 1 to 10000 do
   begin
     for LItem := 1 to 3 do
@@ -209,14 +220,18 @@ begin
       AssertTrue(FQueue.TryEnqueue(LNext));
       Inc(LNext);
     end;
+
     for LItem := 1 to 3 do
     begin
       AssertTrue(FQueue.TryDequeue(LValue));
+
       if LValue <> LExpected then
         Fail(Format('Lap %d: expected %d, got %d', [LLap, LExpected, LValue]));
+
       Inc(LExpected);
     end;
   end;
+
   AssertEquals(0, Int64(FQueue.Count));
 end;
 
@@ -228,18 +243,22 @@ var
 begin
   // The positions start 5 before the end of the NativeUInt range
   FQueue.Open(4, High(NativeUInt) - 5);
+
   for LRound := 1 to 5 do
   begin
     // Fill completely, across the wrap-around, then empty
     for LIndex := 1 to 4 do
       AssertTrue(Format('Round %d: enqueue %d', [LRound, LIndex]), FQueue.TryEnqueue(LIndex));
+
     AssertFalse(Format('Round %d: full', [LRound]), FQueue.TryEnqueue(99));
     AssertEquals(Format('Round %d: count', [LRound]), 4, Int64(FQueue.Count));
+
     for LIndex := 1 to 4 do
     begin
       AssertTrue(Format('Round %d: dequeue %d', [LRound, LIndex]), FQueue.TryDequeue(LValue));
       CheckEqualsU64(Format('Round %d: order', [LRound]), LIndex, LValue);
     end;
+
     AssertFalse(Format('Round %d: empty', [LRound]), FQueue.TryDequeue(LValue));
     // One more pair, so that the next round starts at another offset
     AssertTrue(FQueue.TryEnqueue(7));
@@ -272,24 +291,29 @@ begin
       begin
         LProducer := Integer(LItem shr 24);
         LSequence := Integer(LItem and $FFFFFF);
+
         if (LProducer < 1) or (LProducer > FProducers) or (LSequence >= FItems) then
           TAtomic.Increment(FFailures)    // a value nobody put in
         else
         begin
           if TAtomic.Exchange(FSeen[LProducer * FItems + LSequence], 1) <> 0 then
             TAtomic.Increment(FFailures);    // came out twice
+
           if FConsumers = 1 then
           begin
             if LSequence <> FNextExpected[LProducer] then
               TAtomic.Increment(FFailures);    // out of order
+
             FNextExpected[LProducer] := LSequence + 1;
           end;
         end;
+
         TAtomic.Increment(FConsumed);
       end
       else if TThread.GetTickCount64 > FDeadline then
       begin
         TAtomic.Exchange(FTimedOut, 1);    // values were lost
+
         Exit;
       end
       else
@@ -298,10 +322,12 @@ begin
   else
   begin
     LProducer := AIndex - FConsumers + 1;
+
     for LSequence := 0 to FItems - 1 do
     begin
       for LPause := 1 to FProducerPauses do
         TAtomic.CpuPause;
+
       while not FQueue.TryEnqueue(EncodeValue(LProducer, LSequence)) do
         if TAtomic.LoadAcquire(FTimedOut) <> 0 then
           Exit    // the consumers gave up
@@ -333,9 +359,11 @@ begin
   AssertEquals('Gave up after 20 s: values were lost', 0, FTimedOut);
   AssertEquals('Values twice, out of order, or unknown', 0, FFailures);
   AssertEquals('Values consumed', AProducers * AItems, FConsumed);
+
   for LIndex := AItems to High(FSeen) do
     if FSeen[LIndex] <> 1 then
       Fail(Format('Value of producer %d, sequence %d never came out', [LIndex div AItems, LIndex mod AItems]));
+
   AssertEquals('Empty at the end', 0, Int64(FQueue.Count));
   AssertFalse('Nothing left', FQueue.TryDequeue(LValue));
 end;
@@ -364,9 +392,8 @@ end;
 
 procedure TRequestQueueTests.Stress_ConsumerWaitsForEveryValue;
 begin
-  // Slow producers: the consumer waits at the empty queue and takes every
-  // value right after it is published - the "empty" path, which the busy
-  // queues above rarely take
+  { Slow producers: the consumer waits at the empty queue and takes every value right after it is published - the
+    "empty" path, which the busy queues above rarely take }
   RunProducersAndConsumers(2, 1, 50000, 64, 0, 20);
 end;
 

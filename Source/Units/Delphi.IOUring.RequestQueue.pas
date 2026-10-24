@@ -1,10 +1,10 @@
 ﻿unit Delphi.IOUring.RequestQueue;
 
   {
-    The queue from the producer threads to an I/O thread (Docs/Design.md §10.5): a bounded, lock-free first-in 
+    The queue from the producer threads to an I/O thread (Docs/Design.md §10.5): a bounded, lock-free first-in
     first-out queue of pointer-sized values (request handles). Fixed memory, no allocation per item.
 
-    The algorithm is Dmitry Vyukov's bounded MPMC queue: an array of cells, and two position counters that only grow 
+    The algorithm is Dmitry Vyukov's bounded MPMC queue: an array of cells, and two position counters that only grow
     (enqueue and dequeue position, each on its own cache line). Each cell has a sequence number that says whose turn
     the cell is:
 
@@ -12,12 +12,12 @@
       Sequence = P + 1      full: the consumer of position P may read it
       Sequence = P + Size   free again, for position P + Size (the next lap)
 
-    A producer claims a position with one compare-exchange on the enqueue position, writes the value, then publishes 
-    it by storing the sequence. A consumer does the same on the dequeue side. Producers do not touch the consumer's 
+    A producer claims a position with one compare-exchange on the enqueue position, writes the value, then publishes
+    it by storing the sequence. A consumer does the same on the dequeue side. Producers do not touch the consumer's
     counter and the other way round, so a busy queue has little contention between the two sides.
 
-    Any number of producers and consumers may use the queue at the same time (the engine has one consumer per queue, 
-    the I/O thread; one compare-exchange per item is the price of not having to trust that). Positions are NativeUInt 
+    Any number of producers and consumers may use the queue at the same time (the engine has one consumer per queue,
+    the I/O thread; one compare-exchange per item is the price of not having to trust that). Positions are NativeUInt
     and wrap around on Win32 after 2^32 items; the differences are compared as signed numbers, so that is harmless.
 
     All methods are thread-safe, except Open and Close: no other thread may use the queue during them.
@@ -70,10 +70,11 @@ type
     class operator Assign(var ADest: TIORingRequestQueue; const [ref] ASource: TIORingRequestQueue);
 {$ENDIF}
 
-    // At least ACapacity cells: rounded up to a power of two (at least 2).
-    // Raises EIORingError for 0, above IORING_QUEUE_MAX_CAPACITY, or if already
-    // open. AFirstPosition is only for tests: starting near the end of the
-    // NativeUInt range checks the wrap-around of the positions.
+    {
+      At least ACapacity cells: rounded up to a power of two (at least 2). Raises EIORingError for 0, above
+      IORING_QUEUE_MAX_CAPACITY, or if already open. AFirstPosition is only for tests: starting near the end of the
+      NativeUInt range checks the wrap-around of the positions.
+    }
     procedure Open(const ACapacity: Cardinal; const AFirstPosition: NativeUInt = 0);
     // Values still in the queue are dropped
     procedure Close;
@@ -83,15 +84,17 @@ type
     // False if the queue is empty
     function TryDequeue(out AValue: NativeUInt): Boolean;
 
-    // Values in the queue. Exact only when no other thread uses the queue;
-    // otherwise a moment's picture (it may count a value that is still being
-    // written).
+    { Values in the queue. Exact only when no other thread uses the queue; otherwise a moment's picture (it may count a
+      value that is still being written). }
     function Count: Cardinal;
 
     property Capacity: Cardinal read FCapacity;
   end;
 
 implementation
+
+uses
+  Delphi.IOUring.Backend.Custom;
 
 { TIORingRequestQueue - life cycle }
 
@@ -119,20 +122,26 @@ class operator TIORingRequestQueue.Copy(constref ASource: TIORingRequestQueue; v
 {$ELSE}
 class operator TIORingRequestQueue.Assign(var ADest: TIORingRequestQueue; const [ref] ASource: TIORingRequestQueue);
 {$ENDIF}
+
+  procedure RaiseCannotCopy; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(EInvalidOpException, 'A request queue cannot be copied. Pass it as var or const [ref].');
+  end;
+
 begin
-  raise EInvalidOpException.Create('A request queue cannot be copied. Pass it as var or const [ref].');
+  RaiseCannotCopy;
 end;
 
 procedure TIORingRequestQueue.Open(const ACapacity: Cardinal; const AFirstPosition: NativeUInt);
 
-  procedure RaiseQueueCapacityException(const ACapacity: Cardinal);
+  procedure RaiseCapacityOutOfRange(const ACount: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.CreateFmt('Request queue capacity must be 1..%d, not %d', [IORING_QUEUE_MAX_CAPACITY, ACapacity]);
+    RaiseIORingErrorFmt('Request queue capacity must be 1..%d, not %d', [IORING_QUEUE_MAX_CAPACITY, ACount]);
   end;
 
-  procedure RaiseQueueAlreadyOpenException;
+  procedure RaiseAlreadyOpen; {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.Create('The request queue is already open');;
+    RaiseIORingError('The request queue is already open');
   end;
 
 var
@@ -142,10 +151,10 @@ var
   LPosition: NativeUInt;
 begin
   if (ACapacity = 0) or (ACapacity > IORING_QUEUE_MAX_CAPACITY) then
-    RaiseQueueCapacityException(ACapacity);
+    RaiseCapacityOutOfRange(ACapacity);
 
   if FMemory <> nil then
-    RaiseQueueAlreadyOpenException;
+    RaiseAlreadyOpen;
 
   LCapacity := 2;
 

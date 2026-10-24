@@ -30,18 +30,10 @@
 {$WARN SYMBOL_PLATFORM OFF}
 
 uses
-  Winapi.Windows,
-  System.SysUtils,
-  System.Classes,
-  System.Math,
-  System.StrUtils,
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.Win.Registry,
-  Delphi.IOUring,
+  Winapi.Windows, System.SysUtils, System.Classes, System.Math, System.StrUtils, System.Generics.Collections,
+  System.Generics.Defaults, System.Win.Registry, Delphi.IOUring, Delphi.IOUring.Backend.Custom,
   Bench.Common in 'Bench.Common.pas',
-  Bench.Readers in 'Bench.Readers.pas',
-  Bench.Contenders in 'Bench.Contenders.pas';
+  Bench.Readers in 'Bench.Readers.pas', Bench.Contenders in 'Bench.Contenders.pas';
 
 type
   TScenario = (scReadThrough, scWork);
@@ -89,6 +81,17 @@ var
 { Options }
 
 procedure ParseOptions;
+
+  procedure RaiseMissingValue(const AName: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseErrorFmt(Exception, 'Missing value for %s', [AName]);
+  end;
+
+  procedure RaiseUnknownOption(const AIndex: Integer); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseErrorFmt(Exception, 'Unknown option %s', [ParamStr(AIndex)]);
+  end;
+
 var
   LIndex: Integer;
   LName: string;
@@ -98,8 +101,10 @@ var
   function NextValue: string;
   begin
     Inc(LIndex);
+
     if LIndex > ParamCount then
-      raise Exception.CreateFmt('Missing value for %s', [LName]);
+      RaiseMissingValue(LName);
+
     Result := ParamStr(LIndex);
   end;
 
@@ -114,15 +119,18 @@ begin
   GOptions.Keep := False;
 
   LIndex := 1;
+
   while LIndex <= ParamCount do
   begin
     LName := LowerCase(ParamStr(LIndex));
+
     if LName = '--dir' then
       GOptions.Folder := NextValue
     else if LName = '--sizes' then
     begin
       GOptions.Sizes := nil;
       LParts := NextValue.Split([',']);
+
       for LPart in LParts do
         GOptions.Sizes := GOptions.Sizes + [StrToInt(Trim(LPart))];
     end
@@ -139,7 +147,8 @@ begin
     else if LName = '--keep' then
       GOptions.Keep := True
     else
-      raise Exception.CreateFmt('Unknown option %s', [ParamStr(LIndex)]);
+      RaiseUnknownOption(LIndex);
+
     Inc(LIndex);
   end;
 end;
@@ -152,8 +161,10 @@ var
 begin
   Result := '?';
   LRegistry := TRegistry.Create(KEY_READ);
+
   try
     LRegistry.RootKey := HKEY_LOCAL_MACHINE;
+
     if LRegistry.OpenKeyReadOnly('HARDWARE\DESCRIPTION\System\CentralProcessor\0') then
       Result := Trim(LRegistry.ReadString('ProcessorNameString'));
   finally
@@ -167,6 +178,7 @@ var
 begin
   LStatus.dwLength := SizeOf(LStatus);
   GlobalMemoryStatusEx(LStatus);
+
   Result := LStatus.ullTotalPhys / (1024.0 * 1024 * 1024);
 end;
 
@@ -200,6 +212,7 @@ var
 begin
   LFileName := BenchFileName(ASizeGiB);
   LSize := Int64(ASizeGiB) * 1024 * MiB;
+
   if FileSizeOf(LFileName) = LSize then
     Exit;
 
@@ -211,8 +224,8 @@ begin
   Writeln(Format('%.1f s', [LMeasurement.Seconds], GInvariant));
 end;
 
-// Reads the file warm, purges it, reads it again: if purging works, the
-// second read is clearly slower. Cold results mean nothing otherwise.
+{ Reads the file warm, purges it, reads it again: if purging works, the second read is clearly slower. Cold
+  results mean nothing otherwise. }
 procedure CheckCachePurge(const AFileName: string);
 var
   LConsumer: TBenchConsumer;
@@ -239,8 +252,8 @@ begin
   LCold := LMeasurement.Seconds;
 
   Writeln(Format('Cache purge check (%s): warm %.3f s, after purge %.3f s -> %s',
-    [GContenders[0].Name, LWarm, LCold, System.StrUtils.IfThen(LCold > 1.5 * LWarm, 'purge works', 'PURGE DOES NOT SEEM TO WORK')],
-    GInvariant));
+    [GContenders[0].Name, LWarm, LCold,
+    System.StrUtils.IfThen(LCold > 1.5 * LWarm, 'purge works', 'PURGE DOES NOT SEEM TO WORK')], GInvariant));
   Writeln;
 end;
 
@@ -283,6 +296,7 @@ var
   LUnbufferedPass: Boolean;
 begin
   LFileName := BenchFileName(ASizeGiB);
+
   if AScenario = scWork then
     LWork := GOptions.WorkMicroseconds
   else
@@ -297,10 +311,11 @@ begin
     GContenders[0].Run(LFileName, LWarmUp, LStalls);
   end;
 
-  // Contenders take turns run by run, so slow drift (temperature, background
-  // work) affects all of them alike. In each run the buffered contenders go
-  // first, then (cold cache only) the unbuffered ones, after an untimed
-  // unbuffered read - see ReadUnbufferedUntimed.
+  {
+    Contenders take turns run by run, so slow drift (temperature, background work) affects all of them alike. In each
+    run the buffered contenders go first, then (cold cache only) the unbuffered ones, after an untimed unbuffered read -
+    see ReadUnbufferedUntimed.
+  }
   for LRun := 1 to GOptions.Runs do
     for LUnbufferedPass in [False, True] do
     begin
@@ -308,6 +323,7 @@ begin
       begin
         if ACache = csWarm then
           Continue;
+
         ReadUnbufferedUntimed(LFileName);
       end;
 
@@ -315,6 +331,7 @@ begin
       begin
         if GContenders[LIndex].Unbuffered <> LUnbufferedPass then
           Continue;
+
         if (AScenario = scWork) and not GContenders[LIndex].InOrder then
           Continue;
 
@@ -332,7 +349,9 @@ begin
           AReferenceChecksum := LChecksum;
           AHaveReference := True;
         end;
+
         LResult.ChecksumOK := (LChecksum = AReferenceChecksum) and (LBytes = Int64(ASizeGiB) * 1024 * MiB);
+
         if not LResult.ChecksumOK then
           Writeln(Format('  CHECKSUM OR SIZE MISMATCH: %s run %d', [GContenders[LIndex].Name, LRun]));
 
@@ -340,6 +359,7 @@ begin
         GResults.Add(LResult);
       end;
     end;
+
   Write(StringOfChar(' ', 79) + #13);
 end;
 
@@ -350,9 +370,12 @@ var
   LCount: Integer;
 begin
   LCount := Length(AValues);
+
   if LCount = 0 then
     Exit(0);
+
   TArray.Sort<Double>(AValues);
+
   if Odd(LCount) then
     Result := AValues[LCount div 2]
   else
@@ -379,6 +402,7 @@ var
   LMiB: Double;
 begin
   LLines := TList<TLine>.Create;
+
   try
     for LIndex := 0 to High(GContenders) do
     begin
@@ -387,6 +411,7 @@ begin
       LKernel := nil;
       LStalls := nil;
       LLine.AllOK := True;
+
       for LResult in GResults do
         if (LResult.SizeGiB = ASizeGiB) and (LResult.Scenario = AScenario) and (LResult.Cache = ACache)
           and (LResult.Contender = LIndex) then
@@ -397,6 +422,7 @@ begin
           LStalls := LStalls + [Double(LResult.Stalls)];
           LLine.AllOK := LLine.AllOK and LResult.ChecksumOK;
         end;
+
       if LSeconds = nil then
         Continue;
 
@@ -419,10 +445,12 @@ begin
     Writeln(Format('%s, %d GiB, %s, %s cache (median of %d runs)',
       [PLATFORM_NAME, ASizeGiB, SCENARIO_NAMES[AScenario], CACHE_NAMES[ACache], GOptions.Runs]));
     Writeln(Format('  %-48s %8s %9s %9s %9s %7s', ['Contender', 'Seconds', 'MiB/s', 'User ms', 'Kernel ms', 'Stalls']));
+
     for LLine in LLines do
       Writeln(Format('  %-48s %8.3f %9.0f %9.0f %9.0f %7.0f%s',
         [LLine.Name, LLine.Seconds, LMiB / LLine.Seconds, LLine.UserMilliseconds, LLine.KernelMilliseconds,
          LLine.Stalls, System.StrUtils.IfThen(LLine.AllOK, '', '  CHECKSUM!')], GInvariant));
+
     Writeln;
   finally
     LLines.Free;
@@ -441,13 +469,16 @@ begin
 
   LExists := FileExists(GOptions.CsvFileName);
   LLines := TStringList.Create;
+
   try
     if LExists then
       LLines.LoadFromFile(GOptions.CsvFileName)
     else
-      LLines.Add('timestamp,platform,size_gib,scenario,cache,contender,run,seconds,mib_per_s,user_ms,kernel_ms,stalls,checksum_ok');
+      LLines.Add('timestamp,platform,size_gib,scenario,cache,contender,run,seconds,mib_per_s,user_ms,kernel_ms,' +
+        'stalls,checksum_ok');
 
     LTimestamp := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now, GInvariant);
+
     for LResult in GResults do
       LLines.Add(Format('%s,%s,%d,%s,%s,"%s",%d,%.4f,%.1f,%.1f,%.1f,%d,%s',
         [LTimestamp, PLATFORM_NAME, LResult.SizeGiB, SCENARIO_NAMES[LResult.Scenario], CACHE_NAMES[LResult.Cache],
@@ -477,10 +508,12 @@ begin
     LSize := GOptions.Sizes[LSizeIndex];
     LHaveReference := False;
     LReference := 0;
+
     for LScenario := Low(TScenario) to High(TScenario) do
     begin
       if (LScenario = scWork) and (LSizeIndex > 0) then
         Continue;
+
       for LCache := Low(TCacheState) to High(TCacheState) do
       begin
         RunCase(LSize, LScenario, LCache, LReference, LHaveReference);
@@ -501,14 +534,21 @@ begin
   PrintSummary(GOptions.Sizes[0], scReadThrough, csCold, True);
 end;
 
+procedure RaiseNotAvailable; {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseError(Exception, 'IoRing is not available on this system');
+end;
+
 var
   LSize: Integer;
 begin
   GInvariant := TFormatSettings.Invariant;
+
   try
     ParseOptions;
+
     if not IORingAvailable then
-      raise Exception.Create('IoRing is not available on this system');
+      RaiseNotAvailable;
 
     if GOptions.Tune then
       GContenders := [MainContenders(GOptions.Threads)[0]] + TuningContenders
@@ -516,10 +556,13 @@ begin
       GContenders := MainContenders(GOptions.Threads);
 
     GResults := TList<TRunResult>.Create;
+
     try
       PrintMachine;
+
       for LSize in GOptions.Sizes do
         PrepareFile(LSize);
+
       CheckCachePurge(BenchFileName(GOptions.Sizes[0]));
 
       if GOptions.Tune then
@@ -530,6 +573,7 @@ begin
       WriteCsv;
     finally
       GResults.Free;
+
       if not GOptions.Keep then
         for LSize in GOptions.Sizes do
           DeleteFile(BenchFileName(LSize));

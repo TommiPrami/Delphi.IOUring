@@ -19,8 +19,7 @@ uses
   Winapi.Windows,
   {$ENDIF}
 {$ENDIF}
-  Delphi.IOUring.SequentialReader,
-  Bench.Common;
+  Delphi.IOUring.SequentialReader, Bench.Common;
 
 const
   STREAM_READ_SIZE = 64 * 1024;
@@ -28,15 +27,14 @@ const
 // TFileStream.Read with AReadSize blocks
 procedure ReadWithFileStream(const AFileName: string; const AReadSize: Integer; var AConsumer: TBenchConsumer);
 
-// Plain synchronous ReadFile (Linux: read). ASequentialScanHint:
-// FILE_FLAG_SEQUENTIAL_SCAN (Linux: POSIX_FADV_SEQUENTIAL).
+{ Plain synchronous ReadFile (Linux: read). ASequentialScanHint: FILE_FLAG_SEQUENTIAL_SCAN
+  (Linux: POSIX_FADV_SEQUENTIAL). }
 procedure ReadWithReadFile(const AFileName: string; const AReadSize: Cardinal; const ASequentialScanHint: Boolean;
   var AConsumer: TBenchConsumer);
 
 {$IFDEF MSWINDOWS}
-// Classic asynchronous I/O without IoRing: ABufferCount overlapped ReadFile
-// calls in flight, consumed in order. The fair "is IoRing better than what
-// Windows always had?" baseline.
+{ Classic asynchronous I/O without IoRing: ABufferCount overlapped ReadFile calls in flight, consumed in order. The fair
+  "is IoRing better than what Windows always had?" baseline. }
 procedure ReadWithOverlapped(const AFileName: string; const AUnbuffered: Boolean;
   const ABufferSize, ABufferCount: Cardinal; var AConsumer: TBenchConsumer);
 {$ENDIF}
@@ -49,25 +47,22 @@ function ReadWithIORingStream(const AFileName: string; const AOptions: TIORingSe
 function ReadWithIORingZeroCopy(const AFileName: string; const AOptions: TIORingSequentialReaderOptions;
   const ABufferSize, ABufferCount: Cardinal; var AConsumer: TBenchConsumer): UInt64;
 
-// The first unbuffered read after a buffered read of the same file is slower
-// (about 0.13 s here), probably because Windows keeps the file's cache
-// structures for a while after the buffered reader closes it. Doing this
-// untimed unbuffered read first lets the unbuffered contenders be measured
-// fairly.
+{
+  The first unbuffered read after a buffered read of the same file is slower (about 0.13 s here), probably because
+  Windows keeps the file's cache structures for a while after the buffered reader closes it. Doing this untimed
+  unbuffered read first lets the unbuffered contenders be measured fairly.
+}
 procedure ReadUnbufferedUntimed(const AFileName: string);
 
 implementation
 
 uses
 {$IFDEF FPC}
-  SysUtils,
-  Classes,
+  SysUtils, Classes,
 {$ELSE}
-  System.SysUtils,
-  System.Classes,
+  System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Streams;
+  Delphi.IOUring, Delphi.IOUring.Streams;
 
 procedure ReadWithFileStream(const AFileName: string; const AReadSize: Integer; var AConsumer: TBenchConsumer);
 var
@@ -77,9 +72,11 @@ var
 begin
   SetLength(LBuffer, AReadSize);
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
+
   try
     repeat
       LRead := LStream.Read(LBuffer[0], AReadSize);
+
       if LRead > 0 then
         AConsumer.Consume(@LBuffer[0], LRead);
     until LRead = 0;
@@ -96,11 +93,14 @@ var
   LRead: Cardinal;
 begin
   LBuffer := TIORingPlatform.AllocPages(AReadSize);
+
   try
     LHandle := BenchOpenForReading(AFileName, False, False, ASequentialScanHint);
+
     try
       repeat
         LRead := BenchRead(LHandle, LBuffer^, AReadSize);
+
         if LRead > 0 then
           AConsumer.Consume(LBuffer, LRead);
       until LRead = 0;
@@ -142,15 +142,18 @@ var
     LSlots[ASlot].Overlapped.hEvent := LEvent;
     LSlots[ASlot].Overlapped.Offset := DWORD(LNextOffset);
     LSlots[ASlot].Overlapped.OffsetHigh := DWORD(LNextOffset shr 32);
+
     if not ReadFile(LHandle, LSlots[ASlot].Data^, ABufferSize, LDummy, @LSlots[ASlot].Overlapped) then
       if GetLastError <> ERROR_IO_PENDING then
         RaiseLastOSError;
+
     Inc(LNextOffset, ABufferSize);
     Inc(LOutstanding);
   end;
 
 begin
   LFlags := FILE_ATTRIBUTE_NORMAL or FILE_FLAG_OVERLAPPED or FILE_FLAG_SEQUENTIAL_SCAN;
+
   if AUnbuffered then
     LFlags := LFlags or FILE_FLAG_NO_BUFFERING;
 
@@ -158,8 +161,10 @@ begin
   LMemory := VirtualAlloc(nil, NativeUInt(ABufferSize) * ABufferCount, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
   SetLength(LSlots, ABufferCount);
   LHandle := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, LFlags, 0);
+
   if LHandle = INVALID_HANDLE_VALUE then
     RaiseLastOSError;
+
   try
     for LIndex := 0 to ABufferCount - 1 do
     begin
@@ -169,32 +174,40 @@ begin
 
     LNextOffset := 0;
     LOutstanding := 0;
+
     for LIndex := 0 to ABufferCount - 1 do
       if LNextOffset < LSize then
         Issue(LIndex);
 
     LHead := 0;
+
     while LOutstanding > 0 do
     begin
       if not GetOverlappedResult(LHandle, LSlots[LHead].Overlapped, LBytes, True) then
       begin
         if GetLastError <> ERROR_HANDLE_EOF then
           RaiseLastOSError;
+
         LBytes := 0;
       end;
+
       Dec(LOutstanding);
+
       if LBytes > 0 then
         AConsumer.Consume(LSlots[LHead].Data, LBytes);
+
       if LNextOffset < LSize then
         Issue(LHead);
+
       LHead := (LHead + 1) mod ABufferCount;
     end;
   finally
-    // Nothing is in flight here (the loop waited for everything), except
-    // after an error: CloseHandle cancels the rest
+    // Nothing is in flight here (the loop waited for everything), except after an error: CloseHandle cancels the rest
     CloseHandle(LHandle);
+
     for LIndex := 0 to ABufferCount - 1 do
       CloseHandle(LSlots[LIndex].Overlapped.hEvent);
+
     VirtualFree(LMemory, 0, MEM_RELEASE);
   end;
 end;
@@ -209,12 +222,15 @@ var
 begin
   SetLength(LBuffer, STREAM_READ_SIZE);
   LStream := TSequentialReadOnlyFileStream.Create(AFileName, AOptions);
+
   try
     repeat
       LRead := LStream.Read(LBuffer[0], STREAM_READ_SIZE);
+
       if LRead > 0 then
         AConsumer.Consume(@LBuffer[0], LRead);
     until LRead = 0;
+
     Result := LStream.Stats.Stalls;
   finally
     LStream.Free;
@@ -229,11 +245,13 @@ var
   LLength: NativeInt;
 begin
   LReader.Open(AFileName, AOptions, ABufferSize, ABufferCount);
+
   while LReader.TryAcquireChunk(LData, LLength) do
   begin
     AConsumer.Consume(LData, LLength);
     LReader.ReleaseChunk;
   end;
+
   Result := LReader.Stats.Stalls;
 end;
 
@@ -244,6 +262,7 @@ var
   LLength: NativeInt;
 begin
   LReader.Open(AFileName, [sroUnbuffered]);
+
   while LReader.TryAcquireChunk(LData, LLength) do
     LReader.ReleaseChunk;
 end;

@@ -28,11 +28,9 @@ implementation
 
 uses
 {$IFDEF FPC}
-  SysUtils,
-  Classes,
+  SysUtils, Classes,
 {$ELSE}
-  System.SysUtils,
-  System.Classes,
+  System.SysUtils, System.Classes,
 {$ENDIF}
   TestFileHelpers;
 
@@ -63,6 +61,7 @@ begin
   begin
     SetLength(LBuffer, COUNTS[LCase]);
     TTestFileHelpers.FillPattern(OFFSETS[LCase], LBuffer[0], COUNTS[LCase]);
+
     for LIndex := 0 to COUNTS[LCase] - 1 do
       AssertEquals(Format('Byte at offset %d', [OFFSETS[LCase] + UInt64(LIndex)]),
         Integer(TTestFileHelpers.ExpectedByte(OFFSETS[LCase] + UInt64(LIndex))), Integer(LBuffer[LIndex]));
@@ -116,10 +115,13 @@ begin
   for LSize in SIZES do
   begin
     LFileName := TTestFileHelpers.CreatePatternFile(LSize);
+
     try
       LStream := TFileStream.Create(LFileName, fmOpenRead or fmShareDenyWrite);
+
       try
         AssertEquals('Size', LSize, LStream.Size);
+
         if LSize > 0 then
         begin
           SetLength(LBuffer, LSize);

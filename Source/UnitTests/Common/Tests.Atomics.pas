@@ -99,12 +99,10 @@ const
   HAND_OVERS = 100000;
   PING_PONG_ROUNDS = 5000;
 
-  // Changes both halves of a 64-bit value; the lower half carries into the
-  // upper half about every second addition
+  // Changes both halves of a 64-bit value; the lower half carries into the upper half about every second addition
   STEP_64 = Int64($0000000180000001);
 
-  // The two values a writer alternates between. Half of one and half of
-  // the other gives 0 or -1, never one of these.
+  // The two values a writer alternates between. Half of one and half of the other gives 0 or -1, never one of these.
   PATTERN_A = Int64($00000000FFFFFFFF);
   PATTERN_B = Int64(-4294967296); // $FFFFFFFF00000000
 
@@ -166,9 +164,11 @@ begin
     for LCount := 1 to READS do
     begin
       LValue := TAtomic.LoadAcquire(FValue64);
+
       if (LValue <> PATTERN_A) and (LValue <> PATTERN_B) then
         TAtomic.Increment(FFailures);
     end;
+
     TAtomic.Increment(FFlag);
   end;
 end;
@@ -182,6 +182,7 @@ begin
     begin
       while TAtomic.LoadAcquire(FFlag) <> 0 do
         TAtomic.CpuPause;
+
       FData := LRound * STEP_64;
       TAtomic.StoreRelease(FFlag, LRound);
     end
@@ -189,8 +190,10 @@ begin
     begin
       while TAtomic.LoadAcquire(FFlag) = 0 do
         TAtomic.CpuPause;
+
       if (FFlag <> LRound) or (FData <> LRound * STEP_64) then
         TAtomic.Increment(FFailures);
+
       TAtomic.StoreRelease(FFlag, 0);
     end;
 end;
@@ -213,18 +216,23 @@ var
   LOther: Integer;
 begin
   LOther := 1 - AIndex;
+
   for LRound := 1 to PING_PONG_ROUNDS do
   begin
     while TAtomic.LoadAcquire(FValue32) <> AIndex do
       if not TAtomic.WaitWhileEqual(FValue32, LOther, 5000) then
       begin
         TAtomic.Increment(FFailures); // the other thread times out too
+
         Exit;
       end;
+
     if LRound mod 16 = 0 then
       SpinMicroseconds(200);
+
     if TAtomic.Exchange(FValue32, LOther) <> AIndex then
       TAtomic.Increment(FFailures);
+
     TAtomic.WakeOne(FValue32);
   end;
 end;
@@ -498,8 +506,7 @@ end;
 
 procedure TAtomicTests.Stress_CompareExchange64Loop_IsExact;
 begin
-  // The usual lock-free pattern: read, compute, try; repeat if another
-  // thread got there first
+  // The usual lock-free pattern: read, compute, try; repeat if another thread got there first
   RunThreads(THREAD_COUNT, WorkCompareExchange64Loop);
   AssertEquals(Int64(THREAD_COUNT * ADDS_64) * STEP_64, FValue64);
 end;
@@ -514,9 +521,8 @@ end;
 
 procedure TAtomicTests.Stress_ReleaseAcquire_HandsOverData;
 begin
-  // Thread 0 writes FData (a plain write), then publishes the round number
-  // in FFlag with StoreRelease. Thread 1 waits for it with LoadAcquire, checks
-  // FData (a plain read), and hands the turn back by storing 0.
+  { Thread 0 writes FData (a plain write), then publishes the round number in FFlag with StoreRelease. Thread 1 waits
+    for it with LoadAcquire, checks FData (a plain read), and hands the turn back by storing 0. }
   RunThreads(2, WorkHandOver);
   AssertEquals('Rounds with wrong data', 0, FFailures);
 end;
@@ -528,19 +534,23 @@ var
   LThread: TWorkerThread;
   LSpins: Integer;
 begin
-  // No call inside the loop: if the compiler kept the value in a register,
-  // the loop would never see the change and would stop at the limit
+  { No call inside the loop: if the compiler kept the value in a register, the loop would never see the change
+    and would stop at the limit }
   LThread := TWorkerThread.Create(0, 1, nil, WorkSetFlagLater);
+
   try
     LThread.Start;
     LSpins := 0;
+
     repeat
       Inc(LSpins);
     until (TAtomic.LoadAcquire(FFlag) <> 0) or (LSpins = SPIN_LIMIT);
+
     LThread.WaitFor;
   finally
     LThread.Free;
   end;
+
   AssertTrue('The spin loop did not see the write', LSpins < SPIN_LIMIT);
 end;
 
@@ -572,6 +582,7 @@ var
   LStart: UInt64;
 begin
   LThread := TWorkerThread.Create(0, 1, nil, WorkWaitForWake);
+
   try
     LThread.Start;
     Sleep(50); // let it fall asleep
@@ -582,6 +593,7 @@ begin
   finally
     LThread.Free;
   end;
+
   AssertEquals('Woken and saw the new value', 1, FWoken);
   AssertTrue(Format('Wake-up took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 5000);
 end;
@@ -594,32 +606,36 @@ var
 begin
   for LIndex := 0 to High(LThreads) do
     LThreads[LIndex] := TWorkerThread.Create(LIndex, THREAD_COUNT, nil, WorkWaitForWake);
+
   try
     for LIndex := 0 to High(LThreads) do
       LThreads[LIndex].Start;
+
     Sleep(100); // let them fall asleep
     LStart := TThread.GetTickCount64;
     TAtomic.Exchange(FValue32, 1);
     TAtomic.WakeAll(FValue32);
+
     for LIndex := 0 to High(LThreads) do
       LThreads[LIndex].WaitFor;
   finally
     for LIndex := 0 to High(LThreads) do
       LThreads[LIndex].Free;
   end;
+
   AssertEquals('Woken and saw the new value', THREAD_COUNT, FWoken);
   AssertTrue(Format('Wake-up took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 5000);
 end;
 
 procedure TAtomicTests.Stress_PingPong_NoLostWakeUps;
 begin
-  // FValue32 says whose turn it is (0 or 1). Each thread waits for its turn,
-  // gives the turn to the other one and wakes it. A lost wake-up shows as a
-  // 5-second timeout.
-  //
-  // WaitOnAddress spins a little before it sleeps, so most turns change
-  // without sleeping (about 0.2 µs each). Every 16th turn is held for 200 µs,
-  // so that the other thread really sleeps and must be woken.
+  {
+    FValue32 says whose turn it is (0 or 1). Each thread waits for its turn, gives the turn to the other one and wakes
+    it. A lost wake-up shows as a 5-second timeout.
+
+    WaitOnAddress spins a little before it sleeps, so most turns change without sleeping (about 0.2 µs each). Every 16th
+    turn is held for 200 µs, so that the other thread really sleeps and must be woken.
+  }
   RunThreads(2, WorkPingPong);
   AssertEquals('Lost wake-ups or wrong turns', 0, FFailures);
 end;

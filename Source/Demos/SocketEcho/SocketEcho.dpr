@@ -22,17 +22,12 @@
 
 uses
   cthreads,          // threads (the client thread)
-  SysUtils,
-  Classes,
-  BaseUnix,
-  Sockets,
-  Delphi.IOUring,
-  Delphi.IOUring.Backend.Posix.API;
+  SysUtils, Classes, BaseUnix, Sockets, Delphi.IOUring, Delphi.IOUring.Backend.Custom, Delphi.IOUring.Backend.Posix.API;
 
 const
   MESSAGES: array[0..2] of string = ('hello', 'io_uring', 'goodbye');
-  // sys/socket.h: no SIGPIPE (which would end the program) when the other
-  // side has closed the connection; send fails instead
+  { sys/socket.h: no SIGPIPE (which would end the program) when the other side has closed the
+    connection; send fails instead }
   MSG_NOSIGNAL_FLAG = $4000;
 
 type
@@ -50,6 +45,7 @@ type
 constructor TClientThread.Create(const AAddress: TInetSockAddr);
 begin
   FAddress := AAddress;
+
   inherited Create(False);
 end;
 
@@ -63,32 +59,43 @@ var
   LCount: ssize_t;
 begin
   LSocket := fpsocket(AF_INET, SOCK_STREAM, 0);
+
   try
     if fpconnect(LSocket, psockaddr(@FAddress), SizeOf(FAddress)) <> 0 then
     begin
       Error := 'connect failed: errno ' + IntToStr(socketerror);
+
       Exit;
     end;
+
     for LIndex := Low(MESSAGES) to High(MESSAGES) do
     begin
       LText := AnsiString(MESSAGES[LIndex]);
+
       if fpsend(LSocket, PAnsiChar(LText), Length(LText), MSG_NOSIGNAL_FLAG) <> Length(LText) then
       begin
         Error := 'send failed: errno ' + IntToStr(socketerror);
+
         Exit;
       end;
+
       SetLength(LAnswer, Length(LText));
       LReceived := 0;
+
       while LReceived < Length(LText) do
       begin
         LCount := fprecv(LSocket, @LAnswer[LReceived + 1], Length(LText) - LReceived, 0);
+
         if LCount <= 0 then
           Break;
+
         Inc(LReceived, LCount);
       end;
+
       if LAnswer <> LText then
       begin
         Error := Format('sent "%s", got back "%s"', [LText, LAnswer]);
+
         Exit;
       end;
     end;
@@ -103,12 +110,35 @@ begin
   Result := PByte(APointer) - PByte(nil);
 end;
 
+procedure RaiseClientFailed(const AMessage: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseErrorFmt(Exception, 'Client: %s', [AMessage]);
+end;
+
+procedure RaiseBindFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseErrorFmt(Exception, 'bind/listen failed: errno %d', [socketerror]);
+end;
+
+procedure RaiseNoSockets; {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseError(Exception, 'This system has no socket operations in its ring');
+end;
+
 // Submits what is prepared and returns the one completion
 function SubmitAndWait(var ARing: TIORing; const AOperation: string): TIORingCompletion;
+
+  procedure RaiseNoCompletion(const AName: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseErrorFmt(Exception, '%s: no completion', [AName]);
+  end;
+
 begin
   ARing.Submit(1);
+
   if not ARing.TryPopCompletion(Result) then
-    raise Exception.Create(AOperation + ': no completion');
+    RaiseNoCompletion(AOperation);
+
   Result.RaiseIfFailed(AOperation);
 end;
 
@@ -126,21 +156,24 @@ var
 begin
   try
     if not (ieSockets in IORingCapabilities.Extras) then
-      raise Exception.Create('This system has no socket operations in its ring');
+      RaiseNoSockets;
 
     // A listening socket on 127.0.0.1, any free port (plain socket calls)
     LListen := fpsocket(AF_INET, SOCK_STREAM, 0);
     FillChar(LAddress, SizeOf(LAddress), 0);
     LAddress.sin_family := AF_INET;
     LAddress.sin_addr.s_addr := htonl($7F000001);
+
     if (fpbind(LListen, psockaddr(@LAddress), SizeOf(LAddress)) <> 0) or (fplisten(LListen, 1) <> 0) then
-      raise Exception.Create('bind/listen failed: errno ' + IntToStr(socketerror));
+      RaiseBindFailed;
+
     LLength := SizeOf(LAddress);
     fpgetsockname(LListen, psockaddr(@LAddress), @LLength);
     Writeln(Format('Listening on 127.0.0.1:%d', [ntohs(LAddress.sin_port)]));
 
     LConnection := -1;
     LClient := TClientThread.Create(LAddress);
+
     try
       LRing.Open(8);
 
@@ -159,8 +192,10 @@ begin
         LSqe^.addr := AddressOf(@LBuffer);
         LSqe^.len := SizeOf(LBuffer);
         LCompletion := SubmitAndWait(LRing, 'receive');
+
         if LCompletion.BytesTransferred = 0 then
           Break;                       // the client has closed the connection
+
         SetString(LText, PAnsiChar(@LBuffer[0]), LCompletion.BytesTransferred);
 
         LRing.PrepareSqe(3, LSqe);
@@ -174,14 +209,17 @@ begin
 
       LRing.Close;
       LClient.WaitFor;
+
       if LClient.Error <> '' then
-        raise Exception.Create('Client: ' + LClient.Error);
+        RaiseClientFailed(LClient.Error);
+
       Writeln('The client got every message back.');
     finally
-      // Closing the sockets first ends a client that still waits for an
-      // answer (after an error), so freeing it does not hang
+      { Closing the sockets first ends a client that still waits for an answer (after an error),
+        so freeing it does not hang }
       if LConnection >= 0 then
         FpClose(LConnection);
+
       FpClose(LListen);
       LClient.Free;
     end;

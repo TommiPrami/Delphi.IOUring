@@ -353,6 +353,8 @@ only; measured, it gave no gain for file I/O and cost much more CPU time
   `Delphi.IOUring.Benchmarks.Writes.dproj`, or `Build-FPC.ps1 -Project Writes`.
   With `-Platform Linux64` the four Free Pascal benchmarks build (and with
   `-Run` run) in WSL.
+- How the code is written (layout, comments, empty lines, raising through
+  the raise helpers, parameters): [Docs/CodingStyle.md](Docs/CodingStyle.md).
 
 ## License
 

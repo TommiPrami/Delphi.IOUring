@@ -22,8 +22,7 @@ uses
 {$ELSE}
   System.Classes,
 {$ENDIF}
-  Delphi.IOUring.RequestPool,
-  Tests.Support;
+  Delphi.IOUring.RequestPool, Tests.Support;
 
 const
   STRESS_CAPACITY = 8;
@@ -53,8 +52,7 @@ type
     FFailures: Integer;
     FHandle: TIORingRequestHandle;                      // for WorkWaitFor
     FWaitResult: TIORingWaitResult;
-    // The simulated engine: one mailbox per producer, the I/O thread takes
-    // the handles from them
+    // The simulated engine: one mailbox per producer, the I/O thread takes the handles from them
     FMailboxes: array[0..7] of NativeUInt;
     FProducersDone: Integer;
     procedure RunEngineSimulation(const ASpinMicroseconds: Cardinal);
@@ -99,8 +97,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Atomics;
+  Delphi.IOUring, Delphi.IOUring.Atomics;
 
 const
   STRESS_THREADS = 4;
@@ -141,6 +138,7 @@ begin
   FillChar(LSeen, SizeOf(LSeen), 0);
   FList.Open(CAPACITY);
   AssertEquals('Capacity', CAPACITY, Int64(FList.Capacity));
+
   for LCount := 1 to CAPACITY do
   begin
     AssertTrue('Pop ' + IntToStr(LCount), FList.TryPop(LIndex));
@@ -148,6 +146,7 @@ begin
     AssertFalse('Popped twice: ' + IntToStr(LIndex), LSeen[LIndex]);
     LSeen[LIndex] := True;
   end;
+
   AssertFalse('Empty after all', FList.TryPop(LIndex));
 end;
 
@@ -190,40 +189,48 @@ var
   LRaised: Boolean;
 begin
   LRaised := False;
+
   try
     FList.Open(0);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Capacity 0', LRaised);
 
   LRaised := False;
+
   try
     FList.Open(IORING_POOL_MAX_CAPACITY + 1);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Capacity too big', LRaised);
 
   FList.Open(4, False);
   LRaised := False;
+
   try
     FList.Push(4);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Index out of range', LRaised);
 
   LRaised := False;
+
   try
     FList.Open(4);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Opened twice', LRaised);
 end;
 
@@ -237,16 +244,20 @@ begin
   for LRound := 1 to 2 * STRESS_ROUNDS do
   begin
     LHeldCount := 0;
+
     while (LHeldCount < STRESS_HOLD) and FList.TryPop(LHeld[LHeldCount]) do
     begin
       if TAtomic.Exchange(FOwned[LHeld[LHeldCount]], 1) <> 0 then
         TAtomic.Increment(FFailures);    // another thread holds it too
+
       Inc(LHeldCount);
     end;
+
     for LSlot := 0 to LHeldCount - 1 do
     begin
       if TAtomic.Exchange(FOwned[LHeld[LSlot]], 0) <> 1 then
         TAtomic.Increment(FFailures);
+
       FList.Push(LHeld[LSlot]);
     end;
   end;
@@ -264,12 +275,14 @@ begin
 
   // Every index is back, once
   FillChar(LSeen, SizeOf(LSeen), 0);
+
   for LCount := 1 to STRESS_CAPACITY do
   begin
     AssertTrue('Lost index', FList.TryPop(LIndex));
     AssertFalse('Index twice in the stack', LSeen[LIndex]);
     LSeen[LIndex] := True;
   end;
+
   AssertFalse('More indices than the capacity', FList.TryPop(LIndex));
 end;
 
@@ -295,9 +308,12 @@ var
   LExtra: TIORingRequestHandle;
 begin
   SetLength(LHandles, FPool.Capacity);
+
   for LIndex := 0 to High(LHandles) do
     AssertTrue('Slot lost', FPool.TryAcquire(LHandles[LIndex]));
+
   AssertFalse('More slots than the capacity', FPool.TryAcquire(LExtra));
+
   for LIndex := 0 to High(LHandles) do
     AssertTrue('Release', FPool.Release(LHandles[LIndex]));
 end;
@@ -327,6 +343,7 @@ begin
   FillChar(LSeen, SizeOf(LSeen), 0);
   FPool.Open(CAPACITY);
   AssertEquals('Capacity', CAPACITY, Int64(FPool.Capacity));
+
   for LIndex := 0 to CAPACITY - 1 do
   begin
     AssertTrue('Acquire ' + IntToStr(LIndex), FPool.TryAcquire(LHandles[LIndex]));
@@ -337,11 +354,13 @@ begin
     AssertFalse('Slot given twice', LSeen[LSlot]);
     LSeen[LSlot] := True;
   end;
+
   AssertFalse('All slots in use', FPool.TryAcquire(LExtra));
   AssertTrue('Failed acquire gives an empty handle', LExtra.IsEmpty);
 
   for LIndex := 0 to CAPACITY - 1 do
     AssertTrue('Release ' + IntToStr(LIndex), FPool.Release(LHandles[LIndex]));
+
   CheckAllSlotsFree;
 end;
 
@@ -350,40 +369,48 @@ var
   LRaised: Boolean;
 begin
   LRaised := False;
+
   try
     FPool.Open(0);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Capacity 0', LRaised);
 
   LRaised := False;
+
   try
     FPool.Open(IORING_POOL_MAX_CAPACITY + 1);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Capacity too big', LRaised);
 
   LRaised := False;
+
   try
     FPool.Open(4, IORING_POOL_MAX_PAYLOAD_SIZE + 1);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Payload too big', LRaised);
 
   FPool.Open(4);
   LRaised := False;
+
   try
     FPool.Open(4);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Opened twice', LRaised);
 end;
 
@@ -479,30 +506,36 @@ begin
   AssertTrue(FPool.TryAcquire(LHandle));
 
   LRaised := False;
+
   try
     FPool.TryChangeState(LHandle, rsDefined, rsFree);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('To Free (use Release)', LRaised);
 
   LRaised := False;
+
   try
     FPool.TryChangeState(LHandle, rsFree, rsDefined);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('From Free (use TryAcquire)', LRaised);
 
   LRaised := False;
+
   try
     FPool.TryChangeState(LHandle, rsDefined, rsStale);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('To Stale', LRaised);
   AssertTrue('Unchanged', FPool.State(LHandle) = rsDefined);
 end;
@@ -519,20 +552,25 @@ var
 begin
   FPool.Open(CAPACITY, PAYLOAD_SIZE);
   AssertEquals('PayloadSize', PAYLOAD_SIZE, Int64(FPool.PayloadSize));
+
   for LIndex := 0 to CAPACITY - 1 do
   begin
     AssertTrue(FPool.TryAcquire(LHandles[LIndex]));
     LPayload := FPool.Payload(LHandles[LIndex]);
     AssertEquals('Payload 8-byte aligned', 0, Int64(NativeUInt(LPayload) mod 8));
     AssertEquals('Slot starts on a cache line', 0, Int64((NativeUInt(LPayload) - 8) mod 64));
+
     for LByte := 0 to PAYLOAD_SIZE - 1 do
       AssertEquals('Zeroed at Open', 0, LPayload[LByte]);
+
     FillChar(LPayload^, PAYLOAD_SIZE, Byte(LIndex + 1));
   end;
+
   // No payload overlaps another
   for LIndex := 0 to CAPACITY - 1 do
   begin
     LPayload := FPool.Payload(LHandles[LIndex]);
+
     for LByte := 0 to PAYLOAD_SIZE - 1 do
       AssertEquals(Format('Slot %d byte %d', [LIndex, LByte]), LIndex + 1, LPayload[LByte]);
   end;
@@ -566,6 +604,7 @@ begin
   FPool.Open(IORING_POOL_MAX_CAPACITY);   // Win32: 20 index bits, 12 generation bits
   AssertTrue(FPool.TryAcquire(LFirst));
   AssertTrue(FPool.Release(LFirst));
+
   // Generations 2 .. 4095, then 1 again (0 is skipped)
   for LRound := 2 to (1 shl FPool.GenerationBits) - 1 do
   begin
@@ -574,6 +613,7 @@ begin
     CheckEqualsU64('Generation', LRound, LHandle.Value shr 20);
     AssertTrue(FPool.Release(LHandle));
   end;
+
   AssertTrue(FPool.TryAcquire(LHandle));
   CheckEqualsU64('Wrapped around to generation 1', LFirst.Value, LHandle.Value);
 end;
@@ -631,6 +671,7 @@ begin
   AssertTrue(FPool.TryAcquire(FHandle));
   AssertTrue(FPool.TryChangeState(FHandle, rsDefined, rsSubmitted));
   StartWaiter(LThread);
+
   try
     Sleep(50); // let it fall asleep
     LStart := TThread.GetTickCount64;
@@ -639,6 +680,7 @@ begin
   finally
     LThread.Free;
   end;
+
   AssertTrue('Result', FWaitResult = wrCompleted);
   AssertTrue(Format('Wake-up took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 5000);
 end;
@@ -651,6 +693,7 @@ begin
   FPool.Open(4);
   AssertTrue(FPool.TryAcquire(FHandle));   // Defined: may be released
   StartWaiter(LThread);
+
   try
     Sleep(50); // let it fall asleep
     LStart := TThread.GetTickCount64;
@@ -659,6 +702,7 @@ begin
   finally
     LThread.Free;
   end;
+
   AssertTrue('Result', FWaitResult = wrStale);
   AssertTrue(Format('Wake-up took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 5000);
 end;
@@ -673,18 +717,23 @@ begin
   for LRound := 1 to STRESS_ROUNDS do
   begin
     LHeldCount := 0;
+
     while (LHeldCount < STRESS_HOLD) and FPool.TryAcquire(LHeld[LHeldCount]) do
     begin
       if TAtomic.Exchange(FOwned[FPool.IndexOf(LHeld[LHeldCount])], 1) <> 0 then
         TAtomic.Increment(FFailures);    // another thread holds it too
+
       Inc(LHeldCount);
     end;
+
     for LSlot := 0 to LHeldCount - 1 do
     begin
       if not FPool.TryChangeState(LHeld[LSlot], rsDefined, rsCompleted) then
         TAtomic.Increment(FFailures);
+
       if TAtomic.Exchange(FOwned[FPool.IndexOf(LHeld[LSlot])], 0) <> 1 then
         TAtomic.Increment(FFailures);
+
       if not FPool.Release(LHeld[LSlot]) then
         TAtomic.Increment(FFailures);
     end;
@@ -714,52 +763,70 @@ begin
   begin
     // The I/O thread
     LServed := 0;
+
     while TAtomic.LoadAcquire(FProducersDone) < ENGINE_PRODUCERS do
     begin
       LFound := False;
+
       for LProducer := 1 to ENGINE_PRODUCERS do
       begin
         LValue := TAtomic.Exchange(FMailboxes[LProducer], 0);
+
         if LValue = 0 then
           Continue;
+
         LFound := True;
         LHandle := TIORingRequestHandle.FromUserData(LValue);
+
         if not FPool.TryChangeState(LHandle, rsQueued, rsSubmitted) then
           TAtomic.Increment(FFailures);
+
         // Now and then slow: the producer falls asleep
         Inc(LServed);
+
         if LServed mod 64 = 0 then
           SpinMicroseconds(100);
+
         LPayload := FPool.Payload(LHandle);
         LPayload^.Answer := LPayload^.Request * 3;
+
         if not FPool.TryChangeState(LHandle, rsSubmitted, rsCompleted) then
           TAtomic.Increment(FFailures);
       end;
+
       if not LFound then
         TAtomic.CpuPause;
     end;
   end
   else
+
   try
     // A producer
     for LRound := 1 to ENGINE_ROUNDS do
     begin
       while not FPool.TryAcquire(LHandle) do
         TThread.Yield;    // all slots in use
+
       LPayload := FPool.Payload(LHandle);
       LRequest := (Int64(AIndex) shl 32) or LRound;
       LPayload^.Request := LRequest;
       LPayload^.Answer := 0;
+
       if not FPool.TryChangeState(LHandle, rsDefined, rsQueued) then
         TAtomic.Increment(FFailures);
+
       TAtomic.StoreRelease(FMailboxes[AIndex], LHandle.Value);
+
       if FPool.WaitFor(LHandle, 10000) <> wrCompleted then
       begin
         TAtomic.Increment(FFailures);   // lost wake-up
+
         Exit;
       end;
+
       if LPayload^.Answer <> LRequest * 3 then
         TAtomic.Increment(FFailures);
+
       if not FPool.Release(LHandle) then
         TAtomic.Increment(FFailures);
     end;

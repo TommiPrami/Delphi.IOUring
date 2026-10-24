@@ -36,8 +36,7 @@ type
 implementation
 
 uses
-  SysUtils,
-  Delphi.IOUring.Backend.Posix.API;
+  SysUtils, Delphi.IOUring.Backend.Posix.API;
 
 type
   TLayoutCheck = procedure(const AName: string; const AExpected, AActual: Int64) of object;
@@ -52,7 +51,8 @@ end;
 
 procedure TPosixApiLayoutTests.SetUp;
 begin
-  inherited;
+  inherited SetUp;
+
   FMismatches := '';
   FChecks := 0;
 end;
@@ -60,6 +60,7 @@ end;
 procedure TPosixApiLayoutTests.CheckLayout(const AName: string; const AExpected, AActual: Int64);
 begin
   Inc(FChecks);
+
   if AActual <> AExpected then
     FMismatches := FMismatches + Format('%s  %s: C %d, Pascal %d', [LineEnding, AName, AExpected, AActual]);
 end;
@@ -67,6 +68,7 @@ end;
 procedure TPosixApiLayoutTests.CheckNoMismatches;
 begin
   AssertTrue('No checks', FChecks > 0);
+
   if FMismatches <> '' then
     Fail('Differs from the C header:' + FMismatches);
 end;

@@ -15,8 +15,7 @@ uses
 {$IFDEF UNIX}
   cthreads,           // threads on Linux: must come first
 {$ENDIF}
-  SysUtils,
-  Bench.Blocks;
+  SysUtils, Bench.Blocks;
 
 begin
   try

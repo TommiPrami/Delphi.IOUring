@@ -1,22 +1,22 @@
 ﻿unit Delphi.IOUring.Backend.Windows;
 
-// The Windows ring: TWindowsIORing, built on Delphi.IOUring.Backend.Windows.API
-// (Docs/Design.md §5.2). User code normally uses it through the TIORing alias
-// in Delphi.IOUring.
-//
-// TWindowsIORing is a custom managed record: it owns the ring and closes it
-// automatically at the end of the variable's scope. It cannot be copied; pass
-// it as var or const [ref].
-//
-// Rules for the caller:
-// - One thread at a time. A ring has no locks.
-// - Buffers, file handles and scatter/gather segment arrays must stay valid
-//   until the operation's completion has been popped.
-// - Close (and the end of scope) waits until every submitted operation has
-//   completed, because CloseIoRing does not cancel them and the kernel would
-//   still write into the buffers. Operations that may never complete (pipe
-//   reads etc.) must be cancelled first: PrepareCancel, or CancelIoEx on the
-//   handle.
+{
+  The Windows ring: TWindowsIORing, built on Delphi.IOUring.Backend.Windows.API (Docs/Design.md §5.2). User code
+  normally uses it through the TIORing alias in Delphi.IOUring.
+
+  TWindowsIORing is a custom managed record: it owns the ring and closes it automatically at the end of the variable's
+  scope. It cannot be copied; pass it as var or const [ref].
+
+  Rules for the caller:
+  - One thread at a time. A ring has no locks.
+  - Buffers, file handles and scatter/gather segment arrays must stay valid
+    until the operation's completion has been popped.
+  - Close (and the end of scope) waits until every submitted operation has
+    completed, because CloseIoRing does not cancel them and the kernel would
+    still write into the buffers. Operations that may never complete (pipe
+    reads etc.) must be cancelled first: PrepareCancel, or CancelIoEx on the
+    handle.
+}
 
 {$I Delphi.IOUring.inc}
 
@@ -24,18 +24,15 @@ interface
 
 uses
 {$IFDEF FPC}
-  Windows,
-  SysUtils,
+  Windows, SysUtils,
 {$ELSE}
-  Winapi.Windows,
-  System.SysUtils,
+  Winapi.Windows, System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring.Backend.Custom,
-  Delphi.IOUring.Backend.Windows.API;
+  Delphi.IOUring.Backend.Custom, Delphi.IOUring.Backend.Windows.API;
 
 type
-  // One scatter/gather segment: a page-sized, page-aligned buffer. Windows
-  // needs a file opened with FILE_FLAG_NO_BUFFERING for scatter/gather.
+  { One scatter/gather segment: a page-sized, page-aligned buffer. Windows needs a file opened with
+    FILE_FLAG_NO_BUFFERING for scatter/gather. }
   TIORingSegment = FILE_SEGMENT_ELEMENT;
   PIORingSegment = PFILE_SEGMENT_ELEMENT;
 
@@ -50,8 +47,8 @@ type
     FCompletionQueueSize: Cardinal;
     FPreparedCount: Cardinal;   // built, not yet submitted
     FPendingCount: Cardinal;    // submitted, completion not yet popped
-    // Copies of registration arrays: the kernel reads them when the
-    // registration runs, so they must outlive the Prepare call
+    { Copies of registration arrays: the kernel reads them when the registration runs, so they
+      must outlive the Prepare call }
     FKeepAlive: array of TBytes;
 
     function NoRoom: Boolean;
@@ -70,36 +67,38 @@ type
     class operator Assign(var ADest: TWindowsIORing; const [ref] ASource: TWindowsIORing);
 {$ENDIF}
 
-    // Creates the ring. Sizes are rounded up to powers of two by Windows; the
-    // completion queue is at least twice the submission queue (0 = minimum).
+    { Creates the ring. Sizes are rounded up to powers of two by Windows; the completion queue is at least twice the
+      submission queue (0 = minimum). }
     procedure Open(const ASubmissionQueueSize: Cardinal = 256; const ACompletionQueueSize: Cardinal = 0);
-    // Waits for all submitted operations, then closes. Prepared but not
-    // submitted entries are dropped. Does nothing if the ring is not open.
+    { Waits for all submitted operations, then closes. Prepared but not submitted entries are dropped. Does
+      nothing if the ring is not open. }
     procedure Close;
     function IsOpen: Boolean;
 
-    // --- Prepare: no system call. False = no room (submission queue full, or the
-    // completion queue could not take one more completion): pop completions,
-    // Submit and try again.
-    function PrepareRead(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef; const ACount: Cardinal; 
+    {
+      --- Prepare: no system call. False = no room (submission queue full, or the
+      completion queue could not take one more completion): pop completions,
+      Submit and try again.
+    }
+    function PrepareRead(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef; const ACount: Cardinal;
       const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = []): Boolean;
-    // AWriteThrough: only on a file opened with FILE_FLAG_NO_BUFFERING; on a
-    // cached file the write fails with 0x800701FD (found by testing)
-    function PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef; const ACount: Cardinal; 
-      const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = []; 
+    { AWriteThrough: only on a file opened with FILE_FLAG_NO_BUFFERING; on a cached file the write fails with
+      0x800701FD (found by testing) }
+    function PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef; const ACount: Cardinal;
+      const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags = [];
       const AWriteThrough: Boolean = False): Boolean;
-    function PrepareFlush(const AFile: TIORingFileRef; const AMode: TIORingFlushMode; const AUserData: TIORingUserData; 
+    function PrepareFlush(const AFile: TIORingFileRef; const AMode: TIORingFlushMode; const AUserData: TIORingUserData;
       const AFlags: TIORingSubmitFlags = []): Boolean;
-    // ASegments: ASegmentCount page-sized buffers; the array must stay valid
-    // until the completion is popped. ACount = bytes to transfer.
-    function PrepareReadScatter(const AFile: TIORingFileRef; const ASegments: PIORingSegment; 
-      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; 
+    { ASegments: ASegmentCount page-sized buffers; the array must stay valid until the completion is popped.
+      ACount = bytes to transfer. }
+    function PrepareReadScatter(const AFile: TIORingFileRef; const ASegments: PIORingSegment;
+      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
       const AFlags: TIORingSubmitFlags = []): Boolean;
     function PrepareWriteGather(const AFile: TIORingFileRef; const ASegments: PIORingSegment;
-      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; 
+      const ASegmentCount: Cardinal; const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
       const AFlags: TIORingSubmitFlags = []; const AWriteThrough: Boolean = False): Boolean;
-    // Requests cancellation of the operation prepared with ATargetUserData on
-    // AFile. Both operations produce a completion.
+    { Requests cancellation of the operation prepared with ATargetUserData on AFile. Both
+      operations produce a completion. }
     function PrepareCancel(const AFile: TIORingFileRef; const ATargetUserData: TIORingUserData;
       const AUserData: TIORingUserData): Boolean;
     // Replaces all registered files / buffers. The arrays are copied.
@@ -107,23 +106,24 @@ type
     function PrepareRegisterBuffers(const ABuffers: array of TIORingBufferInfo;
       const AUserData: TIORingUserData): Boolean;
 
-    // --- Submit: one system call. Submits all prepared entries and, if
-    // AWaitCount > 0, waits until that many completions are available (at most
-    // the number of outstanding operations) or the timeout ends. A timeout is
-    // not an error. Returns the number of entries submitted.
+    {
+      --- Submit: one system call. Submits all prepared entries and, if
+      AWaitCount > 0, waits until that many completions are available (at most
+      the number of outstanding operations) or the timeout ends. A timeout is
+      not an error. Returns the number of entries submitted.
+    }
     function Submit(const AWaitCount: Cardinal = 0; const ATimeoutMs: Cardinal = IORING_INFINITE): Cardinal;
 
     // --- Reap: no system call
     function TryPopCompletion(out ACompletion: TIORingCompletion): Boolean;
     function PopCompletions(var ACompletions: array of TIORingCompletion): Integer;
 
-    // Waits until ACount completions are available (at most the number of
-    // outstanding operations). False on timeout. Uses the same system call as
-    // Submit, so it also submits prepared entries.
+    { Waits until ACount completions are available (at most the number of outstanding operations). False on timeout.
+      Uses the same system call as Submit, so it also submits prepared entries. }
     function WaitForCompletions(const ACount: Cardinal; const ATimeoutMs: Cardinal = IORING_INFINITE): Boolean;
 
-    // Auto-reset event, signalled when the completion queue goes from empty to
-    // non-empty. Pop until TryPopCompletion returns False before waiting on it.
+    { Auto-reset event, signalled when the completion queue goes from empty to non-empty. Pop until TryPopCompletion
+      returns False before waiting on it. }
     function CompletionEventHandle: THandle;
 
     class function Available: Boolean; static;
@@ -137,49 +137,46 @@ type
     property PendingCount: Cardinal read FPendingCount;
   end;
 
-  // File, memory and clock services the higher layers need. Every platform
-  // has a record with these names; Delphi.IOUring exports it as TIORingPlatform.
-  // Failures raise EIORingError (NativeCode = HRESULT).
+  { File, memory and clock services the higher layers need. Every platform has a record with these names; Delphi.IOUring
+    exports it as TIORingPlatform. Failures raise EIORingError (NativeCode = HRESULT). }
   TWindowsIORingPlatform = record
   public
-    // Read-only, shared for reading and writing (so a file being written by
-    // someone else can be read), overlapped. AUnbuffered = FILE_FLAG_NO_BUFFERING,
-    // ASequentialHint = FILE_FLAG_SEQUENTIAL_SCAN.
+    { Read-only, shared for reading and writing (so a file being written by someone else can be read), overlapped.
+      AUnbuffered = FILE_FLAG_NO_BUFFERING, ASequentialHint = FILE_FLAG_SEQUENTIAL_SCAN. }
     class function OpenFileForRead(const AFileName: string; const AUnbuffered, ASequentialHint: Boolean): THandle; static;
-    // Creates the file, or empties it if it exists; write access, others may
-    // read meanwhile, overlapped. AUnbuffered = FILE_FLAG_NO_BUFFERING.
+    { Creates the file, or empties it if it exists; write access, others may read meanwhile, overlapped. AUnbuffered
+      = FILE_FLAG_NO_BUFFERING. }
     class function CreateFileForWrite(const AFileName: string; const AUnbuffered: Boolean): THandle; static;
     // Makes the file ASize bytes long (cuts it, or extends it with zeros)
     class procedure SetFileSize(const AHandle: THandle; const ASize: Int64); static;
     class procedure CloseFile(const AHandle: THandle); static;
     class function GetFileSize(const AHandle: THandle): Int64; static;
-    // Logical sector size of the file's volume: unbuffered I/O must use
-    // offsets, sizes and buffer addresses that are multiples of it. 4096 if
-    // the system does not tell.
+    { Logical sector size of the file's volume: unbuffered I/O must use offsets, sizes and buffer addresses that are
+      multiples of it. 4096 if the system does not tell. }
     class function GetSectorSize(const AHandle: THandle): Cardinal; static;
     class function PageSize: Cardinal; static;
-    // Page-aligned memory (VirtualAlloc); FreePages(nil, ...) does nothing.
-    // ASize: the size given to AllocPages (Linux needs it; Windows not)
+    { Page-aligned memory (VirtualAlloc); FreePages(nil, ...) does nothing. ASize: the size given to AllocPages
+      (Linux needs it; Windows not) }
     class function AllocPages(const ASize: NativeUInt): Pointer; static;
     class procedure FreePages(const AMemory: Pointer; const ASize: NativeUInt); static;
     // Monotonic clock for statistics
     class function TimestampMicroseconds: UInt64; static;
 
-    // An auto-reset event for waking a thread (an event): SignalWakeEvent sets
-    // it, WaitForEvents resets it when it returns because of it
+    { An auto-reset event for waking a thread (an event): SignalWakeEvent sets it, WaitForEvents resets it
+      when it returns because of it }
     class function CreateWakeEvent: THandle; static;
     class procedure SignalWakeEvent(const AEvent: THandle); static;
     class procedure CloseWakeEvent(const AEvent: THandle); static;
-    // Waits, without a time limit, until AEvent1 or AEvent2 is signalled
-    // (WaitForMultipleObjects). AEvent2 may be a ring's CompletionEventHandle.
+    { Waits, without a time limit, until AEvent1 or AEvent2 is signalled (WaitForMultipleObjects). AEvent2 may be a
+      ring's CompletionEventHandle. }
     class procedure WaitForEvents(const AEvent1, AEvent2: THandle); static;
   end;
 
 implementation
 
 const
-  // SubmitIoRing result when its wait times out: HRESULT_FROM_WIN32(ERROR_TIMEOUT)
-  // (found by testing; Learn calls it IORING_E_WAIT_TIMEOUT)
+  { SubmitIoRing result when its wait times out: HRESULT_FROM_WIN32(ERROR_TIMEOUT) (found by testing; Learn calls
+    it IORING_E_WAIT_TIMEOUT) }
   SUBMIT_WAIT_TIMEOUT = HRESULT($800705B4);
 
   // How long Close sleeps between checks; the event normally wakes it earlier
@@ -200,9 +197,9 @@ var
   GAvailability: Integer = 0;
   GCapabilities: IORING_CAPABILITIES;
 
-// Queries the capabilities without the delayed import, so this works (and
-// returns False) on Windows versions without IoRing
-function LoadCapabilities(out ACapabilities: IORING_CAPABILITIES): Boolean;
+{ Queries the capabilities without the delayed import, so this works (and returns False) on
+  Windows versions without IoRing }
+function LoadCapabilities(var ACapabilities: IORING_CAPABILITIES): Boolean;
 var
   LQuery: TQueryIoRingCapabilities;
 begin
@@ -304,21 +301,53 @@ class operator TWindowsIORing.Copy(constref ASource: TWindowsIORing; var ADest: 
 {$ELSE}
 class operator TWindowsIORing.Assign(var ADest: TWindowsIORing; const [ref] ASource: TWindowsIORing);
 {$ENDIF}
+
+  procedure RaiseCannotCopy; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(EInvalidOpException, 'A ring cannot be copied. Pass it as var or const [ref].');
+  end;
+
 begin
-  raise EInvalidOpException.Create('A ring cannot be copied. Pass it as var or const [ref].');
+  RaiseCannotCopy;
 end;
 
 procedure TWindowsIORing.Open(const ASubmissionQueueSize, ACompletionQueueSize: Cardinal);
+
+  procedure RaiseAlreadyOpen; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('The ring is already open');
+  end;
+
+  procedure RaiseNotAvailable; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(EIORingNotSupported, NotAvailableMessage);
+  end;
+
+  procedure RaiseCreateFailed(const AResult: HRESULT); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNative(AResult, 'CreateIoRing');
+  end;
+
+  procedure RaiseGetInfoFailed(const AResult: HRESULT); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNative(AResult, 'GetIoRingInfo');
+  end;
+
+  procedure RaiseSetEventFailed(const AResult: HRESULT); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNative(AResult, 'SetIoRingCompletionEvent');
+  end;
+
 var
   LFlags: IORING_CREATE_FLAGS;
   LInfo: IORING_INFO;
   LResult: HRESULT;
 begin
   if FHandle <> 0 then
-    raise EIORingError.Create('The ring is already open');
+    RaiseAlreadyOpen;
 
   if not Available then
-    raise EIORingNotSupported.Create(NotAvailableMessage);
+    RaiseNotAvailable;
 
   LFlags.Required := IORING_CREATE_REQUIRED_FLAGS_NONE;
   LFlags.Advisory := IORING_CREATE_ADVISORY_FLAGS_NONE;
@@ -329,14 +358,14 @@ begin
   begin
     FHandle := 0;
 
-    raise EIORingError.CreateNative(LResult, 'CreateIoRing');
+    RaiseCreateFailed(LResult);
   end;
 
   try
     LResult := GetIoRingInfo(FHandle, LInfo);
 
     if LResult <> S_OK then
-      raise EIORingError.CreateNative(LResult, 'GetIoRingInfo');
+      RaiseGetInfoFailed(LResult);
 
     FSubmissionQueueSize := LInfo.SubmissionQueueSize;
     FCompletionQueueSize := LInfo.CompletionQueueSize;
@@ -350,7 +379,7 @@ begin
     LResult := SetIoRingCompletionEvent(FHandle, FCompletionEvent);
 
     if LResult <> S_OK then
-      raise EIORingError.CreateNative(LResult, 'SetIoRingCompletionEvent');
+      RaiseSetEventFailed(LResult);
   except
     CloseIoRing(FHandle);
     FHandle := 0;
@@ -385,8 +414,8 @@ begin
     Exit;
 
   try
-    // CloseIoRing does not cancel submitted operations; wait for them so the
-    // kernel is done with the caller's buffers before Close returns
+    { CloseIoRing does not cancel submitted operations; wait for them so the kernel is done with the caller's
+      buffers before Close returns }
     WaitForAllPending;
   finally
     CloseIoRing(FHandle);
@@ -411,20 +440,25 @@ end;
 
 { TWindowsIORing - helpers }
 
+procedure RaiseRingNotOpen; {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseIORingError('The ring is not open');
+end;
+
 function TWindowsIORing.NoRoom: Boolean;
 begin
   if FHandle = 0 then
-    raise EIORingError.Create('The ring is not open');
+    RaiseRingNotOpen;
 
   Result := False;
 end;
 
 function TWindowsIORing.BuildFailed(const AResult: HRESULT; const AFunctionName: string): Boolean;
 begin
-  if AResult = IORING_E_SUBMISSION_QUEUE_FULL then
-    Exit(False);
+  if AResult <> IORING_E_SUBMISSION_QUEUE_FULL then
+    RaiseIORingErrorNative(AResult, AFunctionName);
 
-  raise EIORingError.CreateNative(AResult, AFunctionName);
+  Result := False;
 end;
 
 function TWindowsIORing.KeepAlive(const AData: Pointer; const ASize: NativeInt): Pointer;
@@ -438,15 +472,17 @@ begin
   Move(AData^, LCopy[0], ASize);
   SetLength(FKeepAlive, Length(FKeepAlive) + 1);
   FKeepAlive[High(FKeepAlive)] := LCopy;
+
   Result := @LCopy[0];
 end;
 
 { TWindowsIORing - prepare }
 
-// Room check: an entry needs a free submission queue slot (Build reports that)
-// and room for its completion. Keeping PreparedCount + PendingCount below the
-// completion queue size means SubmitIoRing never fails with
-// IORING_E_COMPLETION_QUEUE_TOO_FULL.
+{
+  Room check: an entry needs a free submission queue slot (Build reports that) and room for its completion. Keeping
+  PreparedCount + PendingCount below the completion queue size means SubmitIoRing never fails with
+  IORING_E_COMPLETION_QUEUE_TOO_FULL.
+}
 
 function TWindowsIORing.PrepareRead(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
   const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
@@ -457,7 +493,7 @@ begin
   if FPreparedCount + FPendingCount >= FCompletionQueueSize then
     Exit(NoRoom);
 
-  LResult := BuildIoRingReadFile(FHandle, ToHandleRef(AFile), ToBufferRef(ABuffer), ACount, AOffset, AUserData, 
+  LResult := BuildIoRingReadFile(FHandle, ToHandleRef(AFile), ToBufferRef(ABuffer), ACount, AOffset, AUserData,
     ToSqeFlags(AFlags));
 
   if LResult = S_OK then
@@ -470,7 +506,7 @@ begin
 end;
 
 function TWindowsIORing.PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
-  const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags; 
+  const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData; const AFlags: TIORingSubmitFlags;
   const AWriteThrough: Boolean): Boolean;
 var
   LResult: HRESULT;
@@ -521,7 +557,7 @@ begin
   if FPreparedCount + FPendingCount >= FCompletionQueueSize then
     Exit(NoRoom);
 
-  LResult := BuildIoRingReadFileScatter(FHandle, ToHandleRef(AFile), ASegmentCount, ASegments, ACount, AOffset, 
+  LResult := BuildIoRingReadFileScatter(FHandle, ToHandleRef(AFile), ASegmentCount, ASegments, ACount, AOffset,
     AUserData, ToSqeFlags(AFlags));
 
   if LResult = S_OK then
@@ -542,7 +578,7 @@ begin
   if FPreparedCount + FPendingCount >= FCompletionQueueSize then
     Exit(NoRoom);
 
-  LResult := BuildIoRingWriteFileGather(FHandle, ToHandleRef(AFile), ASegmentCount, ASegments, ACount, AOffset, 
+  LResult := BuildIoRingWriteFileGather(FHandle, ToHandleRef(AFile), ASegmentCount, ASegments, ACount, AOffset,
     ToWriteFlags(AWriteThrough), AUserData, ToSqeFlags(AFlags));
 
   if LResult = S_OK then
@@ -626,12 +662,18 @@ end;
 { TWindowsIORing - submit and reap }
 
 function TWindowsIORing.SubmitAndWait(const AWaitCount, ATimeoutMs: Cardinal): Boolean;
+
+  procedure RaiseSubmitFailed(const AResult: HRESULT); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNative(AResult, 'SubmitIoRing');
+  end;
+
 var
   LWaitCount: Cardinal;
   LResult: HRESULT;
 begin
   if FHandle = 0 then
-    raise EIORingError.Create('The ring is not open');
+    RaiseRingNotOpen;
 
   // Never wait for more completions than there can be
   LWaitCount := AWaitCount;
@@ -645,7 +687,7 @@ begin
   LResult := SubmitIoRing(FHandle, LWaitCount, ATimeoutMs, nil);
 
   if (LResult <> S_OK) and (LResult <> SUBMIT_WAIT_TIMEOUT) then
-    raise EIORingError.CreateNative(LResult, 'SubmitIoRing');  // all entries stay prepared
+    RaiseSubmitFailed(LResult);  // all entries stay prepared
 
   // Also on a wait timeout every prepared entry was submitted
   Inc(FPendingCount, FPreparedCount);
@@ -718,8 +760,7 @@ type
     szCSDVersion: array[0..127] of WideChar;
   end;
 
-// The real version, also for programs without a compatibility manifest
-// (GetVersionEx says 6.2 to them)
+// The real version, also for programs without a compatibility manifest (GetVersionEx says 6.2 to them)
 function RtlGetVersion(var AInfo: TRtlOsVersionInfo): LongInt; stdcall; external 'ntdll.dll' name 'RtlGetVersion';
 
 function SystemDescription: string;
@@ -771,6 +812,7 @@ begin
 
     GNativeOpsChecked := True;
   end;
+
   Result := GNativeOps;
 end;
 
@@ -867,6 +909,12 @@ end;
 
 class function TWindowsIORingPlatform.OpenFileForRead(const AFileName: string; const AUnbuffered,
   ASequentialHint: Boolean): THandle;
+
+  procedure RaiseOpenFailed(const AName: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNativeFmt(LastErrorAsHResult, 'Open "%s"', [AName]);
+  end;
+
 var
   LFlags: DWORD;
 begin
@@ -881,10 +929,16 @@ begin
   Result := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING, LFlags, 0);
 
   if Result = INVALID_HANDLE_VALUE then
-    raise EIORingError.CreateNative(LastErrorAsHResult, 'Open "' + AFileName + '"');
+    RaiseOpenFailed(AFileName);
 end;
 
 class function TWindowsIORingPlatform.CreateFileForWrite(const AFileName: string; const AUnbuffered: Boolean): THandle;
+
+  procedure RaiseCreateFailed(const AName: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNativeFmt(LastErrorAsHResult, 'Create "%s"', [AName]);
+  end;
+
 var
   LFlags: DWORD;
 begin
@@ -896,17 +950,23 @@ begin
   Result := CreateFile(PChar(AFileName), GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, LFlags, 0);
 
   if Result = INVALID_HANDLE_VALUE then
-    raise EIORingError.CreateNative(LastErrorAsHResult, 'Create "' + AFileName + '"');
+    RaiseCreateFailed(AFileName);
 end;
 
 class procedure TWindowsIORingPlatform.SetFileSize(const AHandle: THandle; const ASize: Int64);
+
+  procedure RaiseSetFileSizeFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNative(LastErrorAsHResult, 'Set the file size');
+  end;
+
 var
   LInfo: TFileEndOfFileInfo;
 begin
   LInfo.EndOfFile := ASize;
 
   if not IORingSetFileInformationByHandle(AHandle, FILE_INFO_CLASS_END_OF_FILE_INFO, @LInfo, SizeOf(LInfo)) then
-    raise EIORingError.CreateNative(LastErrorAsHResult, 'Set the file size');
+    RaiseSetFileSizeFailed;
 end;
 
 class procedure TWindowsIORingPlatform.CloseFile(const AHandle: THandle);
@@ -915,9 +975,15 @@ begin
 end;
 
 class function TWindowsIORingPlatform.GetFileSize(const AHandle: THandle): Int64;
+
+  procedure RaiseGetFileSizeFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNative(LastErrorAsHResult, 'GetFileSizeEx');
+  end;
+
 begin
   if not IORingGetFileSizeEx(AHandle, Result) then
-    raise EIORingError.CreateNative(LastErrorAsHResult, 'GetFileSizeEx');
+    RaiseGetFileSizeFailed;
 end;
 
 class function TWindowsIORingPlatform.GetSectorSize(const AHandle: THandle): Cardinal;
@@ -943,11 +1009,17 @@ begin
 end;
 
 class function TWindowsIORingPlatform.AllocPages(const ASize: NativeUInt): Pointer;
+
+  procedure RaiseAllocFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNative(LastErrorAsHResult, 'VirtualAlloc');
+  end;
+
 begin
   Result := VirtualAlloc(nil, ASize, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
 
   if Result = nil then
-    raise EIORingError.CreateNative(LastErrorAsHResult, 'VirtualAlloc');
+    RaiseAllocFailed;
 end;
 
 class procedure TWindowsIORingPlatform.FreePages(const AMemory: Pointer; const ASize: NativeUInt);
@@ -968,11 +1040,17 @@ begin
 end;
 
 class function TWindowsIORingPlatform.CreateWakeEvent: THandle;
+
+  procedure RaiseCreateEventFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNative(LastErrorAsHResult, 'CreateEvent');
+  end;
+
 begin
   Result := CreateEvent(nil, False, False, nil);   // auto-reset
 
   if Result = 0 then
-    raise EIORingError.CreateNative(LastErrorAsHResult, 'CreateEvent');
+    RaiseCreateEventFailed;
 end;
 
 class procedure TWindowsIORingPlatform.SignalWakeEvent(const AEvent: THandle);

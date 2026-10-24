@@ -35,11 +35,13 @@ const
 type
   PBenchConsumer = ^TBenchConsumer;
 
-  // Gets the file's data in order, like a real program would.
-  // - Checksum: XOR of all 64-bit words, so every byte is touched and all
-  //   contenders can be checked against each other.
-  // - Work: if WorkMicrosecondsPerMiB > 0, burns that much CPU time per MiB,
-  //   to simulate processing the data (the "data for free" scenario).
+  {
+    Gets the file's data in order, like a real program would.
+    - Checksum: XOR of all 64-bit words, so every byte is touched and all
+      contenders can be checked against each other.
+    - Work: if WorkMicrosecondsPerMiB > 0, burns that much CPU time per MiB,
+      to simulate processing the data (the "data for free" scenario).
+  }
   TBenchConsumer = record
   private
     FChecksum: UInt64;
@@ -49,8 +51,8 @@ type
   public
     procedure Init(const AWorkMicrosecondsPerMiB: Cardinal);
     procedure Consume(const AData: PByte; const ALength: NativeInt);
-    // Adds the result of a consumer that got another part of the file
-    // (multi-threaded contender). XOR does not depend on the order.
+    { Adds the result of a consumer that got another part of the file (multi-threaded contender). XOR
+      does not depend on the order. }
     procedure Merge(const AOther: TBenchConsumer);
     property Checksum: UInt64 read FChecksum;
     property Bytes: Int64 read FBytes;
@@ -76,37 +78,36 @@ function BenchMicroseconds: UInt64;
 // Busy-waits for AMicroseconds (simulated work)
 procedure SpinMicroseconds(const AMicroseconds: Cardinal);
 
-// Drops the file's data from the file cache. Windows: opening a file without
-// buffering makes the cache manager flush and purge it (checked at start-up
-// by the benchmark, see CheckCachePurge in the program). Linux: fsync, then
-// posix_fadvise(POSIX_FADV_DONTNEED). (In WSL2 the Windows host may still
-// have the data in its own cache: there "cold" is not the disk.)
+{
+  Drops the file's data from the file cache. Windows: opening a file without buffering makes the cache manager
+  flush and purge it (checked at start-up by the benchmark, see CheckCachePurge in the program). Linux: fsync,
+  then posix_fadvise(POSIX_FADV_DONTNEED). (In WSL2 the Windows host may still have the data in its own cache:
+  there "cold" is not the disk.)
+}
 procedure PurgeFileCache(const AFileName: string);
 
-// Creates a file of ASize bytes (multiple of 4096) with pseudo-random data,
-// written without buffering so the new data is not left in the cache.
+{ Creates a file of ASize bytes (multiple of 4096) with pseudo-random data, written without buffering so the new data
+  is not left in the cache. }
 procedure CreateBenchFile(const AFileName: string; const ASize: Int64);
 
 function FileSizeOf(const AFileName: string): Int64;
 
-// Opens a file for reading. AOverlapped: Windows FILE_FLAG_OVERLAPPED (Linux:
-// no such thing). AUnbuffered: past the file cache (FILE_FLAG_NO_BUFFERING /
-// O_DIRECT): buffers, offsets and lengths must then be sector-aligned.
-// ASequentialHint: FILE_FLAG_SEQUENTIAL_SCAN / POSIX_FADV_SEQUENTIAL.
+{
+  Opens a file for reading. AOverlapped: Windows FILE_FLAG_OVERLAPPED (Linux: no such thing). AUnbuffered: past the file
+  cache (FILE_FLAG_NO_BUFFERING / O_DIRECT): buffers, offsets and lengths must then be sector-aligned. ASequentialHint:
+  FILE_FLAG_SEQUENTIAL_SCAN / POSIX_FADV_SEQUENTIAL.
+}
 function BenchOpenForReading(const AFileName: string; const AOverlapped, AUnbuffered: Boolean;
   const ASequentialHint: Boolean = False): THandle;
 procedure BenchCloseFile(const AHandle: THandle);
 // Reads at the current position; returns the bytes read (0 at the end)
 function BenchRead(const AFile: THandle; var ABuffer; const ACount: Cardinal): Cardinal;
-// Reads ACount bytes at AOffset (positioned, no seek call); raises on a short
-// read
+// Reads ACount bytes at AOffset (positioned, no seek call); raises on a short read
 procedure BenchReadAt(const AFile: THandle; var ABuffer; const ACount: Cardinal; const AOffset: UInt64);
-// Puts what the file cache still holds of the file onto the disk, through a
-// handle of its own (FlushFileBuffers / fsync)
+// Puts what the file cache still holds of the file onto the disk, through a handle of its own (FlushFileBuffers / fsync)
 procedure BenchFlushFile(const AFileName: string);
 
-// The logical processors this process may run on. (Free Pascal 3.2.2's
-// TThread.ProcessorCount is 1 on Linux.)
+// The logical processors this process may run on. (Free Pascal 3.2.2's TThread.ProcessorCount is 1 on Linux.)
 function BenchProcessorCount: Integer;
 // 'Win32', 'Win64' or 'Linux64'
 function BenchPlatformName: string;
@@ -122,11 +123,9 @@ uses
   System.Classes,
 {$ENDIF}
 {$IFDEF UNIX}
-  BaseUnix,
-  Unix,
-  Syscall,
+  BaseUnix, Unix, Syscall,
 {$ENDIF}
-  Delphi.IOUring;
+  Delphi.IOUring, Delphi.IOUring.Backend.Custom;
 
 {$Q-}
 {$R-}
@@ -140,12 +139,17 @@ var
 const
   POSIX_FADV_DONTNEED = 4;
 
-procedure RaiseLastErrno(const AOperation: string);
+procedure RaiseLastErrno(const AOperation: string); overload; {$IFNDEF FPC} noreturn; {$ENDIF}
 var
   LErrno: Integer;
 begin
   LErrno := fpgeterrno;
-  raise EOSError.CreateFmt('%s: %s (errno %d)', [AOperation, SysErrorMessage(LErrno), LErrno]);
+  RaiseErrorFmt(EOSError, '%s: %s (errno %d)', [AOperation, SysErrorMessage(LErrno), LErrno]);
+end;
+
+procedure RaiseLastErrno(const AFormat: string; const AArgs: array of const); overload; {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseLastErrno(Format(AFormat, AArgs));
 end;
 {$ENDIF}
 
@@ -170,24 +174,29 @@ begin
   LWord := PUInt64(AData);
   LWordCount := ALength div 8;
   LChecksum := FChecksum;
+
   for LIndex := 1 to LWordCount do
   begin
     LChecksum := LChecksum xor LWord^;
     Inc(LWord);
   end;
+
   // Chunks end on 8-byte file offsets except at the end of the file
   LTail := PByte(LWord);
+
   for LIndex := 1 to ALength mod 8 do
   begin
     LChecksum := LChecksum xor LTail^;
     Inc(LTail);
   end;
+
   FChecksum := LChecksum;
   Inc(FBytes, ALength);
 
   if FWorkMicrosecondsPerMiB > 0 then
   begin
     Inc(FUnworkedBytes, ALength);
+
     while FUnworkedBytes >= MiB do
     begin
       SpinMicroseconds(FWorkMicrosecondsPerMiB);
@@ -228,12 +237,12 @@ var
   LCounter: Int64;
 begin
   QueryPerformanceCounter(LCounter);
+
   Result := UInt64(LCounter div GFrequency) * 1000000 + UInt64((LCounter mod GFrequency) * 1000000 div GFrequency);
 end;
 {$ELSE}
 type
-  // struct rusage (FPC 3.2.2 has no getrusage for Linux): the two times, then
-  // 14 counters we do not use
+  // struct rusage (FPC 3.2.2 has no getrusage for Linux): the two times, then 14 counters we do not use
   TBenchRUsage = record
     UserTime: TTimeVal;
     SystemTime: TTimeVal;
@@ -253,9 +262,8 @@ begin
   AKernel := UInt64(LUsage.SystemTime.tv_sec) * 10000000 + UInt64(LUsage.SystemTime.tv_usec) * 10;
 end;
 
-// The C library's clock_gettime: through the vDSO, without a system call
-// (13 ns in WSL2). FPC 3.2.2's own clock_gettime is a system call (94 ns),
-// which would make the busy-wait of the work scenario mostly kernel time.
+{ The C library's clock_gettime: through the vDSO, without a system call (13 ns in WSL2). FPC 3.2.2's own clock_gettime
+  is a system call (94 ns), which would make the busy-wait of the work scenario mostly kernel time. }
 function LibcClockGetTime(AClock: Integer; ATime: PTimeSpec): Integer; cdecl; external 'c' name 'clock_gettime';
 
 function BenchMicroseconds: UInt64;
@@ -265,6 +273,7 @@ var
   LTime: TTimeSpec;
 begin
   LibcClockGetTime(CLOCK_MONOTONIC, @LTime);
+
   Result := UInt64(LTime.tv_sec) * 1000000 + UInt64(LTime.tv_nsec div 1000);
 end;
 {$ENDIF}
@@ -294,6 +303,7 @@ var
   LStart: UInt64;
 begin
   LStart := BenchMicroseconds;
+
   repeat
   until BenchMicroseconds - LStart >= AMicroseconds;
 end;
@@ -307,8 +317,10 @@ var
 begin
   LHandle := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, nil,
     OPEN_EXISTING, FILE_FLAG_NO_BUFFERING, 0);
+
   if LHandle = INVALID_HANDLE_VALUE then
     RaiseLastOSError;
+
   CloseHandle(LHandle);
 end;
 {$ELSE}
@@ -317,6 +329,7 @@ var
   LFile: THandle;
 begin
   LFile := TIORingPlatform.OpenFileForRead(AFileName, False, False);
+
   try
     // Dirty pages stay in the cache: write them first
     FpFsync(LFile);
@@ -328,6 +341,12 @@ end;
 {$ENDIF}
 
 procedure CreateBenchFile(const AFileName: string; const ASize: Int64);
+
+  procedure RaiseBadSize; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(Exception, 'The benchmark file size must be a multiple of 4096');
+  end;
+
 const
   CHUNK = 4 * MiB;
 var
@@ -343,25 +362,30 @@ var
 {$ENDIF}
 begin
   if ASize mod 4096 <> 0 then
-    raise Exception.Create('The benchmark file size must be a multiple of 4096');
+    RaiseBadSize;
 
   LBuffer := TIORingPlatform.AllocPages(CHUNK);
+
   try
 {$IFDEF MSWINDOWS}
     LHandle := CreateFile(PChar(AFileName), GENERIC_WRITE, 0, nil, CREATE_ALWAYS,
       FILE_ATTRIBUTE_NORMAL or FILE_FLAG_NO_BUFFERING or FILE_FLAG_WRITE_THROUGH, 0);
+
     if LHandle = INVALID_HANDLE_VALUE then
       RaiseLastOSError;
 {$ELSE}
     LHandle := TIORingPlatform.CreateFileForWrite(AFileName, True);
 {$ENDIF}
+
     try
       LState := UInt64($9E3779B97F4A7C15);
       LRemaining := ASize;
+
       while LRemaining > 0 do
       begin
         // xorshift64: fast, not compressible, different in every chunk
         LWord := LBuffer;
+
         for LIndex := 1 to CHUNK div 8 do
         begin
           LState := LState xor (LState shl 13);
@@ -375,13 +399,15 @@ begin
           LCount := Cardinal(LRemaining)
         else
           LCount := CHUNK;
+
 {$IFDEF MSWINDOWS}
         if not WriteFile(LHandle, LBuffer^, LCount, LWritten, nil) or (LWritten <> LCount) then
           RaiseLastOSError;
 {$ELSE}
         if FpWrite(LHandle, LBuffer^, LCount) <> LCount then
-          RaiseLastErrno('Write "' + AFileName + '"');
+          RaiseLastErrno('Write "%s"', [AFileName]);
 {$ENDIF}
+
         Dec(LRemaining, LCount);
       end;
     finally
@@ -399,6 +425,7 @@ var
 begin
   if not GetFileAttributesEx(PChar(AFileName), GetFileExInfoStandard, @LData) then
     Exit(-1);
+
   Result := Int64(LData.nFileSizeHigh) shl 32 or LData.nFileSizeLow;
 end;
 
@@ -408,14 +435,19 @@ var
   LFlags: DWORD;
 begin
   LFlags := FILE_ATTRIBUTE_NORMAL;
+
   if AOverlapped then
     LFlags := LFlags or FILE_FLAG_OVERLAPPED;
+
   if AUnbuffered then
     LFlags := LFlags or FILE_FLAG_NO_BUFFERING;
+
   if ASequentialHint then
     LFlags := LFlags or FILE_FLAG_SEQUENTIAL_SCAN;
+
   Result := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING,
     LFlags, 0);
+
   if Result = INVALID_HANDLE_VALUE then
     RaiseLastOSError;
 end;
@@ -431,10 +463,17 @@ var
 begin
   if not ReadFile(AFile, ABuffer, ACount, LRead, nil) then
     RaiseLastOSError;
+
   Result := LRead;
 end;
 
 procedure BenchReadAt(const AFile: THandle; var ABuffer; const ACount: Cardinal; const AOffset: UInt64);
+
+  procedure RaiseShortRead(const AValue: UInt64); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseErrorFmt(Exception, 'Short read at %d', [AValue]);
+  end;
+
 var
   LOverlapped: TOverlapped;
   LRead: DWORD;
@@ -443,10 +482,12 @@ begin
   LOverlapped.Offset := DWORD(AOffset and $FFFFFFFF);
   LOverlapped.OffsetHigh := DWORD(AOffset shr 32);
   LRead := 0;
+
   if not ReadFile(AFile, ABuffer, ACount, LRead, @LOverlapped) then
     RaiseLastOSError;
+
   if LRead <> ACount then
-    raise Exception.CreateFmt('Short read at %d', [AOffset]);
+    RaiseShortRead(AOffset);
 end;
 
 procedure BenchFlushFile(const AFileName: string);
@@ -455,8 +496,10 @@ var
 begin
   LHandle := CreateFile(PChar(AFileName), GENERIC_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING,
     FILE_ATTRIBUTE_NORMAL, 0);
+
   if LHandle = INVALID_HANDLE_VALUE then
     RaiseLastOSError;
+
   try
     if not FlushFileBuffers(LHandle) then
       RaiseLastOSError;
@@ -471,6 +514,7 @@ var
 begin
   if FpStat(AFileName, LStat) <> 0 then
     Exit(-1);
+
   Result := LStat.st_size;
 end;
 
@@ -490,20 +534,30 @@ var
   LRead: Integer;
 begin
   LRead := FpRead(AFile, ABuffer, ACount);
+
   if LRead < 0 then
     RaiseLastErrno('read');
+
   Result := Cardinal(LRead);
 end;
 
 procedure BenchReadAt(const AFile: THandle; var ABuffer; const ACount: Cardinal; const AOffset: UInt64);
+
+  procedure RaiseShortRead(const AValue: UInt64); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseErrorFmt(Exception, 'Short read at %d', [AValue]);
+  end;
+
 var
   LRead: Integer;
 begin
   LRead := FpPRead(AFile, @ABuffer, ACount, Int64(AOffset));
+
   if LRead < 0 then
     RaiseLastErrno('pread');
+
   if Cardinal(LRead) <> ACount then
-    raise Exception.CreateFmt('Short read at %d', [AOffset]);
+    RaiseShortRead(AOffset);
 end;
 
 procedure BenchFlushFile(const AFileName: string);
@@ -512,6 +566,7 @@ var
 begin
   // fsync needs no write access
   LFile := TIORingPlatform.OpenFileForRead(AFileName, False, False);
+
   try
     if FpFsync(LFile) <> 0 then
       RaiseLastErrno('fsync');
@@ -537,10 +592,12 @@ begin
   // Returns the bytes it filled in
   LBytes := do_SysCall(syscall_nr_sched_getaffinity, 0, SizeOf(LMask), TSysParam(@LMask));
   Result := 0;
+
   if LBytes > 0 then
     for LIndex := 0 to SizeOf(LMask) * 8 - 1 do
       if LMask[LIndex div 64] and (UInt64(1) shl (LIndex mod 64)) <> 0 then
         Inc(Result);
+
   if Result = 0 then
     Result := 1;
 end;

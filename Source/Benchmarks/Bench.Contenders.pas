@@ -15,8 +15,7 @@ uses
 
 type
   // AStalls: how often an IoRing reader had to wait for data (0 for the others)
-  TContenderProc = reference to procedure(const AFileName: string; var AConsumer: TBenchConsumer;
-    var AStalls: UInt64);
+  TContenderProc = reference to procedure(const AFileName: string; var AConsumer: TBenchConsumer; var AStalls: UInt64);
 
   TContender = record
     Name: string;
@@ -34,11 +33,7 @@ function TuningContenders: TArray<TContender>;
 implementation
 
 uses
-  Winapi.Windows,
-  System.SysUtils,
-  System.Classes,
-  Delphi.IOUring.SequentialReader,
-  Bench.Readers;
+  Winapi.Windows, System.SysUtils, System.Classes, Delphi.IOUring.SequentialReader, Bench.Readers;
 
 { Classic RTL streams }
 
@@ -51,9 +46,11 @@ var
 begin
   SetLength(LBuffer, AReadSize);
   LStream := TBufferedFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite, ABufferSize);
+
   try
     repeat
       LRead := LStream.Read(LBuffer[0], AReadSize);
+
       if LRead > 0 then
         AConsumer.Consume(@LBuffer[0], LRead);
     until LRead = 0;
@@ -81,16 +78,21 @@ begin
       LBuffer := VirtualAlloc(nil, AReadSize, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
       LHandle := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING,
         FILE_ATTRIBUTE_NORMAL or FILE_FLAG_SEQUENTIAL_SCAN, 0);
+
       try
         SetFilePointerEx(LHandle, AFrom, nil, FILE_BEGIN);
         LOffset := AFrom;
+
         while LOffset < ATo do
         begin
           LWanted := AReadSize;
+
           if ATo - LOffset < LWanted then
             LWanted := DWORD(ATo - LOffset);
+
           if not ReadFile(LHandle, LBuffer^, LWanted, LRead, nil) or (LRead = 0) then
             Break;
+
           AResult^.Consume(LBuffer, LRead);
           Inc(LOffset, LRead);
         end;
@@ -103,8 +105,8 @@ begin
   Result.Start;
 end;
 
-// Several threads, each reading its own part of the file synchronously
-// (PostgreSQL's "more workers" alternative to asynchronous I/O)
+{ Several threads, each reading its own part of the file synchronously (PostgreSQL's "more workers"
+  alternative to asynchronous I/O) }
 procedure ReadWithThreads(const AFileName: string; const AThreadCount: Integer; const AReadSize: DWORD;
   var AConsumer: TBenchConsumer);
 var
@@ -121,11 +123,14 @@ begin
 
   SetLength(LThreads, AThreadCount);
   SetLength(LResults, AThreadCount);
+
   for LIndex := 0 to AThreadCount - 1 do
   begin
     LTo := (LIndex + 1) * LPart;
+
     if (LIndex = AThreadCount - 1) or (LTo > LSize) then
       LTo := LSize;
+
     LThreads[LIndex] := StartPartReader(AFileName, AReadSize, LIndex * LPart, LTo, @LResults[LIndex]);
   end;
 
@@ -139,8 +144,7 @@ end;
 
 { Contender lists }
 
-function Contender(const AName: string; const AUnbuffered, AInOrder: Boolean;
-  const ARun: TContenderProc): TContender;
+function Contender(const AName: string; const AUnbuffered, AInOrder: Boolean; const ARun: TContenderProc): TContender;
 begin
   Result.Name := AName;
   Result.Unbuffered := AUnbuffered;
@@ -232,6 +236,7 @@ var
   LMode: string;
 begin
   Result := nil;
+
   for LUnbuffered in [False, True] do
   begin
     if LUnbuffered then

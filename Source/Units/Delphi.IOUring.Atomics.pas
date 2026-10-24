@@ -1,39 +1,38 @@
 ﻿unit Delphi.IOUring.Atomics;
 
-// Atomic operations, memory order, CPU pause, and wait/wake on an address:
-// the building blocks of the engine's lock-free parts (Docs/Design.md §10.5).
-//
-// Delphi uses its compiler intrinsics (AtomicCmpExchange, ...), Free Pascal
-// its RTL routines (InterlockedCompareExchange, ...). The differences between
-// compilers and CPUs stay in this unit; the rest of the library uses TAtomic.
-//
-// Rules for callers:
-// - A target must be aligned to its size: 4 bytes for 32-bit values, 8 bytes
-//   for 64-bit values. Heap blocks and record/class fields are; a 64-bit local
-//   variable on the Win32 stack may not be.
-// - CompareExchange, Exchange, FetchAdd, Increment and Decrement are full
-//   barriers: no read or write moves across them, in either direction.
-// - LoadAcquire: the reads and writes after it stay after it.
-//   StoreRelease: the reads and writes before it stay before it.
-//   Together they hand data to another thread: write the data, then
-//   StoreRelease a flag; the other thread LoadAcquires the flag, then reads
-//   the data.
-// - A StoreRelease followed by a LoadAcquire of ANOTHER variable can still
-//   change order (on x86 too). "Set my flag, then check yours" needs Exchange
-//   or FullBarrier.
-// - WaitWhileEqual, WakeOne and WakeAll work on 32-bit values only (the Linux
-//   futex has the same limit).
-//
-// On x86 and x64 the CPU keeps the acquire/release order by itself, so
-// LoadAcquire and StoreRelease are plain moves; only where a compiler would
-// split a 64-bit value into two 32-bit moves is the move a tiny assembler
-// routine. Neither compiler moves or caches reads and writes of shared
-// memory across them (the tests check this with optimization on, too).
-// AArch64 (Linux, Free Pascal) does not keep that order by itself: there
-// every operation gets real barriers (DMB). Tested on ARM64 in CI, with the
-// stress tests, debug and -O3 (Docs/Design.md §5.7, §12.5).
-//
-// Sleeping and waking: WaitOnAddress on Windows, the futex on Linux.
+{
+  Atomic operations, memory order, CPU pause, and wait/wake on an address: the building blocks of the engine's lock-free
+  parts (Docs/Design.md §10.5).
+
+  Delphi uses its compiler intrinsics (AtomicCmpExchange, ...), Free Pascal its RTL routines
+  (InterlockedCompareExchange, ...). The differences between compilers and CPUs stay in this unit; the rest of
+  the library uses TAtomic.
+
+  Rules for callers:
+  - A target must be aligned to its size: 4 bytes for 32-bit values, 8 bytes
+    for 64-bit values. Heap blocks and record/class fields are; a 64-bit local
+    variable on the Win32 stack may not be.
+  - CompareExchange, Exchange, FetchAdd, Increment and Decrement are full
+    barriers: no read or write moves across them, in either direction.
+  - LoadAcquire: the reads and writes after it stay after it.
+    StoreRelease: the reads and writes before it stay before it.
+    Together they hand data to another thread: write the data, then
+    StoreRelease a flag; the other thread LoadAcquires the flag, then reads
+    the data.
+  - A StoreRelease followed by a LoadAcquire of ANOTHER variable can still
+    change order (on x86 too). "Set my flag, then check yours" needs Exchange
+    or FullBarrier.
+  - WaitWhileEqual, WakeOne and WakeAll work on 32-bit values only (the Linux
+    futex has the same limit).
+
+  On x86 and x64 the CPU keeps the acquire/release order by itself, so LoadAcquire and StoreRelease are plain moves;
+  only where a compiler would split a 64-bit value into two 32-bit moves is the move a tiny assembler routine. Neither
+  compiler moves or caches reads and writes of shared memory across them (the tests check this with optimization on,
+  too). AArch64 (Linux, Free Pascal) does not keep that order by itself: there every operation gets real barriers (DMB).
+  Tested on ARM64 in CI, with the stress tests, debug and -O3 (Docs/Design.md §5.7, §12.5).
+
+  Sleeping and waking: WaitOnAddress on Windows, the futex on Linux.
+}
 
 {$I Delphi.IOUring.inc}
 
@@ -55,11 +54,11 @@
   {$ENDIF}
 {$ELSEIF defined(CPUX64)}
   {$IFDEF FPC}
-    // Free Pascal x64 writes a 64-bit constant that does not fit in 32 bits
-    // as two 32-bit stores, so an inlined StoreRelease(X, $FFFFFFFF00000000)
-    // could be seen half-written. A small assembler routine gets the value in
-    // a register and writes it with one instruction. (Delphi Win64 uses one
-    // 64-bit store; checked.)
+    {
+      Free Pascal x64 writes a 64-bit constant that does not fit in 32 bits as two 32-bit stores, so an inlined
+      StoreRelease(X, $FFFFFFFF00000000) could be seen half-written. A small assembler routine gets the value in a
+      register and writes it with one instruction. (Delphi Win64 uses one 64-bit store; checked.)
+    }
     {$DEFINE IORING_ATOMICS_ASM_STORE64}
   {$ENDIF}
 {$ELSEIF defined(CPUAARCH64) and defined(FPC)}
@@ -76,31 +75,34 @@
 interface
 
 const
-  // Cache line size of x86/x64 CPUs (and most ARM ones). Values that
-  // different threads write often are kept at least this far apart, so they
-  // do not share a cache line ("false sharing").
+  { Cache line size of x86/x64 CPUs (and most ARM ones). Values that different threads write often are kept at least
+    this far apart, so they do not share a cache line ("false sharing"). }
   IORING_CACHE_LINE_SIZE = 64;
 
   // Timeout for TAtomic.WaitWhileEqual: no time limit
   IORING_WAIT_INFINITE = Cardinal($FFFFFFFF);
 
-  // The longest wait of TAtomic.BackOff, in CPU pauses: ~35 µs on a recent
-  // Intel performance core (Docs/Benchmarks.md, "Engine structures")
+  { The longest wait of TAtomic.BackOff, in CPU pauses: ~35 µs on a recent Intel performance core
+    (Docs/Benchmarks.md, "Engine structures") }
   IORING_BACKOFF_MAX_PAUSES = 1024;
 
 type
-  // Atomic operations; only class methods, nothing to create.
-  //
-  // CompareExchange, Exchange and FetchAdd return the OLD value, Increment
-  // and Decrement the NEW value. NativeInt and NativeUInt variables use the
-  // 32-bit or 64-bit versions automatically.
+  {
+    Atomic operations; only class methods, nothing to create.
+
+    CompareExchange, Exchange and FetchAdd return the OLD value, Increment and Decrement the NEW value. NativeInt and
+    NativeUInt variables use the 32-bit or 64-bit versions automatically.
+  }
   TAtomic = record
   public
-    // If ATarget = AComparand, sets ATarget := ANewValue. Returns the old
-    // value (AComparand when the exchange happened).
+    {
+      If ATarget = AComparand, sets ATarget := ANewValue. Returns the old
+      value (AComparand when the exchange happened).
+    }
     class function CompareExchange(var ATarget: Integer; ANewValue, AComparand: Integer): Integer; overload; static; inline;
     class function CompareExchange(var ATarget: Cardinal; ANewValue, AComparand: Cardinal): Cardinal; overload; static; inline;
-    class function CompareExchange(var ATarget: Int64; ANewValue, AComparand: Int64): Int64; overload; static; {$IFNDEF IORING_ATOMICS_FPC_X86}inline;{$ENDIF}
+    class function CompareExchange(var ATarget: Int64; ANewValue, AComparand: Int64): Int64; overload; static;
+      {$IFNDEF IORING_ATOMICS_FPC_X86}inline;{$ENDIF}
     class function CompareExchange(var ATarget: UInt64; ANewValue, AComparand: UInt64): UInt64; overload; static; inline;
     class function CompareExchange(var ATarget: Pointer; ANewValue, AComparand: Pointer): Pointer; overload; static; inline;
 
@@ -114,14 +116,16 @@ type
     // Sets ATarget := AValue; returns the old value
     class function Exchange(var ATarget: Integer; AValue: Integer): Integer; overload; static; inline;
     class function Exchange(var ATarget: Cardinal; AValue: Cardinal): Cardinal; overload; static; inline;
-    class function Exchange(var ATarget: Int64; AValue: Int64): Int64; overload; static; {$IFNDEF IORING_ATOMICS_FPC_X86}inline;{$ENDIF}
+    class function Exchange(var ATarget: Int64; AValue: Int64): Int64; overload; static;
+      {$IFNDEF IORING_ATOMICS_FPC_X86}inline;{$ENDIF}
     class function Exchange(var ATarget: UInt64; AValue: UInt64): UInt64; overload; static; inline;
     class function Exchange(var ATarget: Pointer; AValue: Pointer): Pointer; overload; static; inline;
 
     // Adds ADelta to ATarget; returns the old value
     class function FetchAdd(var ATarget: Integer; ADelta: Integer): Integer; overload; static; inline;
     class function FetchAdd(var ATarget: Cardinal; ADelta: Cardinal): Cardinal; overload; static; inline;
-    class function FetchAdd(var ATarget: Int64; ADelta: Int64): Int64; overload; static; {$IFNDEF IORING_ATOMICS_FPC_X86}inline;{$ENDIF}
+    class function FetchAdd(var ATarget: Int64; ADelta: Int64): Int64; overload; static;
+      {$IFNDEF IORING_ATOMICS_FPC_X86}inline;{$ENDIF}
     class function FetchAdd(var ATarget: UInt64; ADelta: UInt64): UInt64; overload; static; inline;
 
     // Adds or subtracts one; returns the new value
@@ -134,57 +138,55 @@ type
     class function Decrement(var ATarget: Int64): Int64; overload; static; inline;
     class function Decrement(var ATarget: UInt64): UInt64; overload; static; inline;
 
-    // Reads ATarget whole (a 64-bit value on Win32 too); later reads and
-    // writes stay after it
+    // Reads ATarget whole (a 64-bit value on Win32 too); later reads and writes stay after it
     class function LoadAcquire(var ATarget: Integer): Integer; overload; static; inline;
     class function LoadAcquire(var ATarget: Cardinal): Cardinal; overload; static; inline;
-    class function LoadAcquire(var ATarget: Int64): Int64; overload; static; {$IFNDEF IORING_ATOMICS_X86}inline;{$ENDIF}
+    class function LoadAcquire(var ATarget: Int64): Int64; overload; static;
+      {$IFNDEF IORING_ATOMICS_X86}inline;{$ENDIF}
     class function LoadAcquire(var ATarget: UInt64): UInt64; overload; static; inline;
     class function LoadAcquire(var ATarget: Pointer): Pointer; overload; static; inline;
 
-    // Writes ATarget whole (a 64-bit value on Win32 too); earlier reads and
-    // writes stay before it
+    // Writes ATarget whole (a 64-bit value on Win32 too); earlier reads and writes stay before it
     class procedure StoreRelease(var ATarget: Integer; AValue: Integer); overload; static; inline;
     class procedure StoreRelease(var ATarget: Cardinal; AValue: Cardinal); overload; static; inline;
-    class procedure StoreRelease(var ATarget: Int64; AValue: Int64); overload; static; {$IFNDEF IORING_ATOMICS_ASM_STORE64}inline;{$ENDIF}
+    class procedure StoreRelease(var ATarget: Int64; AValue: Int64); overload; static;
+      {$IFNDEF IORING_ATOMICS_ASM_STORE64}inline;{$ENDIF}
     class procedure StoreRelease(var ATarget: UInt64; AValue: UInt64); overload; static; inline;
     class procedure StoreRelease(var ATarget: Pointer; AValue: Pointer); overload; static; inline;
 
     // No read or write moves across this, in either direction
     class procedure FullBarrier; static; {$IFNDEF FPC}inline;{$ENDIF}
 
-    // Tells the CPU that this thread is spinning (x86 PAUSE): saves power and
-    // gives the other hyper-thread of the core more time. Use in every spin
-    // loop.
+    { Tells the CPU that this thread is spinning (x86 PAUSE): saves power and gives the other hyper-thread of the core
+      more time. Use in every spin loop. }
     class procedure CpuPause; static; {$IFNDEF FPC}inline;{$ENDIF}
 
-    // After a failed compare-exchange (or another lost race): waits APauses
-    // CPU pauses, then doubles APauses, up to AMaxPauses. Start every
-    // operation with APauses = 1. Without it, threads that fail together try
-    // again together and fail again - a lock-free structure then loses badly
-    // to a lock (Docs/Benchmarks.md, "Engine structures").
+    {
+      After a failed compare-exchange (or another lost race): waits APauses CPU pauses, then doubles APauses, up to
+      AMaxPauses. Start every operation with APauses = 1. Without it, threads that fail together try again together and
+      fail again - a lock-free structure then loses badly to a lock (Docs/Benchmarks.md, "Engine structures").
+    }
     class procedure BackOff(var APauses: Integer; const AMaxPauses: Integer = IORING_BACKOFF_MAX_PAUSES); static;
 
-    // Sleeps while ATarget = AExpected, until a WakeOne/WakeAll on ATarget or
-    // the timeout. Returns at once if ATarget <> AExpected already. True:
-    // woken, or the value differed - possibly also without a reason (a
-    // spurious wake-up), so always check the value again. False: timed out.
+    {
+      Sleeps while ATarget = AExpected, until a WakeOne/WakeAll on ATarget or the timeout. Returns at once if ATarget <>
+      AExpected already. True: woken, or the value differed - possibly also without a reason (a spurious wake-up), so
+      always check the value again. False: timed out.
+    }
     class function WaitWhileEqual(var ATarget: Integer; AExpected: Integer;
       ATimeoutMilliseconds: Cardinal = IORING_WAIT_INFINITE): Boolean; overload; static;
     class function WaitWhileEqual(var ATarget: Cardinal; AExpected: Cardinal;
       ATimeoutMilliseconds: Cardinal = IORING_WAIT_INFINITE): Boolean; overload; static;
 
-    // Wakes one / all threads sleeping in WaitWhileEqual on ATarget. Change
-    // the value first, with an atomic operation (Exchange, CompareExchange,
-    // FetchAdd ...), then wake.
+    { Wakes one / all threads sleeping in WaitWhileEqual on ATarget. Change the value first, with an atomic operation
+      (Exchange, CompareExchange, FetchAdd ...), then wake. }
     class procedure WakeOne(var ATarget); static;
     class procedure WakeAll(var ATarget); static;
   end;
 
-  // ASize bytes, zeroed, starting at a cache-line boundary - for data that
-  // threads share (lock-free structures). Free with FreeMem(AMemory): AMemory
-  // is the block as allocated.
-  function IORingAllocCacheAligned(const ASize: NativeUInt; out AMemory: Pointer): Pointer;
+  { ASize bytes, zeroed, starting at a cache-line boundary - for data that threads share (lock-free structures). Free
+    with FreeMem(AMemory): AMemory is the block as allocated. }
+  function IORingAllocCacheAligned(const ASize: NativeUInt; var AMemory: Pointer): Pointer;
 
 implementation
 
@@ -198,8 +200,7 @@ uses
 const
   SYNCHRONIZATION_DLL = 'api-ms-win-core-synch-l1-2-0.dll';
 
-  // Windows 8 and newer. Delphi's Winapi.Windows declares them too, Free
-  // Pascal 3.2.2's Windows unit does not.
+  // Windows 8 and newer. Delphi's Winapi.Windows declares them too, Free Pascal 3.2.2's Windows unit does not.
   function IORingWaitOnAddress(AAddress, ACompareAddress: Pointer; AAddressSize: NativeUInt;
     AMilliseconds: Cardinal): LongBool; stdcall; external SYNCHRONIZATION_DLL name 'WaitOnAddress';
   procedure IORingWakeByAddressSingle(AAddress: Pointer); stdcall; external SYNCHRONIZATION_DLL name 'WakeByAddressSingle';
@@ -208,8 +209,8 @@ const
 
 { TAtomic }
 
-// Only the Integer and Int64 versions have their own code; Cardinal, UInt64
-// and Pointer use them through a typecast of the same size.
+{ Only the Integer and Int64 versions have their own code; Cardinal, UInt64 and Pointer use them through a
+  typecast of the same size. }
 
 class function TAtomic.CompareExchange(var ATarget: Integer; ANewValue, AComparand: Integer): Integer;
 begin
@@ -228,8 +229,8 @@ begin
 end;
 
 {$IFDEF IORING_ATOMICS_FPC_X86}
-// LOCK CMPXCHG8B: compares EDX:EAX with the target; if equal, writes ECX:EBX.
-// Either way EDX:EAX ends up holding the old value, which is the result.
+{ LOCK CMPXCHG8B: compares EDX:EAX with the target; if equal, writes ECX:EBX. Either way EDX:EAX ends up holding the old
+  value, which is the result. }
 class function TAtomic.CompareExchange(var ATarget: Int64; ANewValue, AComparand: Int64): Int64;
 asm
   push  ebx
@@ -312,9 +313,8 @@ class function TAtomic.Exchange(var ATarget: Int64; AValue: Int64): Int64;
 var
   LSeen: Int64;
 begin
-  // No 64-bit exchange instruction on x86: repeat the compare-exchange until
-  // no other thread changed the value in between. A torn first read only
-  // costs one more round.
+  { No 64-bit exchange instruction on x86: repeat the compare-exchange until no other thread changed the value in
+    between. A torn first read only costs one more round. }
   Result := ATarget;
 
   repeat
@@ -371,6 +371,7 @@ var
 begin
   // Compare-exchange loop, as in Exchange
   Result := ATarget;
+
   repeat
     LSeen := CompareExchange(ATarget, Result + ADelta, Result);
 
@@ -437,8 +438,7 @@ begin
   Result := UInt64(Decrement(Int64(ATarget)));
 end;
 
-// AArch64: a barrier after the read keeps the later reads and writes after it
-// (on x86/x64 the CPU does that by itself)
+// AArch64: a barrier after the read keeps the later reads and writes after it (on x86/x64 the CPU does that by itself)
 class function TAtomic.LoadAcquire(var ATarget: Integer): Integer;
 begin
   Result := ATarget;
@@ -453,8 +453,8 @@ begin
 end;
 
 {$IFDEF IORING_ATOMICS_X86}
-// Two 32-bit moves could see half of another thread's write. An aligned
-// 64-bit SSE move is one access (Intel SDM vol. 3, 9.1.1).
+{ Two 32-bit moves could see half of another thread's write. An aligned 64-bit SSE move is one access
+  (Intel SDM vol. 3, 9.1.1). }
 class function TAtomic.LoadAcquire(var ATarget: Int64): Int64;
 asm
   movlps  xmm0, qword ptr [eax]          // ATarget (register convention: EAX)
@@ -481,8 +481,7 @@ begin
   Result := Pointer(LoadAcquire(NativeInt(ATarget)));
 end;
 
-// AArch64: a barrier before the write keeps the earlier reads and writes
-// before it
+// AArch64: a barrier before the write keeps the earlier reads and writes before it
 class procedure TAtomic.StoreRelease(var ATarget: Integer; AValue: Integer);
 begin
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
@@ -535,9 +534,8 @@ begin
   ReadWriteBarrier;   // DMB ISH
 end;
 {$ELSEIF defined(FPC)}
-// Any LOCK-prefixed instruction is a full barrier on x86/x64 (and often
-// cheaper than MFENCE). FPC's ReadWriteBarrier does the same job, but on x64
-// it gives a "not inlined" note wherever it is used.
+{ Any LOCK-prefixed instruction is a full barrier on x86/x64 (and often cheaper than MFENCE). FPC's ReadWriteBarrier
+  does the same job, but on x64 it gives a "not inlined" note wherever it is used. }
 class procedure TAtomic.FullBarrier;
 asm
 {$IFDEF IORING_ATOMICS_X86}
@@ -556,8 +554,10 @@ end;
 {$IF defined(IORING_ATOMICS_AARCH64)}
 class procedure TAtomic.CpuPause;
 begin
-  // [VERIFY] A YIELD instruction would be the hint here; without it the spin
-  // loops only spin
+  {
+    [VERIFY] A YIELD instruction would be the hint here; without it the spin
+    loops only spin
+  }
 end;
 {$ELSEIF defined(FPC)}
 class procedure TAtomic.CpuPause;
@@ -588,7 +588,7 @@ begin
 end;
 
 {$IFDEF MSWINDOWS}
-class function TAtomic.WaitWhileEqual(var ATarget: Integer; AExpected: Integer; 
+class function TAtomic.WaitWhileEqual(var ATarget: Integer; AExpected: Integer;
   ATimeoutMilliseconds: Cardinal): Boolean;
 begin
   // FALSE means timeout (ERROR_TIMEOUT); the value is checked by the caller
@@ -619,8 +619,8 @@ const
   FUTEX_WAIT_PRIVATE = FUTEX_WAIT or FUTEX_PRIVATE_FLAG;
   FUTEX_WAKE_PRIVATE = FUTEX_WAKE or FUTEX_PRIVATE_FLAG;
 
-// FPC's Futex returns -1 and sets errno: ETIMEDOUT = timed out; EAGAIN = the
-// value differed already; EINTR = a signal (a spurious wake-up)
+{ FPC's Futex returns -1 and sets errno: ETIMEDOUT = timed out; EAGAIN = the value differed already; EINTR = a
+  signal (a spurious wake-up) }
 function FutexWait(const AAddress: Pointer; const AExpected: Integer; const ATimeoutMilliseconds: Cardinal): Boolean;
 var
   LTimeout: TTimeSpec;
@@ -635,8 +635,7 @@ begin
     LTimeoutPointer := @LTimeout;
   end;
 
-  Result := (Futex(AAddress, FUTEX_WAIT_PRIVATE, AExpected, LTimeoutPointer) = 0) or
-    (fpgeterrno <> ESysETIMEDOUT);
+  Result := (Futex(AAddress, FUTEX_WAIT_PRIVATE, AExpected, LTimeoutPointer) = 0) or (fpgeterrno <> ESysETIMEDOUT);
 end;
 
 class function TAtomic.WaitWhileEqual(var ATarget: Integer; AExpected: Integer; ATimeoutMilliseconds: Cardinal): Boolean;
@@ -660,7 +659,7 @@ begin
 end;
 {$ENDIF}
 
-function IORingAllocCacheAligned(const ASize: NativeUInt; out AMemory: Pointer): Pointer;
+function IORingAllocCacheAligned(const ASize: NativeUInt; var AMemory: Pointer): Pointer;
 var
   LAddress: NativeUInt;
 begin

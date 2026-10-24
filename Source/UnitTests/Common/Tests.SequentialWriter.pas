@@ -18,17 +18,11 @@ interface
 
 uses
 {$IFDEF FPC}
-  Classes,
-  SysUtils,
+  Classes, SysUtils,
 {$ELSE}
-  System.Classes,
-  System.SysUtils,
+  System.Classes, System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Engine,
-  Delphi.IOUring.SequentialWriter,
-  Delphi.IOUring.Streams,
-  TestPlatformHelpers,
+  Delphi.IOUring, Delphi.IOUring.Engine, Delphi.IOUring.SequentialWriter, Delphi.IOUring.Streams, TestPlatformHelpers,
   Tests.Support;
 
 type
@@ -49,8 +43,7 @@ type
     FFailures: Integer;
     FEngine: TIORingEngine;
     FNames: array of string;
-    // Writes the pattern bytes of file offsets [AStart, AStart + ASize) in
-    // pieces of APiece bytes
+    // Writes the pattern bytes of file offsets [AStart, AStart + ASize) in pieces of APiece bytes
     procedure WritePattern(var AWriter: TIORingSequentialWriter; const AStart, ASize, APiece: Int64);
     procedure WriteWithoutClose(const AFileName: string);
     procedure WorkWriter(AIndex: Integer);
@@ -89,8 +82,7 @@ type
 implementation
 
 uses
-  Delphi.IOUring.Atomics,
-  TestFileHelpers;
+  Delphi.IOUring.Atomics, TestFileHelpers;
 
 const
   SMALL_BUFFER = 4096;
@@ -104,11 +96,14 @@ var
 begin
   SetLength(LPiece, APiece);
   LDone := 0;
+
   while LDone < ASize do
   begin
     LLength := APiece;
+
     if LLength > ASize - LDone then
       LLength := ASize - LDone;
+
     TTestFileHelpers.FillPattern(AStart + LDone, LPiece[0], LLength);
     AStream.WriteBuffer(LPiece[0], LLength);
     Inc(LDone, LLength);
@@ -140,22 +135,24 @@ var
   LData: TBytes;
 begin
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
+
   try
     CheckEqualsU64('File size', UInt64(ASize), UInt64(LStream.Size));
     SetLength(LData, ASize);
+
     if ASize > 0 then
       LStream.ReadBuffer(LData[0], ASize);
   finally
     LStream.Free;
   end;
+
   if ASize > 0 then
     CheckPattern(0, @LData[0], ASize, 'File data');
 end;
 
 { TSequentialWriterTests }
 
-procedure TSequentialWriterTests.WritePattern(var AWriter: TIORingSequentialWriter;
-  const AStart, ASize, APiece: Int64);
+procedure TSequentialWriterTests.WritePattern(var AWriter: TIORingSequentialWriter; const AStart, ASize, APiece: Int64);
 var
   LPiece: TBytes;
   LDone: Int64;
@@ -163,11 +160,14 @@ var
 begin
   SetLength(LPiece, APiece);
   LDone := 0;
+
   while LDone < ASize do
   begin
     LLength := APiece;
+
     if LLength > ASize - LDone then
       LLength := ASize - LDone;
+
     TTestFileHelpers.FillPattern(AStart + LDone, LPiece[0], LLength);
     AWriter.Write(LPiece[0], LLength);
     Inc(LDone, LLength);
@@ -244,26 +244,32 @@ begin
   LWriter.Open(LName, [], SMALL_BUFFER, 3);
   LDone := 0;
   LRound := 0;
+
   while LDone < SIZE do
   begin
     LWriter.AcquireBuffer(LData, LCapacity);
     AssertTrue('Room in the buffer', LCapacity > 0);
+
     // Sometimes nothing, sometimes all of it, mostly a part
     case LRound mod 4 of
       0: LLength := 0;
       1: LLength := LCapacity;
-    else
-      LLength := 1 + LRound mod 3000;
+      else
+        LLength := 1 + LRound mod 3000;
     end;
+
     if LLength > LCapacity then
       LLength := LCapacity;
+
     if LLength > SIZE - LDone then
       LLength := SIZE - LDone;
+
     TTestFileHelpers.FillPattern(LDone, LData^, LLength);
     LWriter.CommitBuffer(LLength);
     Inc(LDone, LLength);
     Inc(LRound);
   end;
+
   LWriter.Close;
   CheckFile(LName, SIZE);
 end;
@@ -345,22 +351,26 @@ begin
   LWriter.Open(LName, [], SMALL_BUFFER, 2);
   FResources.MakeWritesFail(LName);
   LRaised := False;
+
   try
     WritePattern(LWriter, 0, 3 * SMALL_BUFFER, SMALL_BUFFER);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('A later Write raises', LRaised);
   AssertTrue('Failed', LWriter.Failed);
   AssertTrue('Reported', LWriter.ErrorReported);
   LRaised := False;
+
   try
     WritePattern(LWriter, 0, 1, 1);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('And again', LRaised);
   LWriter.Close(False);
 end;
@@ -378,6 +388,7 @@ begin
   WritePattern(LWriter, 0, 1000, 1000);    // only in the buffer: no write yet
   AssertFalse('Nothing written yet', LWriter.Failed);
   LRaised := 0;
+
   for LIndex := 1 to 2 do
     try
       LWriter.Flush;
@@ -385,13 +396,16 @@ begin
       on EIORingError do
         Inc(LRaised);
     end;
+
   AssertEquals('Flush raises, and again', 2, LRaised);
+
   try
     LWriter.Close;
   except
     on EIORingError do
       Inc(LRaised);
   end;
+
   AssertEquals('Close too', 3, LRaised);
   AssertFalse('Closed anyway', LWriter.IsOpen);
 end;
@@ -407,12 +421,14 @@ begin
   FResources.MakeWritesFail(LName);
   WritePattern(LWriter, 0, 1000, 1000);
   LRaised := False;
+
   try
     LWriter.Close;
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Close writes the rest, which fails', LRaised);
   AssertFalse('Closed anyway', LWriter.IsOpen);
 end;
@@ -444,19 +460,23 @@ begin
   TryOpen(SMALL_BUFFER, 0, nil);                               // no buffers
   TryOpen(SMALL_BUFFER, IORING_WRITER_MAX_BUFFER_COUNT + 1, nil);
   LSmall := TIORingEngine.Create(4, 4);
+
   try
     TryOpen(SMALL_BUFFER, 8, LSmall);                          // too few requests
   finally
     LSmall.Free;
   end;
+
   AssertEquals('Bad arguments raise', 4, LRaised);
   LWriter.Open(LName, [], SMALL_BUFFER, 2);
+
   try
     LWriter.Open(LName, [], SMALL_BUFFER, 2);
   except
     on EIORingError do
       Inc(LRaised);
   end;
+
   AssertEquals('Opened twice', 5, LRaised);
   LWriter.Close;
 end;
@@ -474,40 +494,48 @@ begin
   LWriter.Open(LName, [], SMALL_BUFFER, 2);
   LByte := 1;
   LRaised := False;
+
   try
     LWriter.CommitBuffer(1);
   except
     on EInvalidOpException do
       LRaised := True;
   end;
+
   AssertTrue('Commit without Acquire', LRaised);
   LWriter.AcquireBuffer(LData, LCapacity);
   AssertEquals('A whole buffer', SMALL_BUFFER, LCapacity);
   LRaised := False;
+
   try
     LWriter.Write(LByte, 1);
   except
     on EInvalidOpException do
       LRaised := True;
   end;
+
   AssertTrue('Write while a buffer is acquired', LRaised);
   LRaised := False;
+
   try
     LWriter.CommitBuffer(SMALL_BUFFER + 1);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('More than the buffer holds', LRaised);
   LWriter.CommitBuffer(0);
   LWriter.Close;
   LRaised := False;
+
   try
     LWriter.Write(LByte, 1);
   except
     on EIORingError do
       LRaised := True;
   end;
+
   AssertTrue('Write after Close', LRaised);
 end;
 
@@ -564,16 +592,21 @@ var
   LIndex: Integer;
 begin
   SetLength(FNames, SHARED_WRITERS);
+
   for LIndex := 0 to SHARED_WRITERS - 1 do
     FNames[LIndex] := NewFileName;
+
   FFailures := 0;
   FEngine := TIORingEngine.Create(SHARED_WRITERS * 8 + 4, 64, 2);
+
   try
     RunThreads(SHARED_WRITERS, WorkWriter);
   finally
     FreeAndNil(FEngine);
   end;
+
   AssertEquals('Writers that failed', 0, FFailures);
+
   for LIndex := 0 to SHARED_WRITERS - 1 do
     CheckFile(FNames[LIndex], SHARED_SIZE);
 end;
@@ -588,10 +621,12 @@ var
 begin
   LName := NewFileName;
   LSource := TMemoryStream.Create;
+
   try
     LSource.Size := 300000;
     TTestFileHelpers.FillPattern(100000, LSource.Memory^, LSource.Size);
     LStream := TSequentialWriteOnlyFileStream.Create(LName, [], SMALL_BUFFER, 4);
+
     try
       WritePatternToStream(LStream, 0, 100000, 4321);
       LStream.CopyFrom(LSource, 0);    // from the source's start
@@ -602,6 +637,7 @@ begin
   finally
     LSource.Free;
   end;
+
   CheckFile(LName, 400000);
 end;
 
@@ -617,13 +653,16 @@ var
 begin
   LName := NewFileName;
   LLines := TStringList.Create;
+
   try
     for LIndex := 1 to 20000 do
       LLines.Add(Format('Line %d of the test', [LIndex]));
+
     LStream := TSequentialWriteOnlyFileStream.Create(LName);
+
     try
-      // The bytes of the text: Free Pascal's strings are UTF-8 already;
-      // Delphi's are UTF-16, so write UTF-8 (with its BOM)
+      { The bytes of the text: Free Pascal's strings are UTF-8 already; Delphi's are UTF-16, so
+        write UTF-8 (with its BOM) }
 {$IFDEF FPC}
       LLines.SaveToStream(LStream);
 {$ELSE}
@@ -632,6 +671,7 @@ begin
     finally
       LStream.Free;
     end;
+
 {$IFDEF FPC}
     LExpected := BytesOf(LLines.Text);
 {$ELSE}
@@ -640,13 +680,16 @@ begin
   finally
     LLines.Free;
   end;
+
   LFile := TFileStream.Create(LName, fmOpenRead or fmShareDenyNone);
+
   try
     SetLength(LRead, LFile.Size);
     LFile.ReadBuffer(LRead[0], Length(LRead));
   finally
     LFile.Free;
   end;
+
   AssertEquals('File size', Length(LExpected), Length(LRead));
   AssertTrue('Same text', CompareMem(@LExpected[0], @LRead[0], Length(LExpected)));
 end;
@@ -659,6 +702,7 @@ var
 begin
   LName := NewFileName;
   LStream := TSequentialWriteOnlyFileStream.Create(LName, [], SMALL_BUFFER, 2);
+
   try
     CheckEqualsU64('Start', 0, UInt64(LStream.Position));
     WritePatternToStream(LStream, 0, 10000, 3000);
@@ -668,23 +712,27 @@ begin
     CheckEqualsU64('The end is here', 10000, UInt64(LStream.Seek(0, soEnd)));
     LStream.Position := 10000;
     LRaised := 0;
+
     try
       LStream.Position := 0;
     except
       on EIORingStreamError do
         Inc(LRaised);
     end;
+
     try
       LStream.Seek(10, soCurrent);
     except
       on EIORingStreamError do
         Inc(LRaised);
     end;
+
     AssertEquals('Back and forward raise', 2, LRaised);
     WritePatternToStream(LStream, 10000, 5, 5);
   finally
     LStream.Free;
   end;
+
   CheckFile(LName, 10005);
 end;
 
@@ -697,20 +745,24 @@ var
 begin
   LName := NewFileName;
   LStream := TSequentialWriteOnlyFileStream.Create(LName);
+
   try
     LRaised := 0;
+
     try
       LStream.Read(LByte, 1);
     except
       on EIORingStreamError do
         Inc(LRaised);
     end;
+
     try
       LStream.Size := 100;
     except
       on EIORingStreamError do
         Inc(LRaised);
     end;
+
     AssertEquals('Read and Size raise', 2, LRaised);
   finally
     LStream.Free;
@@ -722,12 +774,14 @@ var
   LRaised: Boolean;
 begin
   LRaised := False;
+
   try
     TSequentialWriteOnlyFileStream.Create(TTestFileHelpers.TestFolder + 'no such folder' + PathDelim + 'file.dat').Free;
   except
     on EFCreateError do
       LRaised := True;
   end;
+
   AssertTrue('A folder that does not exist', LRaised);
 end;
 
@@ -739,22 +793,26 @@ var
 begin
   LName := NewFileName;
   LStream := TSequentialWriteOnlyFileStream.Create(LName, [], SMALL_BUFFER, 2);
+
   try
     FResources.MakeWritesFail(LName);
     WritePatternToStream(LStream, 0, 1000, 1000);
     LRaised := 0;
+
     try
       LStream.Flush;
     except
       on EWriteError do
         Inc(LRaised);
     end;
+
     try
       WritePatternToStream(LStream, 1000, 1, 1);
     except
       on EWriteError do
         Inc(LRaised);
     end;
+
     AssertEquals('Flush and a later Write raise', 2, LRaised);
   finally
     // Reported already: Free does not raise it again
@@ -774,12 +832,14 @@ begin
   WritePatternToStream(LStream, 0, 1000, 1000);    // only in the buffer
   // Free writes it, which fails, and nobody has seen that yet
   LRaised := False;
+
   try
     LStream.Free;
   except
     on EWriteError do
       LRaised := True;
   end;
+
   AssertTrue('Free raises', LRaised);
 end;
 
@@ -792,24 +852,30 @@ var
 begin
   LName := NewFileName;
   LEngine := TIORingEngine.Create;
+
   try
     LStream := TSequentialWriteOnlyFileStream.Create(LName, LEngine, [], SMALL_BUFFER, 4);
+
     try
       WritePatternToStream(LStream, 0, 77777, 7777);
     finally
       LStream.Free;
     end;
+
     LRaised := False;
+
     try
       TSequentialWriteOnlyFileStream.Create(LName, TIORingEngine(nil)).Free;
     except
       on EIORingError do
         LRaised := True;
     end;
+
     AssertTrue('No engine', LRaised);
   finally
     LEngine.Free;
   end;
+
   CheckFile(LName, 77777);
 end;
 
@@ -820,11 +886,13 @@ var
 begin
   LName := NewFileName;
   LStream := TSequentialWriteOnlyFileStream.Create(LName, [swoUnbuffered], 64 * 1024, 4);
+
   try
     WritePatternToStream(LStream, 0, 1000000 + 7, 12345);
   finally
     LStream.Free;
   end;
+
   CheckFile(LName, 1000000 + 7);
 end;
 

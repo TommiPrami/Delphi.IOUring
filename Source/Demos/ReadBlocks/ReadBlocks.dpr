@@ -22,16 +22,11 @@ uses
   cthreads,          // Free Pascal on Linux: threads (the library uses them)
 {$ENDIF}
 {$IFDEF FPC}
-  SysUtils,
-  Classes,
+  SysUtils, Classes,
 {$ELSE}
-  System.SysUtils,
-  System.Classes,
+  System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Engine,
-  Delphi.IOUring.BlockReader,
-  Demo.Common in '..\Common\Demo.Common.pas';
+  Delphi.IOUring, Delphi.IOUring.Engine, Delphi.IOUring.BlockReader, Demo.Common in '..\Common\Demo.Common.pas';
 
 const
   BLOCK_SIZE = 4096;
@@ -60,14 +55,14 @@ begin
   LCount := AFileSize div (BLOCK_SIZE * EVERY_NTH);
   Result := nil;
   SetLength(Result, LCount);
+
   for LIndex := 0 to LCount - 1 do
     Result[LIndex] := TIORingBlock.Create(UInt64(LIndex) * EVERY_NTH * BLOCK_SIZE, BLOCK_SIZE);
 end;
 
-// The library's way: one engine (I/O thread) for the program; the reader
-// hands out its own buffers (no copy); give each one back with ReleaseBlock
-function SumWithBlockReader(const AFileName: string; const ABlocks: array of TIORingBlock;
-  out AStalls: UInt64): UInt64;
+{ The library's way: one engine (I/O thread) for the program; the reader hands out its own buffers (no copy); give each
+  one back with ReleaseBlock }
+function SumWithBlockReader(const AFileName: string; const ABlocks: array of TIORingBlock; out AStalls: UInt64): UInt64;
 var
   LEngine: TIORingEngine;
   LFile: THandle;
@@ -78,18 +73,21 @@ var
 begin
   Result := 0;
   LEngine := TIORingEngine.Create;
+
   try
-    // On Windows the handle must allow overlapped I/O (it does), or Windows
-    // reads one block at a time
+    // On Windows the handle must allow overlapped I/O (it does), or Windows reads one block at a time
     LFile := TIORingPlatform.OpenFileForRead(AFileName, False, False);
+
     try
       LReader.Open(LEngine, LFile, ABlocks);   // read-ahead 32 by default
+
       try
         while LReader.TryGetBlock(LBlock, LData, LLength) do
         begin
           AddToSum(Result, LData, LLength);
           LReader.ReleaseBlock;
         end;
+
         AStalls := LReader.Stats.Stalls;
       finally
         LReader.Close;                 // before the file and the engine go away
@@ -111,6 +109,7 @@ var
 begin
   Result := 0;
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
+
   try
     for LIndex := 0 to High(ABlocks) do
     begin
@@ -135,6 +134,7 @@ var
 begin
   try
     LTemporary := ParamCount = 0;
+
     if LTemporary then
     begin
       LFileName := DemoFileName('ReadBlocks.dat');
@@ -157,11 +157,13 @@ begin
       LStreamSum := SumWithFileStream(LFileName, LBlocks);
       LMilliseconds := DemoMilliseconds - LStart;
       Writeln(Format('TFileStream, Seek + Read: sum %d in %d ms', [LStreamSum, LMilliseconds]));
+
       if LStreamSum <> LReaderSum then
       begin
         Writeln('The sums differ!');
         ExitCode := 1;
       end;
+
       Writeln('(Both read from the file cache here. With data that is not in the cache yet,');
       Writeln(' the block reader is many times faster: Docs/Benchmarks.md.)');
     finally

@@ -1,58 +1,56 @@
 ﻿unit Delphi.IOUring.Backend.Posix.API;
 
-// Complete translation of the Linux io_uring user API:
-//   linux/io_uring.h of Linux 6.8 (the header of Ubuntu 24.04 LTS,
-//   package linux-libc-dev), __kernel_timespec of linux/time_types.h and the
-//   three system call numbers of asm/unistd.h.
-//
-// This unit is standalone: it depends only on the RTL (BaseUnix, Syscall),
-// has no initialization section, no global state and raises no exceptions.
-// Other projects can use it without the rest of Delphi.IOUring.
-//
-// Free Pascal on Linux only, x86-64 and AArch64. The system call numbers are
-// the same on both (io_uring came after the kernel gave all architectures one
-// numbering). Tested on both (ARM64: in CI, Docs/Design.md §12.5).
-//
-// No C library and no liburing: io_uring_setup, io_uring_enter and
-// io_uring_register call the kernel directly. Like liburing's, they return
-// the kernel's result: >= 0 on success, -errno on failure (for example
-// -ESysEINVAL = -22; the ESys* constants are in BaseUnix).
-//
-// Names are the original C names; P<name> is a pointer to <name>.
-// C types: __u8 = Byte, __u16 = Word, __u32 = Cardinal, __s32 = Integer,
-// __u64 and __aligned_u64 = UInt64, __s64 = Int64.
-//
-// How the C records are translated:
-// - A C union is the variant part (case) of a record. Pascal allows a variant
-//   part only at the end of a record, so the fields that follow a union are
-//   in its last variant (all variants of these unions have the same size, or
-//   the last one is the largest, so the offsets are those of C). Every union
-//   member is reached by its C name: sqe.off, sqe.addr, sqe.rw_flags, ...
-// - io_uring_sqe and io_uring_restriction are packed records. FPC aligns a
-//   variant part to its largest field, and the fields after the union are
-//   inside it; C aligns a union only to its own members. Example: the flags
-//   union of the SQE is at offset 28 in C, FPC would move it to 32 because
-//   user_data (8 bytes) follows it. C has no gaps in these two records, so
-//   packed gives the C offsets. (Found by the layout tests.)
-// - io_sqring_offsets.array is &array (array is a reserved word).
-// - C flexible arrays (x[]) add nothing to the size of the record:
-//   io_uring_cqe.big_cqe and io_uring_probe.ops are not fields here (a field
-//   would change SizeOf); they start right after the record. In
-//   io_uring_buf_ring, bufs shares the first 16 bytes with the tail, as in C;
-//   it is array[0..0]: index it with range checks off. io_uring_sqe.cmd
-//   (C: cmd[0]) is the last 16 bytes of the SQE; with IORING_SETUP_SQE128 the
-//   command data is 80 bytes and goes on into the next 64 bytes.
-//
-// "Linux x.y" says which kernel added an opcode or a setup flag. At run time
-// ask the kernel itself: IORING_REGISTER_PROBE (which opcodes it has),
-// io_uring_params.features (IORING_FEAT_*), and io_uring_setup refuses
-// setup flags it does not know with -EINVAL.
-//
-// The C header is licensed (GPL-2.0 WITH Linux-syscall-note) OR MIT; this
-// translation is under the MIT license of Delphi.IOUring.
-//
-// Documentation: the man pages io_uring(7), io_uring_setup(2),
-// io_uring_enter(2) and io_uring_register(2); https://kernel.dk/io_uring.pdf
+{
+  Complete translation of the Linux io_uring user API:
+    linux/io_uring.h of Linux 6.8 (the header of Ubuntu 24.04 LTS,
+    package linux-libc-dev), __kernel_timespec of linux/time_types.h and the
+    three system call numbers of asm/unistd.h.
+
+  This unit is standalone: it depends only on the RTL (BaseUnix, Syscall), has no initialization section, no global
+  state and raises no exceptions. Other projects can use it without the rest of Delphi.IOUring.
+
+  Free Pascal on Linux only, x86-64 and AArch64. The system call numbers are the same on both (io_uring came after the
+  kernel gave all architectures one numbering). Tested on both (ARM64: in CI, Docs/Design.md §12.5).
+
+  No C library and no liburing: io_uring_setup, io_uring_enter and
+  io_uring_register call the kernel directly. Like liburing's, they return
+  the kernel's result: >= 0 on success, -errno on failure (for example
+  -ESysEINVAL = -22; the ESys* constants are in BaseUnix).
+
+  Names are the original C names; P<name> is a pointer to <name>. C types: __u8 = Byte, __u16 = Word, __u32 = Cardinal,
+  __s32 = Integer, __u64 and __aligned_u64 = UInt64, __s64 = Int64.
+
+  How the C records are translated:
+  - A C union is the variant part (case) of a record. Pascal allows a variant
+    part only at the end of a record, so the fields that follow a union are
+    in its last variant (all variants of these unions have the same size, or
+    the last one is the largest, so the offsets are those of C). Every union
+    member is reached by its C name: sqe.off, sqe.addr, sqe.rw_flags, ...
+  - io_uring_sqe and io_uring_restriction are packed records. FPC aligns a
+    variant part to its largest field, and the fields after the union are
+    inside it; C aligns a union only to its own members. Example: the flags
+    union of the SQE is at offset 28 in C, FPC would move it to 32 because
+    user_data (8 bytes) follows it. C has no gaps in these two records, so
+    packed gives the C offsets. (Found by the layout tests.)
+  - io_sqring_offsets.array is &array (array is a reserved word).
+  - C flexible arrays (x[]) add nothing to the size of the record:
+    io_uring_cqe.big_cqe and io_uring_probe.ops are not fields here (a field
+    would change SizeOf); they start right after the record. In
+    io_uring_buf_ring, bufs shares the first 16 bytes with the tail, as in C;
+    it is array[0..0]: index it with range checks off. io_uring_sqe.cmd
+    (C: cmd[0]) is the last 16 bytes of the SQE; with IORING_SETUP_SQE128 the
+    command data is 80 bytes and goes on into the next 64 bytes.
+
+  "Linux x.y" says which kernel added an opcode or a setup flag. At run time ask the kernel itself:
+  IORING_REGISTER_PROBE (which opcodes it has), io_uring_params.features (IORING_FEAT_*), and io_uring_setup refuses
+  setup flags it does not know with -EINVAL.
+
+  The C header is licensed (GPL-2.0 WITH Linux-syscall-note) OR MIT; this translation is under the MIT
+  license of Delphi.IOUring.
+
+  Documentation: the man pages io_uring(7), io_uring_setup(2), io_uring_enter(2) and io_uring_register(2);
+  https://kernel.dk/io_uring.pdf
+}
 
 // Standalone on purpose: no Delphi.IOUring.inc, the needed switches are here.
 {$IFNDEF FPC}
@@ -83,11 +81,11 @@ const
 { ---------------------------------------------------------------------------- }
 
 type
-  // IO submission data structure (Submission Queue Entry), 64 bytes; 128 bytes
-  // with IORING_SETUP_SQE128.
-  // Each "case Integer of" is one C union; the fields after it are in its last
-  // variant. Packed: without it FPC would move the unions (see the top of the
-  // unit); C has no gaps here either.
+  {
+    IO submission data structure (Submission Queue Entry), 64 bytes; 128 bytes with IORING_SETUP_SQE128. Each "case
+    Integer of" is one C union; the fields after it are in its last variant. Packed: without it FPC would move the
+    unions (see the top of the unit); C has no gaps here either.
+  }
   io_uring_sqe = packed record
     opcode: Byte;                   // type of operation for this sqe (IORING_OP_*)
     flags: Byte;                    // IOSQE_ flags
@@ -149,9 +147,8 @@ type
   Pio_uring_sqe = ^io_uring_sqe;
 
 const
-  // If sqe.file_index is set to this for opcodes that make a new direct
-  // descriptor (openat, openat2, accept, ...), io_uring picks a free one and
-  // returns it in cqe.res (-ENFILE if there is none).
+  { If sqe.file_index is set to this for opcodes that make a new direct descriptor (openat, openat2, accept, ...),
+    io_uring picks a free one and returns it in cqe.res (-ENFILE if there is none). }
   IORING_FILE_INDEX_ALLOC = $FFFFFFFF;  // ~0U
 
   IOSQE_FIXED_FILE_BIT = 0;
@@ -184,25 +181,23 @@ const
   IORING_SETUP_ATTACH_WQ = 1 shl 5;       // attach to existing wq (Linux 5.6)
   IORING_SETUP_R_DISABLED = 1 shl 6;      // start with ring disabled (Linux 5.10)
   IORING_SETUP_SUBMIT_ALL = 1 shl 7;      // continue submit on error (Linux 5.18)
-  // Cooperative task running: work for completed requests is done when the
-  // task enters the kernel anyway, instead of interrupting it (saves an
-  // inter-processor interrupt). (Linux 5.19)
+  { Cooperative task running: work for completed requests is done when the task enters the kernel anyway, instead of
+    interrupting it (saves an inter-processor interrupt). (Linux 5.19) }
   IORING_SETUP_COOP_TASKRUN = 1 shl 8;
-  // With COOP_TASKRUN: IORING_SQ_TASKRUN is set in the SQ ring flags when
-  // task work is waiting and a kernel entry is needed to run it. (Linux 5.19)
+  { With COOP_TASKRUN: IORING_SQ_TASKRUN is set in the SQ ring flags when task work is waiting and a kernel entry is
+    needed to run it. (Linux 5.19) }
   IORING_SETUP_TASKRUN_FLAG = 1 shl 9;
   IORING_SETUP_SQE128 = 1 shl 10;         // SQEs are 128 byte (Linux 5.19)
   IORING_SETUP_CQE32 = 1 shl 11;          // CQEs are 32 byte (Linux 5.19)
   // Only one task is allowed to submit requests (Linux 6.0)
   IORING_SETUP_SINGLE_ISSUER = 1 shl 12;
-  // Defer running task work to get events: run it just before it is needed,
-  // not whenever the task enters the kernel (Linux 6.1)
+  { Defer running task work to get events: run it just before it is needed, not whenever the task
+    enters the kernel (Linux 6.1) }
   IORING_SETUP_DEFER_TASKRUN = 1 shl 13;
   // Application provides the memory for the rings (Linux 6.5)
   IORING_SETUP_NO_MMAP = 1 shl 14;
-  // Register the ring fd in itself for use with
-  // IORING_REGISTER_USE_REGISTERED_RING; return a registered fd index rather
-  // than an fd (Linux 6.5)
+  { Register the ring fd in itself for use with IORING_REGISTER_USE_REGISTERED_RING; return a registered fd index
+    rather than an fd (Linux 6.5) }
   IORING_SETUP_REGISTERED_FD_ONLY = 1 shl 15;
   // Removes indirection through the SQ index array (Linux 6.6)
   IORING_SETUP_NO_SQARRAY = 1 shl 16;
@@ -278,8 +273,8 @@ const
 { ---------------------------------------------------------------------------- }
 
 const
-  // sqe.uring_cmd_flags (the top 8 bits are not for user space).
-  // IORING_URING_CMD_FIXED: use a registered buffer; set sqe.buf_index too.
+  { sqe.uring_cmd_flags (the top 8 bits are not for user space). IORING_URING_CMD_FIXED: use a registered
+    buffer; set sqe.buf_index too. }
   IORING_URING_CMD_FIXED = 1 shl 0;
   IORING_URING_CMD_MASK = IORING_URING_CMD_FIXED;
 
@@ -300,13 +295,15 @@ const
   // sqe.splice_flags: extends the flags of splice(2)
   SPLICE_F_FD_IN_FIXED = 1 shl 31;  // the last bit of __u32
 
-  // POLL_ADD flags. sqe.poll_events holds the poll events, so these command
-  // flags are in sqe.len.
-  // IORING_POLL_ADD_MULTI: multishot poll; sets IORING_CQE_F_MORE while the
-  //   poll handler goes on reporting CQEs for the same SQE.
-  // IORING_POLL_UPDATE_*: update an existing poll request, matching sqe.addr
-  //   as the old user_data.
-  // IORING_POLL_ADD_LEVEL: level triggered poll.
+  {
+    POLL_ADD flags. sqe.poll_events holds the poll events, so these command
+    flags are in sqe.len.
+    IORING_POLL_ADD_MULTI: multishot poll; sets IORING_CQE_F_MORE while the
+      poll handler goes on reporting CQEs for the same SQE.
+    IORING_POLL_UPDATE_*: update an existing poll request, matching sqe.addr
+      as the old user_data.
+    IORING_POLL_ADD_LEVEL: level triggered poll.
+  }
   IORING_POLL_ADD_MULTI = 1 shl 0;
   IORING_POLL_UPDATE_EVENTS = 1 shl 1;
   IORING_POLL_UPDATE_USER_DATA = 1 shl 2;
@@ -320,23 +317,24 @@ const
   IORING_ASYNC_CANCEL_USERDATA = 1 shl 4;  // match on user_data, default for no other key
   IORING_ASYNC_CANCEL_OP = 1 shl 5;        // match request based on opcode
 
-  // send/sendmsg and recv/recvmsg flags (sqe.ioprio)
-  // IORING_RECVSEND_POLL_FIRST: arm poll first, without the first attempt to
-  //   send or receive.
-  // IORING_RECV_MULTISHOT: multishot recv; sets IORING_CQE_F_MORE while the
-  //   handler goes on reporting CQEs for the same SQE.
-  // IORING_RECVSEND_FIXED_BUF: use a registered buffer, index in sqe.buf_index.
-  // IORING_SEND_ZC_REPORT_USAGE: SEND[MSG]_ZC reports in cqe.res of the
-  //   IORING_CQE_F_NOTIF CQE whether zero copy was possible: 0 if it was,
-  //   IORING_NOTIF_USAGE_ZC_COPIED if the data was copied (at least partly).
+  {
+    send/sendmsg and recv/recvmsg flags (sqe.ioprio)
+    IORING_RECVSEND_POLL_FIRST: arm poll first, without the first attempt to
+      send or receive.
+    IORING_RECV_MULTISHOT: multishot recv; sets IORING_CQE_F_MORE while the
+      handler goes on reporting CQEs for the same SQE.
+    IORING_RECVSEND_FIXED_BUF: use a registered buffer, index in sqe.buf_index.
+    IORING_SEND_ZC_REPORT_USAGE: SEND[MSG]_ZC reports in cqe.res of the
+      IORING_CQE_F_NOTIF CQE whether zero copy was possible: 0 if it was,
+      IORING_NOTIF_USAGE_ZC_COPIED if the data was copied (at least partly).
+  }
   IORING_RECVSEND_POLL_FIRST = 1 shl 0;
   IORING_RECV_MULTISHOT = 1 shl 1;
   IORING_RECVSEND_FIXED_BUF = 1 shl 2;
   IORING_SEND_ZC_REPORT_USAGE = 1 shl 3;
 
-  // cqe.res of the IORING_CQE_F_NOTIF CQE with IORING_SEND_ZC_REPORT_USAGE.
-  // A flag: the other bits of cqe.res are reserved. cqe.res is an Integer,
-  // so test Cardinal(cqe.res) and IORING_NOTIF_USAGE_ZC_COPIED.
+  { cqe.res of the IORING_CQE_F_NOTIF CQE with IORING_SEND_ZC_REPORT_USAGE. A flag: the other bits of cqe.res are
+    reserved. cqe.res is an Integer, so test Cardinal(cqe.res) and IORING_NOTIF_USAGE_ZC_COPIED. }
   IORING_NOTIF_USAGE_ZC_COPIED = 1 shl 31;
 
   // accept flags (sqe.ioprio)
@@ -358,9 +356,8 @@ const
 { ---------------------------------------------------------------------------- }
 
 type
-  // IO completion data structure (Completion Queue Entry), 16 bytes.
-  // C: __u64 big_cqe[] at the end. With IORING_SETUP_CQE32 each CQE is 32
-  // bytes: big_cqe is the 16 bytes right after this record.
+  { IO completion data structure (Completion Queue Entry), 16 bytes. C: __u64 big_cqe[] at the end. With
+    IORING_SETUP_CQE32 each CQE is 32 bytes: big_cqe is the 16 bytes right after this record. }
   io_uring_cqe = record
     user_data: UInt64;  // sqe.user_data passed back
     res: Integer;       // result code for this event
@@ -547,8 +544,8 @@ type
   Pio_uring_files_update = ^io_uring_files_update;
 
 const
-  // Register a fully sparse file space, rather than pass in an array of all
-  // -1 file descriptors (io_uring_rsrc_register.flags)
+  { Register a fully sparse file space, rather than pass in an array of all
+    -1 file descriptors (io_uring_rsrc_register.flags) }
   IORING_RSRC_REGISTER_SPARSE = 1 shl 0;
 
 type
@@ -594,9 +591,8 @@ type
   end;
   Pio_uring_probe_op = ^io_uring_probe_op;
 
-  // C: struct io_uring_probe_op ops[] at the end. The ops start right after
-  // this record: Pio_uring_probe_op(PByte(probe) + SizeOf(io_uring_probe)).
-  // Give the kernel room for them: IORING_REGISTER_PROBE with nr_args ops.
+  { C: struct io_uring_probe_op ops[] at the end. The ops start right after this record: Pio_uring_probe_op(PByte(probe)
+    + SizeOf(io_uring_probe)). Give the kernel room for them: IORING_REGISTER_PROBE with nr_args ops. }
   io_uring_probe = record
     last_op: Byte;  // last opcode supported
     ops_len: Byte;  // length of ops[] array below
@@ -625,9 +621,8 @@ type
   end;
   Pio_uring_buf = ^io_uring_buf;
 
-  // The ring of a provided buffer group. To avoid spilling into more pages
-  // than needed, the ring tail is laid over the resv field of bufs[0].
-  // bufs is a flexible array: index it with range checks off.
+  { The ring of a provided buffer group. To avoid spilling into more pages than needed, the ring tail is laid over the
+    resv field of bufs[0]. bufs is a flexible array: index it with range checks off. }
   io_uring_buf_ring = record
     case Integer of
       0: (resv1: UInt64;
@@ -639,10 +634,11 @@ type
   Pio_uring_buf_ring = ^io_uring_buf_ring;
 
 const
-  // Flags for IORING_REGISTER_PBUF_RING (io_uring_buf_reg.flags).
-  // IOU_PBUF_RING_MMAP: the kernel allocates the memory for the ring. Leave
-  // io_uring_buf_reg.ring_addr empty and then mmap(2) the ring with the offset
-  // IORING_OFF_PBUF_RING or (bgid shl IORING_OFF_PBUF_SHIFT).
+  {
+    Flags for IORING_REGISTER_PBUF_RING (io_uring_buf_reg.flags). IOU_PBUF_RING_MMAP: the kernel allocates the memory
+    for the ring. Leave io_uring_buf_reg.ring_addr empty and then mmap(2) the ring with the offset IORING_OFF_PBUF_RING
+    or (bgid shl IORING_OFF_PBUF_SHIFT).
+  }
   IOU_PBUF_RING_MMAP = 1;
 
 type
@@ -673,8 +669,7 @@ const
   IORING_RESTRICTION_LAST = 4;
 
 type
-  // linux/time_types.h. The time for IORING_OP_TIMEOUT, io_uring_getevents_arg
-  // and io_uring_sync_cancel_reg.
+  // linux/time_types.h. The time for IORING_OP_TIMEOUT, io_uring_getevents_arg and io_uring_sync_cancel_reg.
   __kernel_timespec = record
     tv_sec: Int64;   // __kernel_time64_t
     tv_nsec: Int64;  // long long
@@ -702,8 +697,7 @@ type
   end;
   Pio_uring_sync_cancel_reg = ^io_uring_sync_cancel_reg;
 
-  // Argument for IORING_REGISTER_FILE_ALLOC_RANGE.
-  // The range is [off, off + len)
+  // Argument for IORING_REGISTER_FILE_ALLOC_RANGE. The range is [off, off + len)
   io_uring_file_index_range = record
     off: Cardinal;
     len: Cardinal;
@@ -730,25 +724,21 @@ const
   { System call wrappers. Result: >= 0 on success, -errno on failure.            }
   { ---------------------------------------------------------------------------- }
 
-  // Creates a ring with (at least) entries SQ entries. p: in: flags and the
-  // other inputs; out: the sizes, features and ring offsets. Result: the ring's
-  // file descriptor (close it with FpClose).
+  { Creates a ring with (at least) entries SQ entries. p: in: flags and the other inputs; out: the sizes, features and
+    ring offsets. Result: the ring's file descriptor (close it with FpClose). }
   function io_uring_setup(entries: Cardinal; p: Pio_uring_params): Integer;
 
-  // Submits to_submit SQEs and/or waits for min_complete CQEs
-  // (IORING_ENTER_GETEVENTS). sig: a signal mask (sigset_t) to use while
-  // waiting, or nil. Result: the number of SQEs submitted.
+  { Submits to_submit SQEs and/or waits for min_complete CQEs (IORING_ENTER_GETEVENTS). sig: a signal mask (sigset_t) to
+    use while waiting, or nil. Result: the number of SQEs submitted. }
   function io_uring_enter(fd: Cardinal; to_submit, min_complete, flags: Cardinal; sig: Pointer): Integer;
 
-  // io_uring_enter with the size of arg: with IORING_ENTER_EXT_ARG, arg is a
-  // Pio_uring_getevents_arg and argsz = SizeOf(io_uring_getevents_arg);
-  // otherwise arg is a sigset_t and argsz its size (8).
+  { io_uring_enter with the size of arg: with IORING_ENTER_EXT_ARG, arg is a Pio_uring_getevents_arg and argsz =
+    SizeOf(io_uring_getevents_arg); otherwise arg is a sigset_t and argsz its size (8). }
   function io_uring_enter2(fd: Cardinal; to_submit, min_complete, flags: Cardinal; arg: Pointer;
     argsz: NativeUInt): Integer;
 
-  // Registers or unregisters files, buffers, ... (IORING_REGISTER_*), or asks
-  // the kernel (IORING_REGISTER_PROBE). nr_args: the number of items arg points
-  // to.
+  { Registers or unregisters files, buffers, ... (IORING_REGISTER_*), or asks the kernel (IORING_REGISTER_PROBE).
+    nr_args: the number of items arg points to. }
   function io_uring_register(fd: Cardinal; opcode: Cardinal; arg: Pointer; nr_args: Cardinal): Integer;
 
 implementation
@@ -760,13 +750,12 @@ const
   // The kernel's sigset_t: 64 signals (_NSIG / 8)
   KERNEL_SIGSET_SIZE = 8;
 
-// Pointers go to the kernel as system call arguments (TSysParam). The unit is
-// for 64-bit CPUs only, where both are 64 bits: no hint "Conversion between
-// ordinals and pointers is not portable".
+{ Pointers go to the kernel as system call arguments (TSysParam). The unit is for 64-bit CPUs only, where both are 64
+  bits: no hint "Conversion between ordinals and pointers is not portable". }
 {$WARN 4055 OFF}
 
-// FPC's system call functions return -1 and set errno on failure; the kernel
-// itself returns -errno. Give back the kernel's form, as liburing does.
+{ FPC's system call functions return -1 and set errno on failure; the kernel itself returns -errno. Give back the
+  kernel's form, as liburing does. }
 function KernelResult(const AResult: TSysResult): Integer; inline;
 begin
   if AResult = -1 then
@@ -788,13 +777,13 @@ end;
 function io_uring_enter2(fd: Cardinal; to_submit, min_complete, flags: Cardinal; arg: Pointer;
   argsz: NativeUInt): Integer;
 begin
-  Result := KernelResult(do_SysCall(__NR_io_uring_enter, TSysParam(fd), TSysParam(to_submit), TSysParam(min_complete), 
+  Result := KernelResult(do_SysCall(__NR_io_uring_enter, TSysParam(fd), TSysParam(to_submit), TSysParam(min_complete),
     TSysParam(flags), TSysParam(arg), TSysParam(argsz)));
 end;
 
 function io_uring_register(fd: Cardinal; opcode: Cardinal; arg: Pointer; nr_args: Cardinal): Integer;
 begin
-  Result := KernelResult(do_SysCall(__NR_io_uring_register, TSysParam(fd), TSysParam(opcode), TSysParam(arg), 
+  Result := KernelResult(do_SysCall(__NR_io_uring_register, TSysParam(fd), TSysParam(opcode), TSysParam(arg),
     TSysParam(nr_args)));
 end;
 

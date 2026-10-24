@@ -1,11 +1,12 @@
 ﻿unit Delphi.IOUring.Backend.Custom;
 
-// OS-neutral types shared by all backends (Docs/Design.md §5.1).
-//
-// Everything used per operation is a plain record: no managed fields, no
-// set-up or clean-up cost. The meaning of TIORingCompletion.NativeResult is
-// the OS's own (HRESULT on Windows, res = bytes or -errno on Linux); the few
-// helpers that interpret it are the only OS-dependent code in this unit.
+{
+  OS-neutral types shared by all backends (Docs/Design.md §5.1).
+
+  Everything used per operation is a plain record: no managed fields, no set-up or clean-up cost. The meaning of
+  TIORingCompletion.NativeResult is the OS's own (HRESULT on Windows, res = bytes or -errno on Linux); the few helpers
+  that interpret it are the only OS-dependent code in this unit.
+}
 
 {$I Delphi.IOUring.inc}
 
@@ -19,41 +20,39 @@ uses
 {$ENDIF}
 
 const
-  // The version of the library. It stays below 1.0 for a long time: the API
-  // may still change (Docs/Design.md §12.6).
+  // The version of the library. It stays below 1.0 for a long time: the API may still change (Docs/Design.md §12.6).
   IORING_LIBRARY_VERSION = '0.1.0';
 
   // Timeout value meaning "wait forever"
   IORING_INFINITE = Cardinal($FFFFFFFF);
 
 {$IFDEF MSWINDOWS}
-  // NativeResult of a read that starts at or after the end of the file:
-  // HRESULT_FROM_WIN32(ERROR_HANDLE_EOF). (On Linux such a read returns 0.)
+  { NativeResult of a read that starts at or after the end of the file: HRESULT_FROM_WIN32(ERROR_HANDLE_EOF). (On
+    Linux such a read returns 0.) }
   IORING_RESULT_END_OF_FILE = Integer($80070026);
-  // NativeResult of a cancelled operation:
-  // HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED). The engine uses it also for
-  // requests it cancels before they reach the ring.
+  { NativeResult of a cancelled operation: HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED). The engine uses it also for
+    requests it cancels before they reach the ring. }
   IORING_RESULT_CANCELLED = Integer($800703E3);
 {$ENDIF}
 {$IFDEF LINUX}
-  // NativeResult of a cancelled operation: -ECANCELED. The engine uses it also
-  // for requests it cancels before they reach the ring. (A read at or after
-  // the end of the file succeeds on Linux, with 0 bytes: IsEndOfFile.)
+  { NativeResult of a cancelled operation: -ECANCELED. The engine uses it also for requests it cancels before they reach
+    the ring. (A read at or after the end of the file succeeds on Linux, with 0 bytes: IsEndOfFile.) }
   IORING_RESULT_CANCELLED = -125;
 {$ENDIF}
 
 type
-  // Value that identifies an operation in its completion. Pointer-sized, like
-  // the OS type (UINT_PTR on Windows): on Win32 it has 32 bits.
+  { Value that identifies an operation in its completion. Pointer-sized, like the OS type (UINT_PTR on
+    Windows): on Win32 it has 32 bits. }
   TIORingUserData = NativeUInt;
 
-  TIORingOp = (ioRead, ioWrite, ioFlush, ioCancel, ioRegisterFiles, ioRegisterBuffers,
-    ioReadScatter, ioWriteGather);
+  TIORingOp = (ioRead, ioWrite, ioFlush, ioCancel, ioRegisterFiles, ioRegisterBuffers, ioReadScatter, ioWriteGather);
+
   TIORingOps = set of TIORingOp;
 
   TIORingSubmitFlag = (
     sfDrainPreceding   // start only after all earlier operations have completed (full barrier)
   );
+
   TIORingSubmitFlags = set of TIORingSubmitFlag;
 
   TIORingFlushMode = (
@@ -67,37 +66,34 @@ type
   TIORingExtra = (
     ieSockets,         // socket operations through the ring (Linux: send, receive, accept, connect)
     ieLinkedOps,       // an operation can wait for the one before it (Linux: TLinuxIORing.LinkToNext)
-    ieSqPoll,          // a kernel thread can take the submissions, without system calls
-                       // (Linux: IORING_SETUP_SQPOLL, through Delphi.IOUring.Backend.Posix.API)
+    ieSqPoll,          // a kernel thread takes the submissions, no system calls (Linux: IORING_SETUP_SQPOLL)
     ieRawEntries       // any operation of the system can be prepared (Linux: TLinuxIORing.PrepareSqe)
   );
+
   TIORingExtras = set of TIORingExtra;
 
   // Opcodes of the system's ring API: Windows IORING_OP_*, Linux IORING_OP_*
   TIORingNativeOps = set of Byte;
 
-  // What this system offers. Windows and Linux differ, and so do Linux
-  // systems among themselves (kernel, distribution, what is switched off):
-  // ToString describes it all for logs and bug reports.
+  { What this system offers. Windows and Linux differ, and so do Linux systems among themselves (kernel, distribution,
+    what is switched off): ToString describes it all for logs and bug reports. }
   TIORingCapabilities = record
     BackendName: string;              // e.g. 'Windows IoRing'; empty if not available
-    // Windows: the IoRing version (IORING_VERSION_*: 1, 2, 300, 400); Linux:
-    // the kernel version, major * 100 + minor (618 = 6.18)
+    { Windows: the IoRing version (IORING_VERSION_*: 1, 2, 300, 400);
+      Linux: the kernel version, major * 100 + minor (618 = 6.18) }
     NativeVersion: Cardinal;
     MaxSubmissionQueueSize: Cardinal;
     MaxCompletionQueueSize: Cardinal;
     SupportedOps: TIORingOps;
     Emulated: Boolean;                // works, but without kernel support (slow)
-    // The system, e.g. 'Windows 11 (10.0, build 26300)' or
-    // 'Ubuntu 24.04.3 LTS, Linux 6.18.54.1-microsoft-standard-WSL2'
+    // The system, e.g. 'Windows 11 (10.0, build 26300)' or 'Ubuntu 24.04.3 LTS, Linux 6.18.54.1-microsoft-standard-WSL2'
     SystemDescription: string;
     // Why the ring cannot be used here; empty if it can
     NotAvailableReason: string;
-    // Feature bits of the system's ring API: Windows IORING_FEATURE_FLAGS,
-    // Linux io_uring_params.features (IORING_FEAT_*)
+    { Feature bits of the system's ring API: Windows IORING_FEATURE_FLAGS, Linux
+      io_uring_params.features (IORING_FEAT_*) }
     NativeFeatures: UInt64;
-    // The opcodes the kernel supports (Windows: IsIoRingOpSupported, Linux:
-    // the probe)
+    // The opcodes the kernel supports (Windows: IsIoRingOpSupported, Linux: the probe)
     NativeOps: TIORingNativeOps;
     Extras: TIORingExtras;
     // All of the above in a few lines
@@ -123,20 +119,22 @@ type
     class function FromRegistered(const AIndex, AOffset: Cardinal): TIORingBufferRef; static;
   end;
 
-  // Entry for PrepareRegisterBuffers. Address = nil and Length = 0 is a "sparse"
-  // entry (releases that index). Same layout as Windows IORING_BUFFER_INFO.
+  { Entry for PrepareRegisterBuffers. Address = nil and Length = 0 is a "sparse" entry (releases that index). Same
+    layout as Windows IORING_BUFFER_INFO. }
   PIORingBufferInfo = ^TIORingBufferInfo;
+
   TIORingBufferInfo = record
     Address: Pointer;
     Length: Cardinal;
   end;
 
-  // Result of one operation. Field order and sizes match Windows IORING_CQE,
-  // so the Windows backend pops straight into this record.
-  // The same meaning on every system: NativeResult is 0 (success) or a
-  // negative error code (HRESULT on Windows, -errno on Linux), the bytes are
-  // in BytesTransferred. End of file differs: check IsEndOfFile first.
+  {
+    Result of one operation. Field order and sizes match Windows IORING_CQE, so the Windows backend pops straight into
+    this record. The same meaning on every system: NativeResult is 0 (success) or a negative error code (HRESULT on
+    Windows, -errno on Linux), the bytes are in BytesTransferred. End of file differs: check IsEndOfFile first.
+  }
   PIORingCompletion = ^TIORingCompletion;
+
   TIORingCompletion = record
     UserData: TIORingUserData;
     NativeResult: Integer;          // 0, or HRESULT (Windows) / -errno (Linux)
@@ -164,13 +162,15 @@ type
 function IORingErrorMessage(const ANativeCode: Integer): string;
 
 {
-  Raise helpers (Docs/CodingStyle.md, "Raising"): a routine that raises through these gets no hidden try/finally for
-  the exception's message. They raise at the caller's address, so the exception points to the line that called them.
-  Pass a constant text, or a format and its arguments - not Format(...) or a string built with +.
+  Raise helpers (Docs/CodingStyle.md, "Raising"), called from the small raise procedures: the text stays out of the
+  routines that do the work. They raise at the caller's address. Pass a constant text, or a format and its
+  arguments - not Format(...) or a string built with +.
 }
 procedure RaiseIORingError(const AMessage: string); {$IFNDEF FPC} noreturn; {$ENDIF}
 procedure RaiseIORingErrorFmt(const AFormat: string; const AArgs: array of const); {$IFNDEF FPC} noreturn; {$ENDIF}
 procedure RaiseIORingErrorNative(const ANativeCode: Integer; const AOperation: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+procedure RaiseIORingErrorNativeFmt(const ANativeCode: Integer; const AFormat: string; const AArgs: array of const);
+  {$IFNDEF FPC} noreturn; {$ENDIF}
 procedure RaiseError(const AClass: ExceptClass; const AMessage: string); {$IFNDEF FPC} noreturn; {$ENDIF}
 procedure RaiseErrorFmt(const AClass: ExceptClass; const AFormat: string; const AArgs: array of const);
   {$IFNDEF FPC} noreturn; {$ENDIF}
@@ -232,11 +232,12 @@ var
   LHighest: Integer;
   LList: string;
 begin
-  // The reason first: also when the system has the API, but too old a
-  // version of it
+  // The reason first: also when the system has the API, but too old a version of it
   Result := '';
+
   if NotAvailableReason <> '' then
     Result := 'Not available: ' + NotAvailableReason + sLineBreak;
+
   if BackendName <> '' then
   begin
 {$IFDEF MSWINDOWS}
@@ -284,7 +285,7 @@ begin
         LHighest := LOpcode;
       end;
 
-    Result := Result + sLineBreak + Format('Native: %d opcodes (highest %d), features $%x', [LCount, LHighest, 
+    Result := Result + sLineBreak + Format('Native: %d opcodes (highest %d), features $%x', [LCount, LHighest,
       NativeFeatures]);
 
     LList := '';
@@ -410,6 +411,16 @@ begin
   raise EIORingError.CreateNative(ANativeCode, AOperation) at get_caller_addr(get_frame), get_caller_frame(get_frame);
 {$ELSE}
   raise EIORingError.CreateNative(ANativeCode, AOperation) at ReturnAddress;
+{$ENDIF}
+end;
+
+procedure RaiseIORingErrorNativeFmt(const ANativeCode: Integer; const AFormat: string; const AArgs: array of const);
+begin
+{$IFDEF FPC}
+  raise EIORingError.CreateNative(ANativeCode, Format(AFormat, AArgs)) at get_caller_addr(get_frame),
+    get_caller_frame(get_frame);
+{$ELSE}
+  raise EIORingError.CreateNative(ANativeCode, Format(AFormat, AArgs)) at ReturnAddress;
 {$ENDIF}
 end;
 

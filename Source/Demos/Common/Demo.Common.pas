@@ -14,8 +14,7 @@ interface
 // <temp folder>/Delphi.IOUring.Demo.<AName>
 function DemoFileName(const AName: string): string;
 
-// Writes ASize bytes of changing data into AFileName (an existing file is
-// replaced), with a plain TFileStream
+// Writes ASize bytes of changing data into AFileName (an existing file is replaced), with a plain TFileStream
 procedure CreateDemoFile(const AFileName: string; const ASize: Int64);
 
 // The size of a file in bytes
@@ -31,8 +30,7 @@ implementation
 
 uses
 {$IFDEF FPC}
-  SysUtils,
-  Classes;
+  SysUtils, Classes;
 {$ELSE}
   System.SysUtils,
   System.Classes,
@@ -62,8 +60,10 @@ begin
   SetLength(LBuffer, CHUNK);
   LValue := 1;
   LStream := TFileStream.Create(AFileName, fmCreate);
+
   try
     LLeft := ASize;
+
     while LLeft > 0 do
     begin
       // xorshift: bytes that change all the time, so a wrong offset shows
@@ -74,10 +74,12 @@ begin
         LValue := LValue xor (LValue shl 5);
         LBuffer[LIndex] := Byte(LValue);
       end;
+
       if LLeft < CHUNK then
         LCount := LLeft
       else
         LCount := CHUNK;
+
       LStream.WriteBuffer(LBuffer[0], LCount);
       Dec(LLeft, LCount);
     end;
@@ -91,6 +93,7 @@ var
   LStream: TFileStream;
 begin
   LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
+
   try
     Result := LStream.Size;
   finally

@@ -17,8 +17,7 @@
 interface
 
 uses
-  Delphi.IOUring.Backend.Posix.API,
-  Tests.Support;
+  Delphi.IOUring.Backend.Posix.API, Tests.Support;
 
 type
   // A ring of a test, with its memory mapped
@@ -40,15 +39,14 @@ type
     SqesSize: NativeUInt;
     // Not open (Close does nothing)
     procedure Init;
-    // io_uring_setup with AParams, then maps the memory of the ring. Result:
-    // the result of io_uring_setup; on failure nothing is open.
+    { io_uring_setup with AParams, then maps the memory of the ring. Result: the result of io_uring_setup;
+      on failure nothing is open. }
     function Open(const AEntries: Cardinal; const AParams: io_uring_params): Integer;
     procedure Close;
     // The next free SQE, zeroed; nil if the SQ is full
     function NextSqe: Pio_uring_sqe;
-    // Stores the SQ tail and calls io_uring_enter for the SQEs taken since
-    // the last Submit; AWaitFor > 0: and waits for that many CQEs. Result: the
-    // result of io_uring_enter.
+    { Stores the SQ tail and calls io_uring_enter for the SQEs taken since the last Submit; AWaitFor > 0: and waits for
+      that many CQEs. Result: the result of io_uring_enter. }
     function Submit(const AWaitFor: Cardinal): Integer;
     function TryPopCqe(out ACqe: io_uring_cqe): Boolean;
   end;
@@ -95,13 +93,10 @@ type
 implementation
 
 uses
-  SysUtils,
-  BaseUnix,
-  TestFileHelpers;
+  SysUtils, BaseUnix, Delphi.IOUring.Backend.Custom, TestFileHelpers;
 
 const
-  // The features the 6.8 header names (IORING_FEAT_SINGLE_MMAP ..
-  // IORING_FEAT_REG_REG_RING)
+  // The features the 6.8 header names (IORING_FEAT_SINGLE_MMAP .. IORING_FEAT_REG_REG_RING)
   FEATURES_OF_THE_HEADER = (1 shl 14) - 1;
   // A file descriptor no process has
   BAD_FD = 1000000;
@@ -150,10 +145,17 @@ begin
 end;
 
 function TTestRing.Map(const ASize: NativeUInt; const AOffset: Int64): PByte;
+
+  procedure RaiseMapFailed(const AValue: Int64); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseErrorFmt(Exception, 'mmap of offset $%x failed: errno %d', [AValue, fpgeterrno]);
+  end;
+
 begin
   Result := fpmmap(nil, ASize, PROT_READ or PROT_WRITE, MAP_SHARED, Fd, AOffset);
+
   if Pointer(Result) = MAP_FAILED then
-    raise Exception.CreateFmt('mmap of offset $%x failed: errno %d', [AOffset, fpgeterrno]);
+    RaiseMapFailed(AOffset);
 end;
 
 function TTestRing.Open(const AEntries: Cardinal; const AParams: io_uring_params): Integer;
@@ -161,9 +163,12 @@ begin
   Init;
   Params := AParams;
   Result := io_uring_setup(AEntries, @Params);
+
   if Result < 0 then
     Exit;
+
   Fd := Result;
+
   try
     // The sizes as liburing computes them
     SqRingSize := Params.sq_off.&array + Params.sq_entries * SizeOf(Cardinal);
@@ -182,12 +187,16 @@ procedure TTestRing.Close;
 begin
   if Sqes <> nil then
     fpmunmap(Sqes, SqesSize);
+
   if CqRing <> nil then
     fpmunmap(CqRing, CqRingSize);
+
   if SqRing <> nil then
     fpmunmap(SqRing, SqRingSize);
+
   if Fd >= 0 then
     FpClose(Fd);
+
   Init;
 end;
 
@@ -198,6 +207,7 @@ var
 begin
   LHead := SqWord(Params.sq_off.head)^;  // the kernel moves the head
   ReadBarrier;
+
   if FSqTail - LHead >= Params.sq_entries then
     Exit(nil);
 
@@ -218,17 +228,22 @@ begin
   SqWord(Params.sq_off.tail)^ := FSqTail;
 
   LFlags := 0;
+
   if AWaitFor > 0 then
     LFlags := IORING_ENTER_GETEVENTS;
+
   if (Params.flags and IORING_SETUP_SQPOLL) <> 0 then
   begin
-    // The polling thread takes the SQEs by itself; it needs a wake-up only
-    // when it has gone to sleep. The kernel returns the count it was given.
+    { The polling thread takes the SQEs by itself; it needs a wake-up only when it has gone to sleep. The kernel
+      returns the count it was given. }
     ReadWriteBarrier;  // the tail before the flags
+
     if (SqWord(Params.sq_off.flags)^ and IORING_SQ_NEED_WAKEUP) <> 0 then
       LFlags := LFlags or IORING_ENTER_SQ_WAKEUP;
   end;
+
   Result := io_uring_enter(Fd, FToSubmit, AWaitFor, LFlags, nil);
+
   if Result > 0 then
     Dec(FToSubmit, Result);
 end;
@@ -242,6 +257,7 @@ begin
   LTail := CqWord(Params.cq_off.tail)^;  // the kernel moves the tail
   ReadBarrier;                            // the CQE after the tail
   Result := LHead <> LTail;
+
   if Result then
   begin
     ACqe := Pio_uring_cqe(CqRing + Params.cq_off.cqes +
@@ -255,7 +271,8 @@ end;
 
 procedure TPosixApiTests.SetUp;
 begin
-  inherited;
+  inherited SetUp;
+
   FRing.Init;
   FFiles := nil;
   FFds := nil;
@@ -266,11 +283,14 @@ var
   I: Integer;
 begin
   FRing.Close;
+
   for I := 0 to High(FFds) do
     FpClose(FFds[I]);
+
   for I := 0 to High(FFiles) do
     TTestFileHelpers.DeleteTestFile(FFiles[I]);
-  inherited;
+
+  inherited TearDown;
 end;
 
 procedure TPosixApiTests.OpenRing(const AEntries: Cardinal);
@@ -291,6 +311,7 @@ begin
   AssertTrue('open: errno ' + IntToStr(fpgeterrno), AFd >= 0);
   SetLength(FFds, Length(FFds) + 1);
   FFds[High(FFds)] := AFd;
+
   Result := AFd;
 end;
 
@@ -301,6 +322,7 @@ begin
   LFileName := TTestFileHelpers.CreatePatternFile(ASize, 'Posix');
   SetLength(FFiles, Length(FFiles) + 1);
   FFiles[High(FFiles)] := LFileName;
+
   Result := KeepFd(FpOpen(LFileName, O_RDONLY));
 end;
 
@@ -312,6 +334,7 @@ begin
   LParams := Default(io_uring_params);
   LFd := io_uring_setup(8, @LParams);
   AssertTrue('io_uring_setup: ' + IntToStr(LFd), LFd >= 0);
+
   try
     AssertEquals('sq_entries', 8, LParams.sq_entries);
     AssertEquals('cq_entries (twice sq_entries)', 16, LParams.cq_entries);
@@ -429,22 +452,26 @@ var
   LSeen: Cardinal;
 begin
   OpenRing(8);
+
   for I := 1 to 8 do
   begin
     LSqe := FRing.NextSqe;
     LSqe^.opcode := IORING_OP_NOP;
     LSqe^.user_data := I;
   end;
+
   AssertTrue('The SQ is full', FRing.NextSqe = nil);
   AssertEquals('submitted', 8, FRing.Submit(8));
 
   LSeen := 0;
+
   for I := 1 to 8 do
   begin
     LCqe := PopCqe;
     AssertEquals('res', 0, LCqe.res);
     LSeen := LSeen or (Cardinal(1) shl LCqe.user_data);
   end;
+
   AssertEquals('user_data 1..8', $1FE, LSeen);
 end;
 
@@ -545,6 +572,7 @@ begin
 
   LCheck := FileOpen(LFileName, fmOpenRead or fmShareDenyNone);
   AssertTrue('FileOpen', LCheck <> THandle(-1));
+
   try
     AssertEquals('file size', 4096 + SizeOf(LData), FileSeek(LCheck, Int64(0), fsFromEnd));
     FileSeek(LCheck, 4096, fsFromBeginning);
@@ -552,6 +580,7 @@ begin
   finally
     FileClose(LCheck);
   end;
+
   CheckPattern(4096, @LBack, SizeOf(LBack));
 end;
 
@@ -649,15 +678,19 @@ begin
 
   AssertEquals('ops_len', LProbe^.last_op + 1, LProbe^.ops_len);
   LSupported := 0;
+
   for I := 0 to LProbe^.ops_len - 1 do
   begin
     AssertEquals('ops[I].op', I, ProbeOp(LProbe, I)^.op);
+
     if ProbeOp(LProbe, I)^.flags and IO_URING_OP_SUPPORTED <> 0 then
       Inc(LSupported);
   end;
+
   for I := 0 to High(CORE_OPS) do
     AssertTrue('Opcode ' + IntToStr(CORE_OPS[I]) + ' supported',
       ProbeOp(LProbe, CORE_OPS[I])^.flags and IO_URING_OP_SUPPORTED <> 0);
+
   Log(Format('last_op %d (the 6.8 header: %d), %d opcodes supported',
     [LProbe^.last_op, IORING_OP_LAST - 1, LSupported]));
 end;
@@ -720,8 +753,8 @@ begin
   AssertEquals('res', -ESysETIME, LCqe.res);
 end;
 
-// SQPOLL is reachable through this unit only (Docs/Design.md §5.8): a kernel
-// thread takes the submissions. Allowed without root since Linux 5.11.
+{ SQPOLL is reachable through this unit only (Docs/Design.md §5.8): a kernel thread takes the submissions. Allowed
+  without root since Linux 5.11. }
 procedure TPosixApiTests.SqPoll_NopsComplete;
 var
   LParams: io_uring_params;
@@ -735,28 +768,33 @@ begin
   LParams.flags := IORING_SETUP_SQPOLL;
   LParams.sq_thread_idle := 10;    // ms until the polling thread sleeps
   LResult := FRing.Open(8, LParams);
+
   if LResult = -ESysEPERM then
   begin
     Log('SQPOLL is not allowed here (EPERM): not tested');
     AssertTrue(True);
+
     Exit;
   end;
+
   AssertTrue('setup: ' + IntToStr(LResult), LResult >= 0);
   AssertTrue('Kept the flag', (FRing.Params.flags and IORING_SETUP_SQPOLL) <> 0);
 
-  // Twice: the second time after the polling thread has gone to sleep, so
-  // the wake-up is needed
+  // Twice: the second time after the polling thread has gone to sleep, so the wake-up is needed
   for LRound := 1 to 2 do
   begin
     if LRound = 2 then
       Sleep(50);
+
     for LIndex := 1 to 3 do
     begin
       LSqe := FRing.NextSqe;
       LSqe^.opcode := IORING_OP_NOP;
       LSqe^.user_data := LRound * 10 + LIndex;
     end;
+
     AssertEquals('submitted', 3, FRing.Submit(3));
+
     for LIndex := 1 to 3 do
     begin
       LCqe := PopCqe;

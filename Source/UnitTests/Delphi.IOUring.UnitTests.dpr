@@ -11,11 +11,9 @@ uses
   {$IFDEF TESTINSIGHT}
   TestInsight.DUnitX,
   {$ELSE}
-  DUnitX.Loggers.Console,
-  DUnitX.Loggers.Xml.NUnit,
+  DUnitX.Loggers.Console, DUnitX.Loggers.Xml.NUnit,
   {$ENDIF}
-  DUnitX.TestFramework,
-  Delphi.IOUring.Backend.Windows.API in '..\Units\Delphi.IOUring.Backend.Windows.API.pas',
+  DUnitX.TestFramework, Delphi.IOUring.Backend.Windows.API in '..\Units\Delphi.IOUring.Backend.Windows.API.pas',
   Delphi.IOUring.Backend.Custom in '..\Units\Delphi.IOUring.Backend.Custom.pas',
   Delphi.IOUring.Backend.Windows in '..\Units\Delphi.IOUring.Backend.Windows.pas',
   Delphi.IOUring in '..\Units\Delphi.IOUring.pas',
@@ -27,21 +25,14 @@ uses
   Delphi.IOUring.RequestQueue in '..\Units\Delphi.IOUring.RequestQueue.pas',
   Delphi.IOUring.Engine in '..\Units\Delphi.IOUring.Engine.pas',
   Delphi.IOUring.BlockReader in '..\Units\Delphi.IOUring.BlockReader.pas',
-  TestFileHelpers in 'Common\TestFileHelpers.pas',
-  TestPlatformHelpers in 'Common\TestPlatformHelpers.pas',
-  Tests.Support in 'Common\Tests.Support.pas',
-  Tests.TestFileHelpers in 'Common\Tests.TestFileHelpers.pas',
+  TestFileHelpers in 'Common\TestFileHelpers.pas', TestPlatformHelpers in 'Common\TestPlatformHelpers.pas',
+  Tests.Support in 'Common\Tests.Support.pas', Tests.TestFileHelpers in 'Common\Tests.TestFileHelpers.pas',
   Tests.Backend.Windows.API.Layout in 'Common\Tests.Backend.Windows.API.Layout.pas',
-  Tests.Backend.Windows.API in 'Common\Tests.Backend.Windows.API.pas',
-  Tests.Ring in 'Common\Tests.Ring.pas',
-  Tests.SequentialReader in 'Common\Tests.SequentialReader.pas',
-  Tests.Streams in 'Common\Tests.Streams.pas',
-  Tests.Atomics in 'Common\Tests.Atomics.pas',
-  Tests.RequestPool in 'Common\Tests.RequestPool.pas',
-  Tests.RequestQueue in 'Common\Tests.RequestQueue.pas',
-  Tests.Engine in 'Common\Tests.Engine.pas',
-  Tests.BlockReader in 'Common\Tests.BlockReader.pas',
-  Tests.EngineOverlap in 'Common\Tests.EngineOverlap.pas',
+  Tests.Backend.Windows.API in 'Common\Tests.Backend.Windows.API.pas', Tests.Ring in 'Common\Tests.Ring.pas',
+  Tests.SequentialReader in 'Common\Tests.SequentialReader.pas', Tests.Streams in 'Common\Tests.Streams.pas',
+  Tests.Atomics in 'Common\Tests.Atomics.pas', Tests.RequestPool in 'Common\Tests.RequestPool.pas',
+  Tests.RequestQueue in 'Common\Tests.RequestQueue.pas', Tests.Engine in 'Common\Tests.Engine.pas',
+  Tests.BlockReader in 'Common\Tests.BlockReader.pas', Tests.EngineOverlap in 'Common\Tests.EngineOverlap.pas',
   Tests.SequentialWriter in 'Common\Tests.SequentialWriter.pas';
 
 {$IFNDEF TESTINSIGHT}

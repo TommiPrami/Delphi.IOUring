@@ -25,8 +25,8 @@ type
     // Fills ABuffer with the pattern bytes of file offsets AOffset .. AOffset + ACount - 1
     class procedure FillPattern(const AOffset: UInt64; var ABuffer; const ACount: NativeInt); static;
 
-    // True if ABuffer holds the pattern bytes of AOffset .. AOffset + ACount - 1.
-    // On mismatch AFirstBadOffset is the file offset of the first wrong byte.
+    { True if ABuffer holds the pattern bytes of AOffset .. AOffset + ACount - 1. On mismatch AFirstBadOffset is the
+      file offset of the first wrong byte. }
     class function CheckPattern(const AOffset: UInt64; const ABuffer; const ACount: NativeInt;
       out AFirstBadOffset: UInt64): Boolean; static;
 
@@ -65,6 +65,7 @@ begin
   LValue := AWordIndex * UInt64($9E3779B97F4A7C15);
   LValue := (LValue xor (LValue shr 30)) * UInt64($BF58476D1CE4E5B9);
   LValue := (LValue xor (LValue shr 27)) * UInt64($94D049BB133111EB);
+
   Result := LValue xor (LValue shr 31);
 end;
 
@@ -133,11 +134,13 @@ begin
     begin
       LWord := PatternWord(LOffset shr 3);
       Move(LSource^, LActual, 8);
+
       if LActual = LWord then
       begin
         Inc(LSource, 8);
         Inc(LOffset, 8);
         Dec(LRemaining, 8);
+
         Continue;
       end;
     end;
@@ -146,6 +149,7 @@ begin
     if LSource^ <> ExpectedByte(LOffset) then
     begin
       AFirstBadOffset := LOffset;
+
       Exit(False);
     end;
 
@@ -172,6 +176,7 @@ var
   LGuid: TGUID;
 begin
   CreateGUID(LGuid);
+
   Result := TestFolder + APrefix + '-' + GUIDToString(LGuid) + '.bin';
 end;
 
@@ -187,11 +192,14 @@ begin
   SetLength(LBuffer, CREATE_CHUNK_SIZE);
 
   LStream := TFileStream.Create(Result, fmCreate);
+
   try
     LOffset := 0;
+
     while LOffset < ASize do
     begin
       LChunk := CREATE_CHUNK_SIZE;
+
       if ASize - LOffset < LChunk then
         LChunk := Integer(ASize - LOffset);
 

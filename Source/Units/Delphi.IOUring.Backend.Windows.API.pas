@@ -1,44 +1,42 @@
 ﻿unit Delphi.IOUring.Backend.Windows.API;
 
-// Complete translation of the Windows IoRing API:
-//   ioringapi.h, ntioring_x.h (Windows SDK 10.0.26100), the IoRing related
-//   parts of winbase.h (FILE_WRITE_FLAGS, FILE_FLUSH_MODE) and winnt.h
-//   (FILE_SEGMENT_ELEMENT), and the IORING_E_* codes of winerror.h.
-//
-// This unit is standalone: it depends only on the Windows API unit of the RTL,
-// has no initialization section, no global state and raises no exceptions.
-// Other projects can use it without the rest of Delphi.IOUring.
-//
-// Names are the original C names. With Delphi all functions are "delayed"
-// imports, so a program using this unit still loads on Windows versions
-// without IoRing (or with an older IoRing version); calling a function the OS
-// does not have raises a delay-load error at the call. Check
-// QueryIoRingCapabilities first. Free Pascal 3.2.2 has no "delayed"; there
-// each function looks itself up with GetProcAddress on its first call, and a
-// function Windows does not have returns E_NOTIMPL (see the end of the unit).
-//
-// Behaviour found by testing (Windows 11 build 26300) that differs from, or is
-// missing in, the documentation:
-// - PopIoRingCompletion returning S_FALSE zeroes cqe (Learn: "unmodified").
-// - SubmitIoRing whose wait times out returns HRESULT_FROM_WIN32(ERROR_TIMEOUT)
-//   (0x800705B4). The entries are submitted, but submittedEntries is not written.
-// - While one thread waits inside SubmitIoRing, a SubmitIoRing on another
-//   thread fails with IORING_E_SUBMIT_IN_PROGRESS.
-// - Scatter/gather needs a handle opened with FILE_FLAG_NO_BUFFERING; on a
-//   buffered handle the completion is E_INVALIDARG.
-// - Reads crossing EOF complete with S_OK and a short count; reads starting at
-//   or after EOF complete with HRESULT_FROM_WIN32(ERROR_HANDLE_EOF), 0 bytes.
-// - Handles opened without FILE_FLAG_OVERLAPPED work too.
-//
-// Versions (IORING_VERSION) and what they add:
-//   1   (Windows 11 21H2, build 22000) read, register files/buffers, cancel
-//   2   fix: completion event could miss the empty -> non-empty signal
-//   300 (Windows 11 22H2) write, flush, IOSQE_FLAGS_DRAIN_PRECEDING_OPS
-//   400 (Windows 11 24H2) read scatter, write gather
-//
-// Documentation: https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/
-// (Learn has no pages for the version 3 and 4 functions; the SDK header is the
-// reference for those.)
+{
+  Complete translation of the Windows IoRing API:
+    ioringapi.h, ntioring_x.h (Windows SDK 10.0.26100), the IoRing related
+    parts of winbase.h (FILE_WRITE_FLAGS, FILE_FLUSH_MODE) and winnt.h
+    (FILE_SEGMENT_ELEMENT), and the IORING_E_* codes of winerror.h.
+
+  This unit is standalone: it depends only on the Windows API unit of the RTL, has no initialization section, no global
+  state and raises no exceptions. Other projects can use it without the rest of Delphi.IOUring.
+
+  Names are the original C names. With Delphi all functions are "delayed" imports, so a program using this unit still
+  loads on Windows versions without IoRing (or with an older IoRing version); calling a function the OS does not have
+  raises a delay-load error at the call. Check QueryIoRingCapabilities first. Free Pascal 3.2.2 has no "delayed"; there
+  each function looks itself up with GetProcAddress on its first call, and a function Windows does not have returns
+  E_NOTIMPL (see the end of the unit).
+
+  Behaviour found by testing (Windows 11 build 26300) that differs from, or is
+  missing in, the documentation:
+  - PopIoRingCompletion returning S_FALSE zeroes cqe (Learn: "unmodified").
+  - SubmitIoRing whose wait times out returns HRESULT_FROM_WIN32(ERROR_TIMEOUT)
+    (0x800705B4). The entries are submitted, but submittedEntries is not written.
+  - While one thread waits inside SubmitIoRing, a SubmitIoRing on another
+    thread fails with IORING_E_SUBMIT_IN_PROGRESS.
+  - Scatter/gather needs a handle opened with FILE_FLAG_NO_BUFFERING; on a
+    buffered handle the completion is E_INVALIDARG.
+  - Reads crossing EOF complete with S_OK and a short count; reads starting at
+    or after EOF complete with HRESULT_FROM_WIN32(ERROR_HANDLE_EOF), 0 bytes.
+  - Handles opened without FILE_FLAG_OVERLAPPED work too.
+
+  Versions (IORING_VERSION) and what they add:
+    1   (Windows 11 21H2, build 22000) read, register files/buffers, cancel
+    2   fix: completion event could miss the empty -> non-empty signal
+    300 (Windows 11 22H2) write, flush, IOSQE_FLAGS_DRAIN_PRECEDING_OPS
+    400 (Windows 11 24H2) read scatter, write gather
+
+  Documentation: https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/ (Learn has no pages for the version 3
+  and 4 functions; the SDK header is the reference for those.)
+}
 
 // Standalone on purpose: no Delphi.IOUring.inc, the needed switches are here.
 {$IFDEF FPC}
@@ -82,8 +80,8 @@ type
 const
   IORING_VERSION_INVALID = 0;
   IORING_VERSION_1 = 1;
-  // Minor update: fixes a race where the completion event could stay
-  // unsignalled. On version 1, wait on the event only with a timeout.
+  { Minor update: fixes a race where the completion event could stay unsignalled. On version 1, wait on the
+    event only with a timeout. }
   IORING_VERSION_2 = 2;
   // Major update: adds write, flush and drain support
   IORING_VERSION_3 = 300;
@@ -192,8 +190,7 @@ const
   IORING_E_SUBMIT_IN_PROGRESS = HRESULT($80460006);
   // The shared ring buffers of the IoRing are corrupt
   IORING_E_CORRUPT = HRESULT($80460007);
-  // The completion queue does not have enough free space, to post completions,
-  // for all entries being submitted
+  // The completion queue does not have enough free space, to post completions, for all entries being submitted
   IORING_E_COMPLETION_QUEUE_TOO_FULL = HRESULT($80460008);
 
 { ---------------------------------------------------------------------------- }
@@ -262,8 +259,7 @@ type
     Information: NativeUInt;  // ULONG_PTR, e.g. bytes transferred
   end;
 
-  // winnt.h. Buffer is a PVOID64: a 64-bit value even in 32-bit programs
-  // (store the pointer zero-extended).
+  // winnt.h. Buffer is a PVOID64: a 64-bit value even in 32-bit programs (store the pointer zero-extended).
   PFILE_SEGMENT_ELEMENT = ^FILE_SEGMENT_ELEMENT;
   FILE_SEGMENT_ELEMENT = record
     case Integer of
@@ -285,80 +281,84 @@ type
   { them to const (Delphi may then pass them by reference).                      }
   { ---------------------------------------------------------------------------- }
 
-  // Version 1. Queries the OS for the supported IoRing capabilities.
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-queryioringcapabilities
+  { Version 1. Queries the OS for the supported IoRing capabilities.
+    https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-queryioringcapabilities }
   function QueryIoRingCapabilities(out capabilities: IORING_CAPABILITIES): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'QueryIoRingCapabilities' delayed;{$ENDIF}
 
-  // Version 1. Is the operation supported by this ring?
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-isioringopsupported
+  { Version 1. Is the operation supported by this ring?
+    https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-isioringopsupported }
   function IsIoRingOpSupported(ioRing: HIORING; op: IORING_OP_CODE): BOOL;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'IsIoRingOpSupported' delayed;{$ENDIF}
 
-  // Version 1. Creates a ring. Queue sizes are rounded up to powers of two; the
-  // completion queue is at least twice the submission queue.
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-createioring
+  { Version 1. Creates a ring. Queue sizes are rounded up to powers of two; the completion queue is at least twice the
+    submission queue. https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-createioring }
   function CreateIoRing(ioringVersion: IORING_VERSION; flags: IORING_CREATE_FLAGS;
     submissionQueueSize: UInt32; completionQueueSize: UInt32; out h: HIORING): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'CreateIoRing' delayed;{$ENDIF}
 
-  // Version 1. Version and actual queue sizes of a ring.
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-getioringinfo
+  { Version 1. Version and actual queue sizes of a ring.
+    https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-getioringinfo }
   function GetIoRingInfo(ioRing: HIORING; out info: IORING_INFO): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'GetIoRingInfo' delayed;{$ENDIF}
 
-  // Version 1. Submits all built entries; optionally waits for waitOperations
-  // completions (0 = no wait; IORING_SUBMIT_WAIT_ALL = all). submittedEntries
-  // may be nil. On failure (other than a wait timeout) all entries stay queued.
-  // A wait timeout returns HRESULT_FROM_WIN32(ERROR_TIMEOUT): the entries were
-  // submitted, but submittedEntries is not written.
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-submitioring
+  {
+    Version 1. Submits all built entries; optionally waits for waitOperations completions (0 = no wait;
+    IORING_SUBMIT_WAIT_ALL = all). submittedEntries may be nil. On failure (other than a wait timeout) all entries stay
+    queued. A wait timeout returns HRESULT_FROM_WIN32(ERROR_TIMEOUT): the entries were submitted, but submittedEntries
+    is not written. https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-submitioring
+  }
   function SubmitIoRing(ioRing: HIORING; waitOperations: UInt32; milliseconds: UInt32;
     submittedEntries: PCardinal): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'SubmitIoRing' delayed;{$ENDIF}
 
-  // Version 1. Closes a ring.
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-closeioring
+  // Version 1. Closes a ring. https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-closeioring
   function CloseIoRing(ioRing: HIORING): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'CloseIoRing' delayed;{$ENDIF}
 
-  // Version 1. Pops one completion: S_OK, or S_FALSE if the queue is empty
-  // (do not use cqe then; it is zeroed although Learn says "unmodified").
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-popioringcompletion
+  {
+    Version 1. Pops one completion: S_OK, or S_FALSE if the queue is empty (do not use cqe then; it is zeroed although
+    Learn says "unmodified").
+    https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-popioringcompletion
+  }
   function PopIoRingCompletion(ioRing: HIORING; out cqe: IORING_CQE): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'PopIoRingCompletion' delayed;{$ENDIF}
 
-  // Version 1. Event signalled when the completion queue goes from empty to
-  // non-empty. Pop until S_FALSE before waiting on it. 0 clears the event.
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-setioringcompletionevent
+  {
+    Version 1. Event signalled when the completion queue goes from empty to non-empty. Pop until S_FALSE before waiting
+    on it. 0 clears the event.
+    https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-setioringcompletionevent
+  }
   function SetIoRingCompletionEvent(ioRing: HIORING; hEvent: THandle): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'SetIoRingCompletionEvent' delayed;{$ENDIF}
 
-  // Version 1. Requests cancellation of the operation built with userData = opToCancel.
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringcancelrequest
+  { Version 1. Requests cancellation of the operation built with userData = opToCancel.
+    https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringcancelrequest }
   function BuildIoRingCancelRequest(ioRing: HIORING; file_: IORING_HANDLE_REF;
     opToCancel: NativeUInt; userData: NativeUInt): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingCancelRequest' delayed;{$ENDIF}
 
-  // Version 1. Read from a file.
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringreadfile
+  { Version 1. Read from a file.
+    https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringreadfile }
   function BuildIoRingReadFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF;
     dataRef: IORING_BUFFER_REF; numberOfBytesToRead: UInt32; fileOffset: UInt64;
     userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingReadFile' delayed;{$ENDIF}
 
-  // Version 1. Registers file handles (replaces any earlier registration).
-  // INVALID_HANDLE_VALUE entries are sparse. The array must stay valid until
-  // the operation completes.
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringregisterfilehandles
+  {
+    Version 1. Registers file handles (replaces any earlier registration). INVALID_HANDLE_VALUE entries are sparse. The
+    array must stay valid until the operation completes.
+    https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringregisterfilehandles
+  }
   function BuildIoRingRegisterFileHandles(ioRing: HIORING; count: UInt32;
     handles: PHandle; userData: NativeUInt): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingRegisterFileHandles' delayed;{$ENDIF}
 
-  // Version 1. Registers buffers (replaces any earlier registration).
-  // Entries with Address = nil and Length = 0 are sparse. The array must stay
-  // valid until the operation completes.
-  // https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringregisterbuffers
+  {
+    Version 1. Registers buffers (replaces any earlier registration). Entries with Address = nil and Length = 0 are
+    sparse. The array must stay valid until the operation completes.
+    https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/nf-ioringapi-buildioringregisterbuffers
+  }
   function BuildIoRingRegisterBuffers(ioRing: HIORING; count: UInt32;
     buffers: PIORING_BUFFER_INFO; userData: NativeUInt): HRESULT;
     stdcall;{$IFNDEF FPC} external IORING_DLL name 'BuildIoRingRegisterBuffers' delayed;{$ENDIF}
@@ -419,10 +419,11 @@ begin
 end;
 
 {$IFDEF FPC}
-// Free Pascal has no "delayed" imports. Each function is looked up in
-// kernel32.dll when it is called the first time, so a program still starts on
-// Windows without IoRing. A function Windows does not have returns E_NOTIMPL
-// (IsIoRingOpSupported: False) - Delphi raises a delay-load error instead.
+{
+  Free Pascal has no "delayed" imports. Each function is looked up in kernel32.dll when it is called the first time, so
+  a program still starts on Windows without IoRing. A function Windows does not have returns E_NOTIMPL
+  (IsIoRingOpSupported: False) - Delphi raises a delay-load error instead.
+}
 
 type
   TQueryIoRingCapabilities = function(out capabilities: IORING_CAPABILITIES): HRESULT; stdcall;
@@ -478,8 +479,8 @@ var
   GBuildIoRingReadFileScatter: TBuildIoRingReadFileScatter = nil;
   GBuildIoRingWriteFileGather: TBuildIoRingWriteFileGather = nil;
 
-// Looks the function up once; False if this Windows does not have it.
-// Several threads may do this at the same time: they all store the same value.
+{ Looks the function up once; False if this Windows does not have it. Several threads may do this at the same time: they
+  all store the same value. }
 function Resolve(var AFunction; const AName: PAnsiChar): Boolean;
 begin
   if Pointer(AFunction) = nil then
@@ -567,7 +568,7 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingReadFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF; dataRef: IORING_BUFFER_REF; 
+function BuildIoRingReadFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF; dataRef: IORING_BUFFER_REF;
   numberOfBytesToRead: UInt32; fileOffset: UInt64; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingReadFile, 'BuildIoRingReadFile') then
@@ -576,7 +577,7 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingRegisterFileHandles(ioRing: HIORING; count: UInt32; handles: PHandle; 
+function BuildIoRingRegisterFileHandles(ioRing: HIORING; count: UInt32; handles: PHandle;
   userData: NativeUInt): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingRegisterFileHandles, 'BuildIoRingRegisterFileHandles') then
@@ -585,7 +586,7 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingRegisterBuffers(ioRing: HIORING; count: UInt32; buffers: PIORING_BUFFER_INFO; 
+function BuildIoRingRegisterBuffers(ioRing: HIORING; count: UInt32; buffers: PIORING_BUFFER_INFO;
   userData: NativeUInt): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingRegisterBuffers, 'BuildIoRingRegisterBuffers') then
@@ -594,8 +595,8 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingWriteFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF; bufferRef: IORING_BUFFER_REF; 
-  numberOfBytesToWrite: UInt32; fileOffset: UInt64; writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt; 
+function BuildIoRingWriteFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF; bufferRef: IORING_BUFFER_REF;
+  numberOfBytesToWrite: UInt32; fileOffset: UInt64; writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt;
   sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingWriteFile, 'BuildIoRingWriteFile') then
@@ -605,7 +606,7 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingFlushFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF; flushMode: FILE_FLUSH_MODE; 
+function BuildIoRingFlushFile(ioRing: HIORING; fileRef: IORING_HANDLE_REF; flushMode: FILE_FLUSH_MODE;
   userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingFlushFile, 'BuildIoRingFlushFile') then
@@ -614,8 +615,8 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingReadFileScatter(ioRing: HIORING; fileRef: IORING_HANDLE_REF; segmentCount: UInt32; 
-  segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToRead: UInt32; fileOffset: UInt64; userData: NativeUInt; 
+function BuildIoRingReadFileScatter(ioRing: HIORING; fileRef: IORING_HANDLE_REF; segmentCount: UInt32;
+  segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToRead: UInt32; fileOffset: UInt64; userData: NativeUInt;
   sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingReadFileScatter, 'BuildIoRingReadFileScatter') then
@@ -625,8 +626,8 @@ begin
     Result := E_NOTIMPL_RESULT;
 end;
 
-function BuildIoRingWriteFileGather(ioRing: HIORING; fileRef: IORING_HANDLE_REF; segmentCount: UInt32; 
-  segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToWrite: UInt32; fileOffset: UInt64; 
+function BuildIoRingWriteFileGather(ioRing: HIORING; fileRef: IORING_HANDLE_REF; segmentCount: UInt32;
+  segmentArray: PFILE_SEGMENT_ELEMENT; numberOfBytesToWrite: UInt32; fileOffset: UInt64;
   writeFlags: FILE_WRITE_FLAGS; userData: NativeUInt; sqeFlags: IORING_SQE_FLAGS): HRESULT; stdcall;
 begin
   if Resolve(GBuildIoRingWriteFileGather, 'BuildIoRingWriteFileGather') then

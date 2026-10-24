@@ -40,15 +40,11 @@ implementation
 
 uses
 {$IFDEF FPC}
-  SysUtils,
-  Classes,
+  SysUtils, Classes,
 {$ELSE}
-  System.SysUtils,
-  System.Classes,
+  System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.SequentialWriter,
-  Delphi.IOUring.Streams,
+  Delphi.IOUring, Delphi.IOUring.Backend.Custom, Delphi.IOUring.SequentialWriter, Delphi.IOUring.Streams,
   Bench.Common;
 
 {$IFDEF FPC}
@@ -102,16 +98,13 @@ end;
 function CreateStream(const AContender: TContender; const AFileName: string): TStream;
 begin
   case AContender of
-    cnFileStream64K, cnFileStream1M:
-      Result := TFileStream.Create(AFileName, fmCreate);
+    cnFileStream64K, cnFileStream1M: Result := TFileStream.Create(AFileName, fmCreate);
 {$IFNDEF FPC}
-    cnBufferedFileStream:
-      Result := TBufferedFileStream.Create(AFileName, fmCreate, MiB);
+    cnBufferedFileStream: Result := TBufferedFileStream.Create(AFileName, fmCreate, MiB);
 {$ENDIF}
-    cnWriteStream:
-      Result := TSequentialWriteOnlyFileStream.Create(AFileName);
-  else
-    Result := TSequentialWriteOnlyFileStream.Create(AFileName, [swoUnbuffered]);
+    cnWriteStream: Result := TSequentialWriteOnlyFileStream.Create(AFileName);
+    else
+      Result := TSequentialWriteOnlyFileStream.Create(AFileName, [swoUnbuffered]);
   end;
 end;
 
@@ -128,12 +121,15 @@ begin
   LMeasurement.Start;
   LStart := BenchMicroseconds;
   LStream := CreateStream(AContender, AFileName);
+
   try
     for LMiB := 1 to ASizeGiB * 1024 do
     begin
       if AScenario = scWork then
         SpinMicroseconds(GWorkMicroseconds);
+
       LOffset := 0;
+
       while LOffset < MiB do
       begin
         LStream.WriteBuffer((GData + LOffset)^, PIECE_SIZE[AContender]);
@@ -143,6 +139,7 @@ begin
   finally
     LStream.Free;
   end;
+
   Result.WrittenSeconds := (BenchMicroseconds - LStart) / 1000000;
   BenchFlushFile(AFileName);
   LMeasurement.Stop;
@@ -159,19 +156,24 @@ var
   LValue: Double;
 begin
   SetLength(LSorted, Length(AValues));
+
   for LIndex := 0 to High(AValues) do
     LSorted[LIndex] := AValues[LIndex];
+
   for LIndex := 1 to High(LSorted) do
   begin
     LValue := LSorted[LIndex];
     LOther := LIndex - 1;
+
     while (LOther >= 0) and (LSorted[LOther] > LValue) do
     begin
       LSorted[LOther + 1] := LSorted[LOther];
       Dec(LOther);
     end;
+
     LSorted[LOther + 1] := LValue;
   end;
+
   Result := LSorted[High(LSorted) div 2];
 end;
 
@@ -183,15 +185,19 @@ var
 begin
   if GCsvFile = '' then
     Exit;
+
   LNew := not FileExists(GCsvFile);
   AssignFile(LFile, GCsvFile);
+
   if LNew then
     Rewrite(LFile)
   else
     Append(LFile);
+
   try
     if LNew then
       Writeln(LFile, 'timestamp,compiler,platform,size_gib,scenario,contender,run,written_s,flushed_s,cpu_ms');
+
     Writeln(LFile, Format('%s,%s,%s,%d,%s,"%s",%d,%.4f,%.4f,%.1f',
       [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now, GInvariant), COMPILER_NAME, BenchPlatformName, ASizeGiB,
        SCENARIO_NAMES[AScenario], CONTENDER_NAMES[AContender], ARun, AResult.WrittenSeconds,
@@ -202,6 +208,17 @@ begin
 end;
 
 procedure ParseOptions;
+
+  procedure RaiseUnknownOption(const AIndex: Integer); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseErrorFmt(Exception, 'Unknown option: %s', [ParamStr(AIndex)]);
+  end;
+
+  procedure RaiseBadCounts; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseError(Exception, '--runs and --sizes must be at least 1');
+  end;
+
 var
   LIndex: Integer;
   LName: string;
@@ -213,9 +230,11 @@ begin
   GSizes[0] := 1;
   GSizes[1] := 10;
   LIndex := 1;
+
   while LIndex <= ParamCount do
   begin
     LName := LowerCase(ParamStr(LIndex));
+
     if (LName = '--dir') and (LIndex < ParamCount) then
     begin
       Inc(LIndex);
@@ -225,9 +244,11 @@ begin
     begin
       Inc(LIndex);
       LList := TStringList.Create;
+
       try
         LList.CommaText := ParamStr(LIndex);
         SetLength(GSizes, LList.Count);
+
         for LItem := 0 to LList.Count - 1 do
           GSizes[LItem] := StrToInt(LList[LItem]);
       finally
@@ -250,11 +271,13 @@ begin
       GCsvFile := ParamStr(LIndex);
     end
     else
-      raise Exception.CreateFmt('Unknown option: %s', [ParamStr(LIndex)]);
+      RaiseUnknownOption(LIndex);
+
     Inc(LIndex);
   end;
+
   if (GRuns < 1) or (Length(GSizes) = 0) then
-    raise Exception.Create('--runs and --sizes must be at least 1');
+    RaiseBadCounts;
 end;
 
 procedure RunWriteBenchmarks;
@@ -281,40 +304,48 @@ begin
   Writeln(Format('Median of %d runs; work: %d us of CPU time per MiB', [GRuns, GWorkMicroseconds], GInvariant));
 
   GData := TIORingPlatform.AllocPages(MiB);
+
   try
     for LIndex := 0 to MiB - 1 do
       GData[LIndex] := Byte(LIndex * 7 + LIndex shr 8);
+
     for LSizeIndex := 0 to High(GSizes) do
     begin
       LSizeGiB := GSizes[LSizeIndex];
+
       for LScenario := Low(TScenario) to High(TScenario) do
       begin
         Writeln;
         Writeln(Format('%d GiB, %s', [LSizeGiB, SCENARIO_NAMES[LScenario]]));
         Writeln(Format('  %-50s %10s %8s %10s %8s %9s', ['Contender', 'written s', 'MiB/s', '+ flush s', 'MiB/s',
           'CPU ms'], GInvariant));
+
         for LContender := Low(TContender) to High(TContender) do
         begin
           SetLength(LWritten[LContender], GRuns);
           SetLength(LFlushed[LContender], GRuns);
           SetLength(LCpu[LContender], GRuns);
         end;
+
         // The contenders take turns, so that a slow moment of the machine hits all of them
         for LRun := 1 to GRuns do
           for LContender := Low(TContender) to High(TContender) do
           begin
             if not Runs(LContender) then
               Continue;
+
             LResult := RunContender(LContender, LFileName, LSizeGiB, LScenario);
             LWritten[LContender][LRun - 1] := LResult.WrittenSeconds;
             LFlushed[LContender][LRun - 1] := LResult.FlushedSeconds;
             LCpu[LContender][LRun - 1] := LResult.CpuMilliseconds;
             AppendCsv(LSizeGiB, LScenario, LContender, LRun, LResult);
           end;
+
         for LContender := Low(TContender) to High(TContender) do
         begin
           if not Runs(LContender) then
             Continue;
+
           LMedianWritten := Median(LWritten[LContender]);
           LMedianFlushed := Median(LFlushed[LContender]);
           Writeln(Format('  %-50s %10.2f %8.0f %10.2f %8.0f %9.0f', [CONTENDER_NAMES[LContender], LMedianWritten,

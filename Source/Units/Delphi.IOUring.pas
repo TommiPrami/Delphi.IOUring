@@ -1,23 +1,23 @@
 ﻿unit Delphi.IOUring;
 
-  {
-    The unit user code normally uses.
+{
+  The unit user code normally uses.
 
-    TIORing is the ring of the current platform (a compile-time alias, so calls are direct, Docs/Design.md §4). 
-    The other types are re-exported here, so "uses Delphi.IOUring" is enough.
+  TIORing is the ring of the current platform (a compile-time alias, so calls are direct, Docs/Design.md §4).
+  The other types are re-exported here, so "uses Delphi.IOUring" is enough.
 
-    var
-      LRing: TIORing;
-    begin
-      LRing.Open; // closed automatically at the end of scope
-      LRing.PrepareRead(TIORingFileRef.FromHandle(LFile), TIORingBufferRef.FromPointer(@LBuffer), 
-        SizeOf(LBuffer), 0, 1);
-     LRing.Submit(1); // submit and wait for one completion
+  var
+    LRing: TIORing;
+  begin
+    LRing.Open; // closed automatically at the end of scope
+    LRing.PrepareRead(TIORingFileRef.FromHandle(LFile), TIORingBufferRef.FromPointer(@LBuffer),
+      SizeOf(LBuffer), 0, 1);
+   LRing.Submit(1); // submit and wait for one completion
 
-     if LRing.TryPopCompletion(LCompletion) then
-       LCompletion.RaiseIfFailed('Read');
-   end;
-  }
+   if LRing.TryPopCompletion(LCompletion) then
+     LCompletion.RaiseIfFailed('Read');
+ end;
+}
 
 {$I Delphi.IOUring.inc}
 
@@ -101,8 +101,7 @@ const
 
 // True if the ring can be used on this system
 function IORingAvailable: Boolean;
-// What the ring offers on this system, and the system itself (for logs:
-// IORingCapabilities.ToString)
+// What the ring offers on this system, and the system itself (for logs: IORingCapabilities.ToString)
 function IORingCapabilities: TIORingCapabilities;
 
 // Readable text for an OS result code (TIORingCompletion.NativeResult)
@@ -111,12 +110,11 @@ function IORingErrorMessage(const ANativeCode: Integer): string;
 // One scatter/gather segment (a page-sized, page-aligned buffer)
 function IORingSegment(const AAddress: Pointer): TIORingSegment;
 
-// Blocking helpers: prepare, submit, wait, pop. They need an idle ring
-// (nothing prepared or in flight) and raise EIORingError on failure.
-// ReadAt returns the bytes read; 0 at or after the end of the file.
-function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal; 
+{ Blocking helpers: prepare, submit, wait, pop. They need an idle ring (nothing prepared or in flight) and raise
+  EIORingError on failure. ReadAt returns the bytes read; 0 at or after the end of the file. }
+function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
   const AOffset: UInt64): Cardinal;
-function WriteAt(var ARing: TIORing; const AFile: TIORingFileRef; const ABuffer; const ACount: Cardinal; 
+function WriteAt(var ARing: TIORing; const AFile: TIORingFileRef; const ABuffer; const ACount: Cardinal;
   const AOffset: UInt64): Cardinal;
 
 implementation
@@ -141,6 +139,7 @@ begin
 {$IFDEF MSWINDOWS}
   Result := Delphi.IOUring.Backend.Windows.IORingSegment(AAddress);
 {$ENDIF}
+
 {$IFDEF LINUX}
   Result := Delphi.IOUring.Backend.Posix.IORingSegment(AAddress);
 {$ENDIF}
@@ -148,36 +147,36 @@ end;
 
 procedure CheckIdle(var ARing: TIORing; const AOperation: string);
 
-  procedure RaiseIdleRingNeededException(const AOperation: string); // TODO: Delphi 13 noreturn
+  procedure RaiseNotIdle(const AName: string); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.Create(AOperation + ' needs an idle ring (nothing prepared or in flight)'); // todo: "at return address", don't knew if FPC handles it 
+    RaiseIORingErrorFmt('%s needs an idle ring (nothing prepared or in flight)', [AName]);
   end;
 
 begin
   if (ARing.PreparedCount <> 0) or (ARing.PendingCount <> 0) then
-    RaiseIdleRingNeededException(AOperation);
+    RaiseNotIdle(AOperation);
 end;
 
 function WaitForSingleCompletion(var ARing: TIORing; const AOperation: string): TIORingCompletion;
 
-  procedure RaiseIdleRingNeededException(const AOperation: string); // TODO: Delphi 13 noreturn
+  procedure RaiseNoCompletion(const AName: string); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.Create(AOperation + ': no completion after the wait'); // todo: "at return address", don't knew if FPC handles it 
+    RaiseIORingErrorFmt('%s: no completion after the wait', [AName]);
   end;
 
 begin
   ARing.Submit(1);
 
   if not ARing.TryPopCompletion(Result) then
-    RaiseIdleRingNeededException(AOperation);
+    RaiseNoCompletion(AOperation);
 end;
 
-function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal; 
+function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
   const AOffset: UInt64): Cardinal;
 
-  procedure RaiseReadAtNoRoomException; // TODO: Delphi 13 noreturn
+  procedure RaiseNoRoom; {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.Create('ReadAt: no room in the ring'); // todo: "at return address", don't knew if FPC handles it
+    RaiseIORingError('ReadAt: no room in the ring');
   end;
 
 var
@@ -186,7 +185,7 @@ begin
   CheckIdle(ARing, 'ReadAt');
 
   if not ARing.PrepareRead(AFile, TIORingBufferRef.FromPointer(@ABuffer), ACount, AOffset, 0) then
-    RaiseReadAtNoRoomException;
+    RaiseNoRoom;
 
   LCompletion := WaitForSingleCompletion(ARing, 'ReadAt');
 
@@ -198,12 +197,12 @@ begin
   Result := LCompletion.BytesTransferred;
 end;
 
-function WriteAt(var ARing: TIORing; const AFile: TIORingFileRef; const ABuffer; const ACount: Cardinal; 
+function WriteAt(var ARing: TIORing; const AFile: TIORingFileRef; const ABuffer; const ACount: Cardinal;
   const AOffset: UInt64): Cardinal;
 
-  procedure RaiseWriteAtNoRoomException; // TODO: Delphi 13 noreturn
+  procedure RaiseNoRoom; {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    raise EIORingError.Create('WriteAt: no room in the ring'); // todo: "at return address", don't knew if FPC handles it
+    RaiseIORingError('WriteAt: no room in the ring');
   end;
 
 var
@@ -212,7 +211,7 @@ begin
   CheckIdle(ARing, 'WriteAt');
 
   if not ARing.PrepareWrite(AFile, TIORingBufferRef.FromPointer(@ABuffer), ACount, AOffset, 0) then
-    RaiseWriteAtNoRoomException;
+    RaiseNoRoom;
 
   LCompletion := WaitForSingleCompletion(ARing, 'WriteAt');
   LCompletion.RaiseIfFailed('WriteAt');

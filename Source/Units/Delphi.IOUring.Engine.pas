@@ -1,76 +1,63 @@
 ﻿unit Delphi.IOUring.Engine;
 
-// The I/O engine (Docs/Design.md §10, API decisions in §10.4): many threads
-// start reads, writes and flushes; one or more I/O threads, each with its own
-// ring, carry them out, many at a time.
-//
-//   LEngine := TIORingEngine.Create;
-//   try
-//     LHandle := LEngine.ReadAsync(LFile, LBuffer, SizeOf(LBuffer), LOffset);
-//     ...                                       // other work, more requests
-//     LEngine.Wait(LHandle, LCompletion);
-//     LCompletion.RaiseIfFailed('Read');
-//   finally
-//     LEngine.Free;
-//   end;
-//
-// How a request travels:
-//
-//   any thread                                 an I/O thread
-//   ReadAsync: take a slot (request pool),
-//   fill it, put its handle in the queue  -->  take it from the queue and
-//   (wake an I/O thread if all sleep)          prepare it on its ring; one
-//                                              submit for all of them
-//                                              pop the completions, store
-//   Wait: sleep on the slot's state word  <--  the results, mark them
-//   read the result, free the slot             Completed (or call the
-//                                              callback and free the slot)
-//
-// An I/O thread sleeps only when nothing happened in a round: no new
-// requests, nothing to submit, no completions. It then waits for either its
-// "new requests" event or its ring's completion event. Producers wake an I/O
-// thread only when all of them sleep, so while the engine is busy, starting
-// a request costs no system call.
-//
-// Several I/O threads (AIOThreads in Create) all take requests from the same
-// queue. Windows does the work of a request inside the submit call, in the
-// I/O thread - about 7.5 µs for an unbuffered 4 KiB read on a fast PC - so
-// one I/O thread can submit only so many requests per second. More I/O
-// threads help with many small requests of cached data and with unbuffered
-// requests (3.2x as many 4 KiB reads with 4 threads), not with data that
-// comes from the disk through the file cache (Docs/Benchmarks.md, "Several
-// I/O threads"). With siblings, an I/O thread takes at most
-// IORING_ENGINE_SHARE_SIZE requests per round and wakes a sleeping sibling if
-// more are waiting.
-//
-// Requests in flight at the same time have no order (the OS gives none). With
-// the overlap rule orKeepOrder (Docs/Design.md §11), the engine keeps one for
-// each file handle: requests that touch the same bytes (write-write,
-// write-read, read-write) take effect in the order they were started; a later
-// one is held back until the earlier ones have completed. A flush waits for
-// the earlier writes. Reads never wait for reads, and requests that touch
-// other bytes run in parallel. For this, every request of a file handle goes
-// to the same I/O thread (chosen from the handle), so one file uses only one
-// I/O thread. The rule knows file handles, not files: two handles to the same
-// file are two "files" for it.
-//
-// Open files with FILE_FLAG_OVERLAPPED (TIORingPlatform.OpenFileForRead does):
-// a handle opened without it works, but Windows then carries out its I/O one
-// request at a time - no parallel reads (measured: Docs/Benchmarks.md,
-// "Blocks known in advance").
-//
-// Every request completes: done, failed or cancelled. Destroy cancels what is
-// left and waits for it. Buffers and file handles must stay valid until their
-// request has completed. (Known limit: if a ring itself fails - a system
-// call error, not an I/O error - its I/O thread stops, and the requests in
-// that ring do not complete.)
-//
-// A request is a slot of the request pool from ReadAsync until Wait (or until
-// its callback has run). When all MaxRequests are taken, starting another
-// one waits until one is freed - so threads that keep requests without
-// waiting for them can wait for each other forever. Rule: MaxRequests must be
-// more than the sum, over all threads, of the requests a thread keeps while
-// it starts a new one.
+{
+  The I/O engine (Docs/Design.md §10, API decisions in §10.4): many threads start reads, writes and flushes; one or more
+  I/O threads, each with its own ring, carry them out, many at a time.
+
+    LEngine := TIORingEngine.Create;
+    try
+      LHandle := LEngine.ReadAsync(LFile, LBuffer, SizeOf(LBuffer), LOffset);
+      ...                                       // other work, more requests
+      LEngine.Wait(LHandle, LCompletion);
+      LCompletion.RaiseIfFailed('Read');
+    finally
+      LEngine.Free;
+    end;
+
+  How a request travels:
+
+    any thread                                 an I/O thread
+    ReadAsync: take a slot (request pool),
+    fill it, put its handle in the queue  -->  take it from the queue and
+    (wake an I/O thread if all sleep)          prepare it on its ring; one
+                                               submit for all of them
+                                               pop the completions, store
+    Wait: sleep on the slot's state word  <--  the results, mark them
+    read the result, free the slot             Completed (or call the
+                                               callback and free the slot)
+
+  An I/O thread sleeps only when nothing happened in a round: no new requests, nothing to submit, no completions. It
+  then waits for either its "new requests" event or its ring's completion event. Producers wake an I/O thread only when
+  all of them sleep, so while the engine is busy, starting a request costs no system call.
+
+  Several I/O threads (AIOThreads in Create) all take requests from the same queue. Windows does the work of a request
+  inside the submit call, in the I/O thread - about 7.5 µs for an unbuffered 4 KiB read on a fast PC - so one I/O thread
+  can submit only so many requests per second. More I/O threads help with many small requests of cached data and with
+  unbuffered requests (3.2x as many 4 KiB reads with 4 threads), not with data that comes from the disk through the file
+  cache (Docs/Benchmarks.md, "Several I/O threads"). With siblings, an I/O thread takes at most IORING_ENGINE_SHARE_SIZE
+  requests per round and wakes a sleeping sibling if more are waiting.
+
+  Requests in flight at the same time have no order (the OS gives none). With the overlap rule orKeepOrder
+  (Docs/Design.md §11), the engine keeps one for each file handle: requests that touch the same bytes (write-write,
+  write-read, read-write) take effect in the order they were started; a later one is held back until the earlier
+  ones have completed. A flush waits for the earlier writes. Reads never wait for reads, and requests that touch
+  other bytes run in parallel. For this, every request of a file handle goes to the same I/O thread (chosen from the
+  handle), so one file uses only one I/O thread. The rule knows file handles, not files: two handles to the same
+  file are two "files" for it.
+
+  Open files with FILE_FLAG_OVERLAPPED (TIORingPlatform.OpenFileForRead does): a handle opened without it works,
+  but Windows then carries out its I/O one request at a time - no parallel reads (measured: Docs/Benchmarks.md,
+  "Blocks known in advance").
+
+  Every request completes: done, failed or cancelled. Destroy cancels what is left and waits for it. Buffers and file
+  handles must stay valid until their request has completed. (Known limit: if a ring itself fails - a system call error,
+  not an I/O error - its I/O thread stops, and the requests in that ring do not complete.)
+
+  A request is a slot of the request pool from ReadAsync until Wait (or until its callback has run). When all
+  MaxRequests are taken, starting another one waits until one is freed - so threads that keep requests without waiting
+  for them can wait for each other forever. Rule: MaxRequests must be more than the sum, over all threads, of the
+  requests a thread keeps while it starts a new one.
+}
 
 {$I Delphi.IOUring.inc}
 
@@ -78,42 +65,37 @@ interface
 
 uses
 {$IFDEF FPC}
-  SysUtils,
-  Classes,
+  SysUtils, Classes,
 {$ELSE}
-  System.SysUtils,
-  System.Classes,
+  System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring,
-  Delphi.IOUring.Atomics,
-  Delphi.IOUring.RequestPool,
-  Delphi.IOUring.RequestQueue;
+  Delphi.IOUring, Delphi.IOUring.Atomics, Delphi.IOUring.RequestPool, Delphi.IOUring.RequestQueue;
 
 const
   IORING_ENGINE_DEFAULT_MAX_REQUESTS = 1024;
   IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE = 256;
   IORING_ENGINE_MAX_IO_THREADS = 64;
-  // With more than one I/O thread: the most requests a thread takes from the
-  // queue in one round, before it submits them; if more are waiting, it
-  // first wakes a sleeping sibling
+  { With more than one I/O thread: the most requests a thread takes from the queue in one round, before it submits them;
+    if more are waiting, it first wakes a sleeping sibling }
   IORING_ENGINE_SHARE_SIZE = 16;
 
 type
-  // The handle of a request (from Delphi.IOUring.RequestPool), here too so
-  // that users of the engine need only this unit and Delphi.IOUring
+  { The handle of a request (from Delphi.IOUring.RequestPool), here too so that users of the engine need only
+    this unit and Delphi.IOUring }
   TIORingRequestHandle = Delphi.IOUring.RequestPool.TIORingRequestHandle;
 
-  // What the engine does with requests in flight at the same time that touch
-  // the same bytes of a file (Docs/Design.md §11)
+  { What the engine does with requests in flight at the same time that touch the same bytes of a
+    file (Docs/Design.md §11) }
   TIORingOverlapRule = (
     orNone,          // nothing: they run in any order (the user keeps them apart)
     orKeepOrder      // per file handle, they take effect in the order they were started
   );
 
-  // Called on the I/O thread that completed the request, for a request
-  // started with a callback; ACompletion.UserData is the caller's value. Keep
-  // it short (the I/O thread does nothing else meanwhile), and do not wait for
-  // other requests in it.
+  {
+    Called on the I/O thread that completed the request, for a request started with a callback;
+    ACompletion.UserData is the caller's value. Keep it short (the I/O thread does nothing else meanwhile), and do
+    not wait for other requests in it.
+  }
   TIORingCompletionEvent = procedure(const ACompletion: TIORingCompletion) of object;
 
   // Counted by the I/O threads
@@ -137,8 +119,7 @@ type
     FStarted: Boolean;
     FMaxRequests: Cardinal;
     FOverlapRule: TIORingOverlapRule;
-    // Words that several threads write, each on a cache line of its own
-    // (the I/O threads' sleeping flags too)
+    // Words that several threads write, each on a cache line of its own (the I/O threads' sleeping flags too)
     FSharedMemory: Pointer;
     FStopping: PInteger;          // 1: Destroy has begun: no new requests
     FStartCalls: PInteger;        // threads inside ReadAsync / WriteAsync / FlushAsync
@@ -157,26 +138,25 @@ type
     function WakeSleepingIOThread(const AExceptIndex: Integer): Boolean;
     function GetIOThreadCount: Integer;
   public
-    // AMaxRequests: requests that can be started and not yet waited for (or
-    // whose callback has not run); ASubmissionQueueSize: the submission queue
-    // of each I/O thread's ring; AIOThreads: 1..IORING_ENGINE_MAX_IO_THREADS;
-    // AOverlapRule: see TIORingOverlapRule and the unit's comment.
-    // Raises EIORingNotSupported without IoRing.
+    {
+      AMaxRequests: requests that can be started and not yet waited for (or whose callback has not run);
+      ASubmissionQueueSize: the submission queue of each I/O thread's ring; AIOThreads: 1..IORING_ENGINE_MAX_IO_THREADS;
+      AOverlapRule: see TIORingOverlapRule and the unit's comment. Raises EIORingNotSupported without IoRing.
+    }
     constructor Create(const AMaxRequests: Cardinal = IORING_ENGINE_DEFAULT_MAX_REQUESTS;
       const ASubmissionQueueSize: Cardinal = IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE;
       const AIOThreads: Integer = 1; const AOverlapRule: TIORingOverlapRule = orNone);
-    // Accepts no new requests, cancels the requests not finished yet and waits
-    // until each has completed. Threads blocked in Wait wake up (the result is
-    // "cancelled"); calling the engine after Destroy has returned is an error.
+    { Accepts no new requests, cancels the requests not finished yet and waits until each has completed. Threads blocked
+      in Wait wake up (the result is "cancelled"); calling the engine after Destroy has returned is an error. }
     destructor Destroy; override;
 
-    // Start a request and return at once. ABuffer and AFile must stay valid
-    // until the request has completed. AUserData comes back in the completion.
-    // When all MaxRequests requests are in use, the call sleeps until one is
-    // free. Without AOnComplete, finish the request with Wait (or
-    // TryGetResult / WaitAll). With AOnComplete, it is called on an I/O
-    // thread, the request then ends by itself, and the result is an empty
-    // handle. Raises EIORingError when the engine is being destroyed.
+    {
+      Start a request and return at once. ABuffer and AFile must stay valid until the request has completed. AUserData
+      comes back in the completion. When all MaxRequests requests are in use, the call sleeps until one is free.
+      Without AOnComplete, finish the request with Wait (or TryGetResult / WaitAll). With AOnComplete, it is called on
+      an I/O thread, the request then ends by itself, and the result is an empty handle. Raises EIORingError when the
+      engine is being destroyed.
+    }
     function ReadAsync(const AFile: THandle; var ABuffer; const ACount: Cardinal; const AOffset: UInt64;
       const AUserData: NativeUInt = 0; const AOnComplete: TIORingCompletionEvent = nil): TIORingRequestHandle;
     function WriteAsync(const AFile: THandle; const ABuffer; const ACount: Cardinal; const AOffset: UInt64;
@@ -184,10 +164,11 @@ type
     function FlushAsync(const AFile: THandle; const AMode: TIORingFlushMode = rfmDefault;
       const AUserData: NativeUInt = 0; const AOnComplete: TIORingCompletionEvent = nil): TIORingRequestHandle;
 
-    // Waits until the request has completed and returns its completion
-    // (UserData = the caller's value); the request is then finished and the
-    // handle no longer valid. False: timeout - the handle stays valid. One
-    // Wait per request; a handle that is not valid raises EIORingError.
+    {
+      Waits until the request has completed and returns its completion (UserData = the caller's value); the request is
+      then finished and the handle no longer valid. False: timeout - the handle stays valid. One Wait per request; a
+      handle that is not valid raises EIORingError.
+    }
     function Wait(const AHandle: TIORingRequestHandle; out ACompletion: TIORingCompletion;
       const ATimeoutMilliseconds: Cardinal = IORING_INFINITE): Boolean;
     // Wait with timeout 0
@@ -195,10 +176,8 @@ type
     // Waits for all; ACompletions[I] belongs to AHandles[I]
     procedure WaitAll(const AHandles: array of TIORingRequestHandle; var ACompletions: array of TIORingCompletion);
 
-    // Requests started by this thread between BeginBatch and EndBatch do not
-    // wake an I/O thread; EndBatch wakes one (if all sleep), so that they go
-    // to a ring with few submits. Batches can be nested; one engine at a time
-    // per thread.
+    { Requests started by this thread between BeginBatch and EndBatch do not wake an I/O thread; EndBatch wakes one (if
+      all sleep), so that they go to a ring with few submits. Batches can be nested; one engine at a time per thread. }
     procedure BeginBatch;
     procedure EndBatch;
 
@@ -215,6 +194,9 @@ type
   end;
 
 implementation
+
+uses
+  Delphi.IOUring.Backend.Custom;
 
 const
   // UserData of the engine's own cancel operations (a request handle is never 0)
@@ -238,8 +220,7 @@ type
     OnComplete: TIORingCompletionEvent;
     NativeResult: Integer;
     BytesTransferred: NativeUInt;
-    // orKeepOrder: the request's place in its file's list of unfinished
-    // requests (start order; handle values, 0 = none)
+    // orKeepOrder: the request's place in its file's list of unfinished requests (start order; handle values, 0 = none)
     FileIndex: Integer;            // the file in its I/O thread's table (-1: not in a list)
     FilePrev: TIORingUserData;
     FileNext: TIORingUserData;
@@ -272,8 +253,8 @@ type
     FStats: TIORingEngineStats;
     FInFlight: array of TIORingRequestHandle;    // requests in the ring
     FInFlightCount: Integer;
-    // Requests that may start but did not fit into the ring yet, or that are
-    // no longer held back; in start order (a ring buffer)
+    { Requests that may start but did not fit into the ring yet, or that are no longer held back; in
+      start order (a ring buffer) }
     FReady: array of TIORingRequestHandle;
     FReadyHead: Integer;
     FReadyCount: Integer;
@@ -288,7 +269,7 @@ type
     procedure Run;
     procedure PushReady(const AHandle: TIORingRequestHandle);
     function TakeNewRequests: Boolean;
-    function TakeFromQueue(out AHandle: TIORingRequestHandle): Boolean;
+    function TakeFromQueue(var AHandle: TIORingRequestHandle): Boolean;
     function PrepareRequest(const AHandle: TIORingRequestHandle): Boolean;
     // orKeepOrder
     function FindOrAddFile(const AFile: THandle): Integer;
@@ -312,8 +293,7 @@ type
     // Any thread: if this I/O thread sleeps, claims the wake-up and wakes it
     function TryWake: Boolean;
     procedure Signal;
-    // WaitFor, without FPC's 100 ms steps on Unix (see the implementation).
-    // Only for a thread whose Execute ran.
+    // WaitFor, without FPC's 100 ms steps on Unix (see the implementation). Only for a thread whose Execute ran.
     procedure WaitUntilEnded;
     function GetStats: TIORingEngineStats;
   end;
@@ -339,8 +319,8 @@ begin
     Result := AFirst^.Offset - ASecond^.Offset < ASecond^.Count;
 end;
 
-// Must ALater wait for AEarlier (orKeepOrder)? Writes and reads of the same
-// bytes, in any order but read-read; a flush waits for earlier writes.
+{ Must ALater wait for AEarlier (orKeepOrder)? Writes and reads of the same bytes, in any order but read-read; a flush
+  waits for earlier writes. }
 function MustWaitFor(const AEarlier, ALater: PEngineRequest): Boolean;
 begin
   case ALater^.Operation of
@@ -351,8 +331,8 @@ begin
   end;
 end;
 
-// A number for a file handle that spreads the files evenly: Windows handles
-// are multiples of 4, Linux file descriptors are small numbers in a row
+{ A number for a file handle that spreads the files evenly: Windows handles are multiples of 4, Linux file descriptors
+  are small numbers in a row }
 function FileHash(const AFile: THandle): NativeUInt; inline;
 begin
 {$IFDEF MSWINDOWS}
@@ -368,8 +348,8 @@ begin
   Result := Integer(FileHash(AFile) mod NativeUInt(AIOThreadCount));
 end;
 
-// A failed request: an error, but not the end of the file (Windows reports
-// that as an error code; Linux as a read of 0 bytes)
+{ A failed request: an error, but not the end of the file (Windows reports that as an error code;
+  Linux as a read of 0 bytes) }
 function IsFailure(const ANativeResult: Integer): Boolean; inline;
 begin
 {$IFDEF MSWINDOWS}
@@ -452,11 +432,11 @@ begin
   end;
 end;
 
-// Free Pascal 3.2.2 on Unix: TThread.WaitFor, called from the main thread,
-// checks every 100 ms whether the thread has finished (it waits in
-// CheckSynchronize(100)), so freeing an engine took up to 100 ms. When
-// Finished is already True it returns at once. So first wait for the end of
-// Execute (futex), then for Finished, which is set right after Execute.
+{
+  Free Pascal 3.2.2 on Unix: TThread.WaitFor, called from the main thread, checks every 100 ms whether the thread has
+  finished (it waits in CheckSynchronize(100)), so freeing an engine took up to 100 ms. When Finished is already True it
+  returns at once. So first wait for the end of Execute (futex), then for Finished, which is set right after Execute.
+}
 procedure TIORingIOThread.WaitUntilEnded;
 begin
 {$IF defined(FPC) and defined(UNIX)}
@@ -523,6 +503,7 @@ begin
     if TAtomic.LoadAcquire(FEngine.FShutdown) <> 0 then
     begin
       CancelEverything;
+
       Exit;
     end;
 
@@ -538,7 +519,7 @@ begin
   Inc(FReadyCount);
 end;
 
-function TIORingIOThread.TakeFromQueue(out AHandle: TIORingRequestHandle): Boolean;
+function TIORingIOThread.TakeFromQueue(var AHandle: TIORingRequestHandle): Boolean;
 var
   LValue: NativeUInt;
 begin
@@ -613,9 +594,8 @@ var
   LFile: TIORingFileRef;
   LError: Integer;
 begin
-  // One place in the ring stays free: Destroy needs it for a cancel when the
-  // ring is full of requests that only a cancel ends (reads from a pipe that
-  // gets no data). Without it, Destroy waited for them forever.
+  { One place in the ring stays free: Destroy needs it for a cancel when the ring is full of requests that only a cancel
+    ends (reads from a pipe that gets no data). Without it, Destroy waited for them forever. }
   if (FRing.CompletionQueueSize > 1) and (FRing.PreparedCount + FRing.PendingCount + 1 >= FRing.CompletionQueueSize) then
     Exit(False);
 
@@ -634,8 +614,7 @@ begin
   except
     on E: EIORingError do
     begin
-      // The ring refused the request (for example a bad handle): it
-      // completes at once, with the ring's error
+      // The ring refused the request (for example a bad handle): it completes at once, with the ring's error
       LError := E.NativeCode;
 
       if LError = 0 then
@@ -759,8 +738,8 @@ var
   LFile: Integer;
   LValue: TIORingUserData;
 begin
-  // Every request of the file that is not finished yet was started earlier:
-  // the new one waits if it must wait for any of them
+  { Every request of the file that is not finished yet was started earlier: the new one waits if it
+    must wait for any of them }
   LRequest := FEngine.FPool.Payload(AHandle);
   LFile := FindOrAddFile(LRequest^.FileHandle);
   Result := True;
@@ -773,6 +752,7 @@ begin
     if MustWaitFor(LOther, LRequest) then
     begin
       Result := False;
+
       Break;
     end;
 
@@ -836,8 +816,8 @@ var
   LOther: PEngineRequest;
   LMustWait: Boolean;
 begin
-  // In start order: a held-back request may start when nothing earlier that
-  // is still unfinished (started or held back itself) makes it wait
+  { In start order: a held-back request may start when nothing earlier that is still unfinished (started or held
+    back itself) makes it wait }
   LValue := FFiles[AFileIndex].Head;
 
   while LValue <> 0 do
@@ -856,6 +836,7 @@ begin
         if MustWaitFor(LOther, LRequest) then
         begin
           LMustWait := True;
+
           Break;
         end;
 
@@ -886,8 +867,7 @@ var
 begin
   LRequest := FEngine.FPool.Payload(AHandle);
 
-  // Out of its file's list first: once it is Completed, its owner may free
-  // the slot at once
+  // Out of its file's list first: once it is Completed, its owner may free the slot at once
   if LRequest^.FileIndex >= 0 then
     FileRequestDone(LRequest);
 
@@ -927,14 +907,12 @@ procedure TIORingIOThread.SleepUntilWork;
 var
   LStayAwake: Boolean;
 begin
-  // Say "sleeping" first, then look once more: a producer that queued a
-  // request before it saw all I/O threads sleeping woke none. (Both sides
-  // use full barriers, so at least one of the two sees the other.)
+  { Say "sleeping" first, then look once more: a producer that queued a request before it saw all I/O threads sleeping
+    woke none. (Both sides use full barriers, so at least one of the two sees the other.) }
   TAtomic.Exchange(FSleeping^, 1);
   TAtomic.Increment(FEngine.FSleepingCount^);
 
-  // (Requests in FReady after a quiet round mean: this ring is full, only a
-  // completion helps it.)
+  // (Requests in FReady after a quiet round mean: this ring is full, only a completion helps it.)
   LStayAwake := TAtomic.LoadAcquire(FEngine.FShutdown) <> 0;
 
   if LStayAwake then
@@ -957,8 +935,7 @@ begin
     TIORingPlatform.WaitForEvents(FWakeEvent, FRing.CompletionEventHandle);
   end;
 
-  // (If a producer claimed the wake-up meanwhile, its event comes later:
-  // one extra round, harmless)
+  // (If a producer claimed the wake-up meanwhile, its event comes later: one extra round, harmless)
   TAtomic.Exchange(FSleeping^, 0);
   TAtomic.Decrement(FEngine.FSleepingCount^);
 end;
@@ -971,9 +948,11 @@ var
   LIndex: Integer;
   LPrepared: Boolean;
 begin
-  // 1. Requests not in a ring yet: cancelled without starting them - those
-  //    that may start, those held back (none of them starts any more), and
-  //    the queued ones (the other I/O threads empty the shared queue too)
+  {
+    1. Requests not in a ring yet: cancelled without starting them - those
+       that may start, those held back (none of them starts any more), and
+       the queued ones (the other I/O threads empty the shared queue too)
+  }
   FCancelling := True;
 
   while FReadyCount > 0 do
@@ -998,9 +977,11 @@ begin
   while TakeFromQueue(LHandle) do
     FinishRequest(LHandle, IORING_RESULT_CANCELLED, 0);
 
-  // 2. Requests in this ring: ask the ring to cancel each one. (One that
-  //    completes meanwhile makes its cancel fail - harmless; no new request
-  //    can take its slot any more.)
+  {
+    2. Requests in this ring: ask the ring to cancel each one. (One that
+       completes meanwhile makes its cancel fail - harmless; no new request
+       can take its slot any more.)
+  }
   SetLength(LTargets, FInFlightCount);
 
   for LIndex := 0 to FInFlightCount - 1 do
@@ -1009,6 +990,7 @@ begin
   for LIndex := 0 to High(LTargets) do
     repeat
       LPrepared := True;    // if the ring refuses: it completes by itself
+
       try
         LPrepared := FRing.PrepareCancel(
           TIORingFileRef.FromHandle(PEngineRequest(FEngine.FPool.Payload(LTargets[LIndex]))^.FileHandle),
@@ -1047,6 +1029,12 @@ end;
 
 constructor TIORingEngine.Create(const AMaxRequests: Cardinal; const ASubmissionQueueSize: Cardinal;
   const AIOThreads: Integer; const AOverlapRule: TIORingOverlapRule);
+
+  procedure RaiseIOThreadsOutOfRange(const ACount: Integer); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('The engine needs 1..%d I/O threads, not %d', [IORING_ENGINE_MAX_IO_THREADS, ACount]);
+  end;
+
 var
   LShared: PByte;
   LIndex: Integer;
@@ -1055,8 +1043,7 @@ begin
   inherited Create;
 
   if (AIOThreads < 1) or (AIOThreads > IORING_ENGINE_MAX_IO_THREADS) then
-    raise EIORingError.CreateFmt('The engine needs 1..%d I/O threads, not %d', [IORING_ENGINE_MAX_IO_THREADS,
-      AIOThreads]);
+    RaiseIOThreadsOutOfRange(AIOThreads);
 
   FMaxRequests := AMaxRequests;
   FOverlapRule := AOverlapRule;
@@ -1070,8 +1057,7 @@ begin
   FSleepingCount := Pointer(LShared + 4 * IORING_CACHE_LINE_SIZE);
 
   FPool.Open(AMaxRequests, SizeOf(TEngineRequest));
-  // As big as the pool: a request is in the queue at most once, so the queue
-  // is never full
+  // As big as the pool: a request is in the queue at most once, so the queue is never full
   FQueue.Open(AMaxRequests);
   SetLength(FIOThreads, AIOThreads);
 
@@ -1112,8 +1098,10 @@ begin
     for LIndex := 0 to High(FIOThreads) do
       IOThread(FIOThreads[LIndex]).WaitUntilEnded;
 
-    // 4. Threads in Wait have been woken (every request has completed): let
-    //    them leave before the pool goes away
+    {
+      4. Threads in Wait have been woken (every request has completed): let
+         them leave before the pool goes away
+    }
     while TAtomic.LoadAcquire(FWaitCalls^) > 0 do
       TThread.Yield;
   end
@@ -1176,6 +1164,16 @@ begin
   Result := StartRequest(ioFlush, AFile, nil, 0, 0, AMode, AUserData, AOnComplete);
 end;
 
+procedure RaiseShuttingDown; {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseIORingError('The engine is shutting down: no new requests');
+end;
+
+procedure RaiseQueueFull; {$IFNDEF FPC} noreturn; {$ENDIF}
+begin
+  RaiseIORingError('Internal error: the request queue is full');
+end;
+
 function TIORingEngine.StartRequest(const AOperation: TIORingOp; const AFile: THandle; const ABuffer: Pointer;
   const ACount: Cardinal; const AOffset: UInt64; const AFlushMode: TIORingFlushMode;
   const AUserData: NativeUInt; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
@@ -1186,9 +1184,11 @@ var
 begin
   // Counted, so that Destroy can wait until no thread is half-way here
   TAtomic.Increment(FStartCalls^);
+
   try
     if TAtomic.LoadAcquire(FStopping^) <> 0 then
-      raise EIORingError.Create('The engine is shutting down: no new requests');
+      RaiseShuttingDown;
+
     LHandle := AcquireSlot;
     LRequest := FPool.Payload(LHandle);
     LRequest^.Operation := AOperation;
@@ -1211,13 +1211,12 @@ begin
 
     if FOverlapRule = orKeepOrder then
     begin
-      // To the I/O thread of the file handle: it alone keeps the order. The
-      // enqueue is a full barrier, and that thread says "sleeping" before it
-      // looks at its queue once more: one of the two sees the other.
+      { To the I/O thread of the file handle: it alone keeps the order. The enqueue is a full barrier, and that thread
+        says "sleeping" before it looks at its queue once more: one of the two sees the other. }
       LOwner := IOThread(FIOThreads[IOThreadIndexOf(AFile, Length(FIOThreads))]);
 
       if not LOwner.FQueue.TryEnqueue(LHandle.Value) then
-        raise EIORingError.Create('Internal error: the request queue is full');
+        RaiseQueueFull;
 
       if (GBatchDepth = 0) or (GBatchEngine <> Self) then
         LOwner.TryWake;
@@ -1225,7 +1224,7 @@ begin
     else
     begin
       if not FQueue.TryEnqueue(LHandle.Value) then
-        raise EIORingError.Create('Internal error: the request queue is full');
+        RaiseQueueFull;
 
       if (GBatchDepth = 0) or (GBatchEngine <> Self) then
         WakeIOThread;
@@ -1248,9 +1247,10 @@ begin
   if FPool.TryAcquire(Result) then
     Exit;
 
-  // All requests in use: sleep until one is released. Announce the wait
-  // first and then look again, so that a release in between is not missed.
+  { All requests in use: sleep until one is released. Announce the wait first and then look again, so that a release
+    in between is not missed. }
   TAtomic.Increment(FSlotWaiters^);
+
   try
     repeat
       LSeen := TAtomic.LoadAcquire(FSlotsReleased^);
@@ -1259,7 +1259,7 @@ begin
         Exit;
 
       if TAtomic.LoadAcquire(FStopping^) <> 0 then
-        raise EIORingError.Create('The engine is shutting down: no new requests');
+        RaiseShuttingDown;
 
       TAtomic.WaitWhileEqual(FSlotsReleased^, LSeen);
     until False;
@@ -1278,9 +1278,8 @@ end;
 
 procedure TIORingEngine.WakeIOThread;
 begin
-  // The enqueue before this was a full barrier: either this sees all I/O
-  // threads sleeping, or one of them (it counts itself and then looks at the
-  // queue) sees the new request. An I/O thread that is awake takes it.
+  { The enqueue before this was a full barrier: either this sees all I/O threads sleeping, or one of them (it counts
+    itself and then looks at the queue) sees the new request. An I/O thread that is awake takes it. }
   if TAtomic.LoadAcquire(FSleepingCount^) >= Length(FIOThreads) then
     WakeSleepingIOThread(-1);
 end;
@@ -1298,20 +1297,32 @@ begin
 end;
 
 procedure TIORingEngine.BeginBatch;
+
+  procedure RaiseOtherEnginesBatch; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('BeginBatch: this thread is in a batch of another engine');
+  end;
+
 begin
   if (GBatchDepth > 0) and (GBatchEngine <> Self) then
-    raise EIORingError.Create('BeginBatch: this thread is in a batch of another engine');
+    RaiseOtherEnginesBatch;
 
   GBatchEngine := Self;
   Inc(GBatchDepth);
 end;
 
 procedure TIORingEngine.EndBatch;
+
+  procedure RaiseNoBatch; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('EndBatch without BeginBatch');
+  end;
+
 var
   LIndex: Integer;
 begin
   if (GBatchDepth = 0) or (GBatchEngine <> Self) then
-    raise EIORingError.Create('EndBatch without BeginBatch');
+    RaiseNoBatch;
 
   Dec(GBatchDepth);
 
@@ -1335,33 +1346,46 @@ end;
 
 function TIORingEngine.Wait(const AHandle: TIORingRequestHandle; out ACompletion: TIORingCompletion;
   const ATimeoutMilliseconds: Cardinal): Boolean;
+
+  procedure RaiseWaitedByAnother; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('Wait: another thread waited for the same request');
+  end;
+
+  procedure RaiseUnknownRequest; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('Wait: not a request of this engine, or already waited for');
+  end;
+
 var
   LRequest: PEngineRequest;
+  LWaitResult: TIORingWaitResult;
 begin
   ACompletion.UserData := 0;
   ACompletion.NativeResult := 0;
   ACompletion.BytesTransferred := 0;
   // Counted, so that Destroy can wait until no thread is in here
   TAtomic.Increment(FWaitCalls^);
+
   try
-    case FPool.WaitFor(AHandle, ATimeoutMilliseconds) of
-      wrCompleted:
-        begin
-          LRequest := FPool.Payload(AHandle);
-          ACompletion.UserData := LRequest^.UserData;
-          ACompletion.NativeResult := LRequest^.NativeResult;
-          ACompletion.BytesTransferred := LRequest^.BytesTransferred;
+    LWaitResult := FPool.WaitFor(AHandle, ATimeoutMilliseconds);
 
-          if not FPool.Release(AHandle) then
-            raise EIORingError.Create('Wait: another thread waited for the same request');
+    if LWaitResult = wrStale then
+      RaiseUnknownRequest;
 
-          SlotReleased;
+    Result := LWaitResult = wrCompleted;
 
-          Result := True;
-        end;
-      wrTimeout: Result := False;
-      else
-        raise EIORingError.Create('Wait: not a request of this engine, or already waited for');
+    if Result then
+    begin
+      LRequest := FPool.Payload(AHandle);
+      ACompletion.UserData := LRequest^.UserData;
+      ACompletion.NativeResult := LRequest^.NativeResult;
+      ACompletion.BytesTransferred := LRequest^.BytesTransferred;
+
+      if not FPool.Release(AHandle) then
+        RaiseWaitedByAnother;
+
+      SlotReleased;
     end;
   finally
     TAtomic.Decrement(FWaitCalls^);
@@ -1373,13 +1397,19 @@ begin
   Result := Wait(AHandle, ACompletion, 0);
 end;
 
-procedure TIORingEngine.WaitAll(const AHandles: array of TIORingRequestHandle; 
+procedure TIORingEngine.WaitAll(const AHandles: array of TIORingRequestHandle;
   var ACompletions: array of TIORingCompletion);
+
+  procedure RaiseCompletionsTooShort; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingError('WaitAll: ACompletions is shorter than AHandles');
+  end;
+
 var
   LIndex: Integer;
 begin
   if Length(ACompletions) < Length(AHandles) then
-    raise EIORingError.Create('WaitAll: ACompletions is shorter than AHandles');
+    RaiseCompletionsTooShort;
 
   for LIndex := 0 to High(AHandles) do
     Wait(AHandles[LIndex], ACompletions[LIndex]);
@@ -1407,9 +1437,15 @@ begin
 end;
 
 function TIORingEngine.IOThreadStats(const AIndex: Integer): TIORingEngineStats;
+
+  procedure RaiseNoIOThread(const AThread: Integer; const AHigh: Integer); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('IOThreadStats: no I/O thread %d (0..%d)', [AThread, AHigh]);
+  end;
+
 begin
   if (AIndex < 0) or (AIndex >= Length(FIOThreads)) then
-    raise EIORingError.CreateFmt('IOThreadStats: no I/O thread %d (0..%d)', [AIndex, High(FIOThreads)]);
+    RaiseNoIOThread(AIndex, High(FIOThreads));
 
   Result := IOThread(FIOThreads[AIndex]).GetStats;
 end;
