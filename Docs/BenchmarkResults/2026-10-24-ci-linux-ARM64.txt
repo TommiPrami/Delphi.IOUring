@@ -1,0 +1,213 @@
+GitHub Actions run 40081175566 (commit 2999f18), runner: linux-ARM64, 2026-10-24
+
+=== Benchmarks
+Free Pascal 3.2.2, LinuxArm64, 3 runs, files in /tmp/Delphi.IOUring.Bench
+
+Creating /tmp/Delphi.IOUring.Bench/Bench-1GiB.bin ...
+Creating /tmp/Delphi.IOUring.Bench/Bench-4GiB.bin ...
+LinuxArm64 FPC, 1 GiB, read-through, cold cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            2.601       394        63       205       0
+  TFileStream 1 MiB reads                             2.582       397        76       115       0
+  read 1 MiB, sequential hint                         2.615       392        58       131       0
+  io_uring stream, 64 KiB reads                       2.590       395       122       221     134
+  io_uring stream, 64 KiB reads, unbuffered           2.562       400       168        87     141
+  io_uring reader, zero-copy                          2.569       399        74       237     143
+  io_uring reader, zero-copy, unbuffered              2.598       394        87        75     226
+
+LinuxArm64 FPC, 1 GiB, read-through, warm cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.184      5558        65       120       0
+  TFileStream 1 MiB reads                             0.143      7145        65        79       0
+  read 1 MiB, sequential hint                         0.141      7248        71        71       0
+  io_uring stream, 64 KiB reads                       0.196      5231       114        82       0
+  io_uring reader, zero-copy                          0.151      6781        73        78       0
+
+LinuxArm64 FPC, 1 GiB, work, cold cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            2.598       394       267       203       0
+  TFileStream 1 MiB reads                             2.591       395       276       121       0
+  read 1 MiB, sequential hint                         2.596       394       270       126       0
+  io_uring stream, 64 KiB reads                       2.589       396       309       298     121
+  io_uring stream, 64 KiB reads, unbuffered           2.579       397       382        67     127
+  io_uring reader, zero-copy                          2.537       404       252       192     124
+  io_uring reader, zero-copy, unbuffered              2.609       393       291        67     131
+
+LinuxArm64 FPC, 1 GiB, work, warm cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.390      2628       279       111       0
+  TFileStream 1 MiB reads                             0.345      2970       312        32       0
+  read 1 MiB, sequential hint                         0.345      2966       314        31       0
+  io_uring stream, 64 KiB reads                       0.402      2545       318        85       0
+  io_uring reader, zero-copy                          0.356      2874       290        66       0
+
+LinuxArm64 FPC, 4 GiB, read-through, cold cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                           10.417       393       321       763       0
+  TFileStream 1 MiB reads                            10.348       396       286       478       0
+  read 1 MiB, sequential hint                        10.388       394       285       476       0
+  io_uring stream, 64 KiB reads                      10.388       394       507       696     541
+  io_uring stream, 64 KiB reads, unbuffered          10.192       402       706       262     610
+  io_uring reader, zero-copy                         10.332       396       304      1051     519
+  io_uring reader, zero-copy, unbuffered             10.406       394       347       276     873
+
+LinuxArm64 FPC, 4 GiB, read-through, warm cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.735      5570       283       455       0
+  TFileStream 1 MiB reads                             0.562      7292       275       285       0
+  read 1 MiB, sequential hint                         0.558      7336       281       278       0
+  io_uring stream, 64 KiB reads                       0.760      5387       448       313       0
+  io_uring reader, zero-copy                          0.590      6939       262       329       0
+
+
+=== Blocks
+Blocks known in advance: FPC LinuxArm64, 2026-10-24 09:23
+Creating /tmp/Delphi.IOUring.Bench/blocks-4GiB.dat (4 GiB) ... done
+20000 blocks of 4096 bytes per list; median of 3 runs
+
+random 4 KiB, cold cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                       8.4      32.9       173
+  pread                                                          8.8      34.5       167
+  pread, 8 threads                                              26.9     105.1       163
+  Block reader, read-ahead 1                                     7.5      29.2       561
+  Block reader, read-ahead 8                                    27.4     106.9       280
+  Block reader, read-ahead 32                                   20.3      79.2       195
+  Block reader, read-ahead 128                                  20.3      79.3       163
+  Block reader, read-ahead 128, 2 I/O threads                   19.9      77.9       215
+  Block reader, read-ahead 128, 4 I/O threads                   20.3      79.2       238
+  Block reader, read-ahead 128, overlap rule                    20.2      78.8       167
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule        20.3      79.4       172
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                     551.8    2155.3        36
+  pread                                                        655.9    2562.1        30
+  pread, 8 threads                                            2065.5    8068.3        33
+  Block reader, read-ahead 1                                    52.4     204.8       394
+  Block reader, read-ahead 8                                   356.3    1391.7        82
+  Block reader, read-ahead 32                                  545.2    2129.5        59
+  Block reader, read-ahead 128                                 576.8    2253.0        52
+  Block reader, read-ahead 128, 2 I/O threads                 1136.3    4438.7        52
+  Block reader, read-ahead 128, 4 I/O threads                 1096.7    4283.9        58
+  Block reader, read-ahead 128, overlap rule                   485.6    1897.1        60
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule       479.0    1871.3        61
+
+random 4 KiB, unbuffered cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  pread                                                          8.9      34.7       142
+  pread, 8 threads                                              26.3     102.9       131
+  Block reader, read-ahead 1                                     7.6      29.6       515
+  Block reader, read-ahead 8                                    27.1     105.7       242
+  Block reader, read-ahead 32                                   19.4      75.7       157
+  Block reader, read-ahead 128                                  20.0      78.0       138
+  Block reader, read-ahead 128, 2 I/O threads                   19.9      77.8       176
+  Block reader, read-ahead 128, 4 I/O threads                   19.3      75.3       196
+  Block reader, read-ahead 128, overlap rule                    20.0      78.3       149
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule        19.0      74.1       146
+
+sorted, gaps, cold cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                      23.1      90.3        58
+  pread                                                         22.4      87.5        53
+  pread, 8 threads                                              26.9     105.1       160
+  Block reader, read-ahead 1                                    28.9     113.0       378
+  Block reader, read-ahead 8                                    31.4     122.5       267
+  Block reader, read-ahead 32                                   23.0      89.9       179
+  Block reader, read-ahead 128                                  22.5      87.9       149
+  Block reader, read-ahead 128, 2 I/O threads                   22.4      87.5       184
+  Block reader, read-ahead 128, 4 I/O threads                   22.4      87.6       204
+  Block reader, read-ahead 128, overlap rule                    22.4      87.3       151
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule        22.4      87.4       154
+  Block reader, read-ahead 32, MaxGap 32 KiB                    36.0     140.5       128
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                     622.5    2431.8        32
+  pread                                                        737.9    2882.5        27
+  pread, 8 threads                                            2486.0    9711.0        31
+  Block reader, read-ahead 1                                    59.4     232.1       348
+  Block reader, read-ahead 8                                   398.8    1557.8        73
+  Block reader, read-ahead 32                                  677.2    2645.3        49
+  Block reader, read-ahead 128                                 715.4    2794.6        44
+  Block reader, read-ahead 128, 2 I/O threads                 1251.6    4889.2        47
+  Block reader, read-ahead 128, 4 I/O threads                 1227.6    4795.3        49
+  Block reader, read-ahead 128, overlap rule                   603.7    2358.3        50
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule       581.6    2271.9        52
+  Block reader, read-ahead 32, MaxGap 32 KiB                   394.4    1540.7        59
+
+sorted, gaps, unbuffered cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  pread                                                          8.9      34.6       141
+  pread, 8 threads                                              26.8     104.8       132
+  Block reader, read-ahead 1                                     8.1      31.7       458
+  Block reader, read-ahead 8                                    32.3     126.1       230
+  Block reader, read-ahead 32                                   22.3      87.1       149
+  Block reader, read-ahead 128                                  22.2      86.9       122
+  Block reader, read-ahead 128, 2 I/O threads                   22.3      87.0       148
+  Block reader, read-ahead 128, 4 I/O threads                   22.2      86.8       165
+  Block reader, read-ahead 128, overlap rule                    22.2      86.7       130
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule        22.3      87.2       141
+  Block reader, read-ahead 32, MaxGap 32 KiB                    35.5     138.5        47
+
+=== Writes
+Writing a file front to back: FPC LinuxArm64, 2026-10-24 09:26
+Median of 3 runs; work: 200 us of CPU time per MiB
+
+1 GiB, writing only
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               0.18     5848       3.14      326       199
+  TFileStream, 1 MiB writes                                0.14     7252       3.11      329       159
+  Write stream, 64 KiB writes                              0.15     6766       3.12      328       246
+  Write stream, unbuffered, 64 KiB writes                  2.97      345       2.97      345       166
+
+1 GiB, with work
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               0.38     2728       3.58      286       399
+  TFileStream, 1 MiB writes                                0.34     2990       3.55      288       360
+  Write stream, 64 KiB writes                              0.26     3937       3.47      295       452
+  Write stream, unbuffered, 64 KiB writes                  3.08      333       3.08      333       374
+
+4 GiB, writing only
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               5.47      749      13.19      311       760
+  TFileStream, 1 MiB writes                                5.43      755      13.15      311       615
+  Write stream, 64 KiB writes                              5.46      751      13.16      311       975
+  Write stream, unbuffered, 64 KiB writes                 12.36      331      12.36      331       696
+
+4 GiB, with work
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               5.73      715      13.48      304      1579
+  TFileStream, 1 MiB writes                                5.68      721      13.44      305      1421
+  Write stream, 64 KiB writes                              5.56      736      13.32      308      1765
+  Write stream, unbuffered, 64 KiB writes                 12.39      331      12.39      331      1506
+
+=== Structures
+Engine structures: FPC LinuxArm64, 4 logical processors, 2026-10-24 09:32
+
+Free list: take one index, (work,) give it back.
+Mops/s = million take+give pairs per second, all threads; median of 3 runs.
+CPU ms = CPU time of all threads for the run (median).
+
+Scenario   Threads   lock-free       mutex  LF/mutex    LF CPU ms mutex CPU ms
+                        Mops/s      Mops/s                                    
+tight            1       27.39       27.40      1.00          146          146
+tight            2       14.92        5.44      2.74          522         1469
+tight            4        6.68        6.37      1.05         2153         1879
+work 1 us        1        1.00        1.00      1.00          401          401
+work 1 us        2        2.00        1.98      1.01          401          403
+work 1 us        4        1.64        1.87      0.88          929          714
+
+Request queue: N producers put values in, one consumer takes them out.
+Threads = producers (plus the consumer). Mops/s = million values per second; median of 3 runs.
+CPU ms = CPU time of all threads for the run (median).
+
+Scenario   Threads   lock-free       mutex  LF/mutex    LF CPU ms mutex CPU ms
+                        Mops/s      Mops/s                                    
+tight            1       23.99        4.84      4.96          334         1651
+tight            2        4.57        5.26      0.87         2613         2068
+tight            3        2.98        3.30      0.90         5220         4049
+work 1 us        1        1.00        1.00      1.00          802          802
+work 1 us        2        1.99        1.38      1.44          602          806
+work 1 us        3        2.91        1.63      1.79          550          886
+

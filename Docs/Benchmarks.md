@@ -8,7 +8,8 @@ with the block reader: [Blocks known in advance](#blocks-known-in-advance-phase-
 [Several I/O threads](#several-io-threads-phase-15) and
 [Overlap rule](#overlap-rule-phase-16); writing has its own:
 [Writing](#writing-phase-17). A first look at Linux (in WSL2):
-[Linux in WSL2](#linux-in-wsl2--a-first-look-phase-21).
+[Linux in WSL2](#linux-in-wsl2--a-first-look-phase-21); and GitHub's runners,
+x64 and ARM64: [GitHub's runners](#githubs-runners-phase-23).
 
 ## Short version
 
@@ -74,6 +75,12 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
   block reader is **10–20× faster than `pread`**. The write stream with work:
   26–29 % less time. The lock-free structures beat a pthread mutex
   everywhere.
+- **GitHub's runners (Phase 23; slow cloud disks):** the block reader reaches
+  the disk's limit where plain reads do not – on Windows 3.6× `ReadFile`
+  for random blocks, 7.5–12.6× for sorted ones. The write stream with work
+  finished 24–42 % sooner. **On ARM64 the lock-free structures sometimes
+  lose to a mutex** (0.87–0.90 for the queue under contention): planned
+  Phase 27.
 
 ## Machine
 
@@ -812,6 +819,102 @@ unbuffered reads the virtual disk is the limit. So `TLinuxIORing` does not
 offer it; it stays in the API unit (`IORING_SETUP_SQPOLL`) for programs that
 want it – for example network servers with very high rates, not measured
 here.
+
+## GitHub's runners (Phase 23)
+
+The first numbers from other machines: the four Free Pascal benchmarks on
+GitHub's hosted runners (started by hand: Actions → CI → Run workflow),
+2026-10-24, files of 1 and 4 GiB, median of 3 runs. Raw output:
+[2026-10-24-ci-*.txt](BenchmarkResults/). Each runner has 4 processors,
+16 GB of memory and a cloud disk:
+
+| Runner | System |
+| --- | --- |
+| Linux x64 | Ubuntu 24.04, x86-64 |
+| Linux ARM64 | Ubuntu 24.04, kernel 6.17 (Azure), ARM64 |
+| Windows | Windows Server 2025, x64 (Win64 build) |
+
+**The disks set the pace:** about 400 MiB/s for sequential reading, 20–27
+thousand random 4 KiB reads per second, and about 120–330 MiB/s for writing
+with a flush – on all three. "Cold" here is a real, slow, throttled cloud disk:
+neither the NVMe disk of this machine nor WSL2's host cache.
+
+### Blocks known in advance, cold
+
+Thousand blocks per second, 20 000 blocks of 4 KiB from a 4 GiB file:
+
+| Contender | Linux x64 | Linux ARM64 | Windows |
+| --- | ---: | ---: | ---: |
+| *Random 4 KiB* | | | |
+| TFileStream, Seek + Read | 7.9 | 8.4 | 5.5 |
+| pread / ReadFile at offset | 7.7 | 8.8 | 5.6 |
+| … 8 threads | 27.2 | 26.9 | 6.5 |
+| Block reader, read-ahead 8 | **27.1** | **27.4** | 19.1 |
+| Block reader, read-ahead 128 | 20.3 | 20.3 | **20.0** |
+| Block reader, 128, 4 I/O threads | 20.1 | 20.3 | **20.3** |
+| *Sorted, with gaps* | | | |
+| pread / ReadFile at offset | 22.5 | 22.4 | 3.0 |
+| Block reader, read-ahead 128 | 22.5 | 22.5 | 22.6 |
+| Block reader, 32, MaxGap 32 KiB | **33.3** | **36.0** | **37.8** |
+
+- **The block reader reaches the disk's limit; plain reads do not.** On
+  Windows 3.6× as many random blocks as `ReadFile`, 7.5× for sorted blocks,
+  12.6× with `MaxGap`. On Linux 2.3–3.5× `pread` for random blocks; for
+  sorted blocks Linux reads ahead by itself, so there only `MaxGap` gains
+  (1.5–1.6×).
+- **[open] On Linux, read-ahead 8 beats 32 and 128** (27 against 20
+  thousand blocks per second, on both CPUs; `pread` on 8 threads also gets
+  27). Not on Windows. Not explained yet – maybe the cloud disk slows down
+  deep queues.
+- **[open] Unbuffered on Windows** the block reader got no more than
+  `ReadFile` (6.2 against 5.8 thousand random blocks per second), while
+  buffered it got 20. Not explained yet either.
+
+### Blocks known in advance, cached
+
+| Contender | Linux x64 | Linux ARM64 | Windows |
+| --- | ---: | ---: | ---: |
+| pread / ReadFile at offset | 656 | 656 | **233** |
+| … 8 threads | **1 648** | **2 066** | 201 |
+| Block reader, read-ahead 128 | 703 | 577 | 197 |
+| Block reader, 128, 2 I/O threads | 1 134 | 1 136 | 180 |
+
+On Linux two I/O threads read 1.7× as many cached blocks as `pread` (WSL2:
+1.6×). On Windows with 4 processors, one I/O thread gets 85 % of
+`ReadFile`, and more I/O threads do not help.
+
+### Reading front to back, writing
+
+- **Cold, everything reads at the disk's speed** (about 395 MiB/s), except
+  `TFileStream` with 64 KiB reads on Windows (159 MiB/s).
+- **Cached, the read stream pays for its extra copy:** 18–31 % slower than
+  `TFileStream` with 1 MiB reads (Linux x64 7 196 against 10 499 MiB/s,
+  ARM64 5 231 against 7 145, Windows 4 062 against 4 980); the zero-copy
+  reader is within 10 % of the plain reads. Phase 26 is about this copy.
+- **Writing 1 GiB with work, the write stream finished writing 24–42 %
+  sooner** than `TFileStream` with 1 MiB writes (Linux x64 0.26 against
+  0.38 s, ARM64 0.26 against 0.34 s, Windows 0.28 against 0.48 s).
+
+### Engine structures: lock-free ÷ lock
+
+Above 1: the lock-free structure is faster (Linux: a pthread mutex,
+Windows: the SRW lock; the queue has one thread less for the consumer):
+
+| | Linux x64 | Linux ARM64 | Windows |
+| --- | ---: | ---: | ---: |
+| Free list, tight, 1 / 2 / 4 threads | 1.65 / 7.02 / 4.94 | 1.00 / 2.74 / 1.05 | 2.02 / 2.68 / 3.43 |
+| Free list, work 1 µs, 1 / 2 / 4 | 1.00 / 1.19 / 1.81 | 1.00 / 1.01 / **0.88** | 1.00 / 1.00 / 1.29 |
+| Queue, tight, 1 / 2 / 3 producers | 8.96 / 15.2 / 18.6 | 4.96 / **0.87** / **0.90** | 3.42 / 5.33 / 6.84 |
+| Queue, work 1 µs, 1 / 2 / 3 | 1.00 / 1.19 / 1.41 | 1.00 / 1.44 / 1.79 | 1.00 / 1.04 / 1.28 |
+
+**On ARM64 the lock-free structures do not always win.** With 2–3
+producers in a tight loop the mutex queue is faster, and so is the mutex
+free list with 4 threads and work. Design §10.5's rule – a lock-free
+structure stays only where it beats the lock – holds on x86-64, not
+everywhere on ARM64. The likely cause: on AArch64 every atomic operation
+has full barriers (DMB) around it, and FPC 3.2.2 does not inline its
+`ReadWriteBarrier` there (the compiler says so 109 times), so every
+operation makes two calls. Planned: Phase 27.
 
 ## Known limits of these measurements
 

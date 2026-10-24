@@ -2956,6 +2956,28 @@ capabilities report at the top of the test program's output (3).
   the generated file's first lines name the header version and the CPU
   ("for AArch64"). The step now compares only the 373 checks, and reports a
   real difference as annotations.
+- **[VERIFIED] The third run** (commit 2999f18) is green on all three
+  runners, without warnings: Linux x64 and ARM64 (tests debug and `-O3`,
+  the same layout checks on both CPUs, benchmarks built) and Windows Server
+  2025 (Win32 and Win64, debug and `-O3`, benchmarks built). The whole run
+  took 2.5 minutes (the three jobs run at the same time; FPC on Windows came
+  from the cache).
+- **The benchmarks on the runners** (run by hand, 2026-10-24; Benchmarks.md
+  "GitHub's runners"): 19–38 minutes per runner with files of 1 and 4 GiB.
+  Their disks are slow cloud disks (about 400 MiB/s, 20–27 thousand random
+  reads per second), so the cold numbers are disk-bound. Artifacts, like
+  logs, need a sign-in to download.
+- **[VERIFIED] Found: on ARM64 the lock-free structures sometimes lose to a
+  mutex** (queue with 2–3 producers in a tight loop 0.87–0.90, free list
+  with 4 threads and work 0.88; on x86-64 they always win, Linux and
+  Windows). Every atomic operation has full barriers around it on AArch64
+  (§5.7), and FPC 3.2.2 does not inline its `ReadWriteBarrier` there – the
+  compiler reports it 109 times for the structures benchmark. The rule of
+  §10.5 asks for a look: planned as Phase 27.
+- Two things not explained yet ([open], Benchmarks.md): on the Linux
+  runners a block reader with 8 reads in flight beats 32 and 128 (27
+  against 20 thousand blocks per second); on Windows unbuffered block reads
+  gain nothing over `ReadFile` there (6.2 against 5.8 thousand).
 
 ---
 

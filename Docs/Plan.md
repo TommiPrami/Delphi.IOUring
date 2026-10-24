@@ -339,8 +339,10 @@ free, ARM64 included.)
   - [x] `.github/workflows/ci.yml`: Linux x64 and ARM64 (tests debug and `-O3`, the layout generator against the committed file, benchmarks built), Windows Server 2025 (FPC 3.2.2 installer, cached; tests Win32 and Win64 debug and `-O3`, or built only with a warning when IoRing 4 is missing; benchmarks built); the benchmarks run when started by hand, output kept as an artifact.
   - [x] The first run: Linux x64 and Windows Server 2025 (it has IoRing 4) passed; Linux ARM64 found that FPC 3.2.2's `O_DIRECT` is the x86 value on AArch64 (there it means `O_DIRECTORY`): fixed with an own flag per CPU. Failed tests now also become annotations (readable without signing in).
   - [x] Second run: all tests pass on ARM64 too (debug and `-O3`) – AArch64 verified. The layout check compared whole files, whose first lines name the CPU; it now compares the checks only.
-  - [ ] A green run on all three runners.
-  - [ ] The benchmarks once on the runners (first Linux numbers outside WSL2).
+  - [x] A green run on all three runners (third run, commit 2999f18): Linux x64 and ARM64 (tests debug and `-O3`, layout check, benchmarks built), Windows Server 2025 (Win32 and Win64, debug and `-O3`, benchmarks built).
+  - [x] The benchmarks once on the runners (2026-10-24, Benchmarks.md "GitHub's runners"): slow cloud disks (about 400 MiB/s, 20–27 thousand random reads per second); the block reader reaches the disk's limit where plain reads do not (Windows 3.6× `ReadFile` random, 7.5–12.6× sorted); the write stream with work 24–42 % sooner. Found: on ARM64 the lock-free structures sometimes lose to a mutex (Phase 27).
+
+  **Done 2026-10-24** – CI green on Linux x64, Linux ARM64 and Windows Server 2025 (Free Pascal 3.2.2: tests debug and `-O3`, layout check, benchmarks built); AArch64 verified, one AArch64 bug found and fixed (`O_DIRECT`); failed tests become annotations. Locally unchanged: Delphi 246 tests, FPC 245 on Windows, 243 on Linux (WSL2).
 - **Phase 24** – Packages: a Delphi runtime package (`.dpk`) and a Lazarus package (`.lpk`), so a project adds the library in one step; later maybe GetIt or Lazarus's Online Package Manager.
 - **Phase 25** – Examples and a 1.0 release: small example programs (the two streams, the block reader, the engine with callbacks, `IORingCapabilities`, a socket echo on Linux); a version number, a tag and a CHANGELOG.
 
@@ -348,7 +350,8 @@ free, ARM64 included.)
 
 Only what a benchmark has already shown:
 
-- **Phase 26** – Read straight into the caller's buffer for big aligned reads (Design §7, point 7): with cached data the read stream is 16–20 % slower than `TFileStream`, on both systems, because of one more copy. On Linux also the clock through the C library (13 ns instead of 94 ns; Design §10.14).
+- **Phase 26** – Read straight into the caller's buffer for big aligned reads (Design §7, point 7): with cached data the read stream is 16–31 % slower than `TFileStream`, on every system measured, because of one more copy. On Linux also the clock through the C library (13 ns instead of 94 ns; Design §10.14).
+- **Phase 27** – The atomics on AArch64: on GitHub's ARM64 runner the lock-free structures sometimes lose to a mutex (queue with 2–3 producers in a tight loop 0.87–0.90; free list with 4 threads and work 0.88), while on x86-64 they always win. Every atomic operation there has full barriers around it, and FPC 3.2.2 does not inline its `ReadWriteBarrier` on AArch64. Measure inline barriers and lighter ordering (acquire/release instructions); keep the lock-free structures only where they win (Design §10.5).
 
 Small things, any time: run the Windows benchmarks once more (the shared
 benchmark code changed in Phase 21); close the last open question (Design
@@ -359,6 +362,7 @@ of git (they are ignored now, but still tracked).
 
 ## Immediate next step
 
-Milestone 4 is done: the whole library runs on Linux through Free Pascal.
-Next: **Phase 23 – tests in CI**. The proposal is in Design §12.5, with the
-facts about GitHub's runners; it waits for the decisions marked [DECIDE].
+Phase 23 is done: CI runs the Free Pascal tests on Linux x64, Linux ARM64
+and Windows on every push, and the benchmarks ran once on those runners.
+Next: **Phase 24 – packages** (Delphi `.dpk`, Lazarus `.lpk`). It starts
+with a proposal and its decisions, as before.
