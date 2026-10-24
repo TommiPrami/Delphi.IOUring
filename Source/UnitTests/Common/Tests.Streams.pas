@@ -62,6 +62,7 @@ type
     procedure MemoryStream_CopyFromWholeStream;
     procedure MemoryStream_CopyFromPartsThenRest;
     procedure BytesStream_LoadFromStream;
+    procedure MemoryStream_LoadFromStream_ReadsDirectly;
     procedure StreamReader_ReadsLines;
     procedure Create_MissingFile_RaisesEFOpenError;
     procedure Create_BadBufferSize_RaisesEIORingError;
@@ -472,6 +473,28 @@ begin
   end;
 end;
 
+procedure TSequentialReadOnlyFileStreamTests.MemoryStream_LoadFromStream_ReadsDirectly;
+const
+  FILE_SIZE = 20 * SMALL_BUFFER + 77;
+var
+  LStream: TSequentialReadOnlyFileStream;
+  LTarget: TMemoryStream;
+begin
+  LStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 4);
+  FStream := LStream;
+  LTarget := TMemoryStream.Create;
+  try
+    LTarget.LoadFromStream(LStream);
+    AssertEquals('Size', Int64(FILE_SIZE), LTarget.Size);
+    CheckPattern(0, LTarget.Memory, FILE_SIZE);
+    // One big Read: most of the file goes straight into the memory stream
+    AssertTrue('Read directly', LStream.Stats.DirectBytes > FILE_SIZE div 2);
+    CheckEqualsU64('Bytes', FILE_SIZE, LStream.Stats.BytesFromDisk);
+  finally
+    LTarget.Free;
+  end;
+end;
+
 procedure TSequentialReadOnlyFileStreamTests.StreamReader_ReadsLines;
 const
   LINE_COUNT = 20000;
@@ -565,8 +588,11 @@ begin
   LStream := TSequentialReadOnlyFileStream.Create(SharedPatternFile(FILE_SIZE), [], SMALL_BUFFER, 4);
   FStream := LStream;
   LStream.ReadBuffer(LBuffer[0], FILE_SIZE);
-  CheckEqualsU64('Reads', 4, LStream.Stats.ReadsIssued);
+  // The two buffers asked for at open, then the rest straight into LBuffer
+  CheckEqualsU64('Reads into the buffers', 2, LStream.Stats.ReadsIssued);
+  CheckEqualsU64('Reads straight into the caller''s memory', 2, LStream.Stats.DirectReads);
   CheckEqualsU64('Bytes', FILE_SIZE, LStream.Stats.BytesFromDisk);
+  CheckEqualsU64('Bytes read directly', 2 * SMALL_BUFFER, LStream.Stats.DirectBytes);
 end;
 
 initialization

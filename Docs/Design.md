@@ -1295,6 +1295,8 @@ Algorithm:
    adaptivity doesn't pay off in benchmarks.
 7. Big reads (`ACount ≥ BufferSize`) still go through the buffers in v1.
    Later optimization: read directly into the caller's buffer when aligned.
+   *Done in Phase 26 (§12.8): the part of a call beyond what the buffers
+   have asked for is read straight into the caller's memory.*
 8. Unbuffered mode: offsets/lengths are sector multiples (BufferSize is), the
    last read requests a full buffer and gets a short count – fine.
    Sector size via `GetFileInformationByHandleEx(FileStorageInfo)`.
@@ -3216,6 +3218,93 @@ waited for – no reading ahead between calls:
 it and keep it only if it wins (1), only the part beyond what the buffers
 hold, unbuffered only when aligned (2), the Linux clock stays (3).
 
+#### Implementation notes (Phase 26)
+
+- **Where:** `TIORingSequentialReader.Read`. The stream calls it, so
+  `TSequentialReadOnlyFileStream` and the RTL helpers on top of it
+  (`LoadFromStream`, `ReadBuffer` …) get it too. `TryAcquireChunk` is
+  unchanged.
+- **Which part of a call:** from where the buffers' reads end
+  (`FNextReadOffset`) to the end of the call or of the file, if that is at
+  least one buffer. Unbuffered, the end is rounded down to a whole sector,
+  and the caller's memory for that part must start on a sector boundary;
+  otherwise the call goes through the buffers as before. Calls no bigger
+  than what the buffers have asked for (64 KiB calls, for example) never
+  read directly.
+- **How:** in pieces of the buffer size, up to the buffer count in flight,
+  each straight into the caller's memory (a plain pointer; the file stays
+  registered). Meanwhile `Read` copies what the buffers hold before that
+  part, then waits for the pieces and starts new ones as old ones finish.
+- **Measured and changed – the buffers wait for the call's pieces.** In the
+  first version the buffers began reading ahead after the end of the call
+  at once – 64 MiB further on in the file – while the call's own pieces
+  were still being read. Cold, with 64 MiB calls, that lost 6 % (6 300
+  against 6 720 MiB/s): Windows reads ahead in its file cache when it sees
+  reads in file order, and reads at two places at once spoil that. Now the
+  buffers start reading ahead only when all of the call's pieces have
+  started, so the file is read in order.
+- **Tried and dropped (no gain measured):** letting a wait for the call's
+  pieces also grow the buffers' read-ahead (as a wait for a buffer does);
+  pieces of 2 MiB with 4 in flight instead of 1 MiB with 8. Registration
+  explains only a small part of what is left: the old reader without
+  registration lost 0.7 % in the same test.
+- **No read in flight into the caller's memory after `Read`:** `Read`
+  returns only when all its pieces are done. On an exception it starts no
+  more pieces and waits for those in flight before it raises.
+- **A failed big read:** a failed piece raises `EIORingError` once all the
+  pieces are back, and every later call raises too – the buffers have
+  already moved past the call, so going on would leave a gap in the data.
+  The same for any other exception during a big read.
+- **Short pieces:** the file got shorter after `Open`. The data ends at the
+  first short piece; `Read` returns what is there and `Eof` becomes `True`,
+  as with the buffers.
+- **Ring size:** one entry per buffer and per piece, `2 × BufferCount + 2`.
+- **Statistics:** `Stats.DirectReads` and `Stats.DirectBytes`;
+  `BytesFromDisk` counts both kinds; a wait for the pieces counts as a stall.
+
+**Results** (2026-10-24, the same measuring program as above; the reader
+before and after Phase 26 built from the same sources and run in turns, two
+runs each, each the median of 3; MiB/s):
+
+| | 64 MiB calls, cold | warm | 8 MiB calls, cold | warm | 64 KiB calls, cold | warm |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| *Windows* | | | | | | |
+| TFileStream | 3 280–3 320 | 7 160–7 360 | 4 060–4 200 | 8 720–9 020 | 1 410–1 610 | 8 000–8 130 |
+| the stream before | 6 703 / 6 737 | 6 530 / 6 418 | 6 742 / 6 696 | 6 492 / 6 356 | 6 740 / 6 782 | 7 296 / 7 111 |
+| the stream now | 6 601 / 6 568 | **6 879 / 7 061** | 6 716 / 6 724 | **7 685 / 7 744** | 6 755 / 6 735 | 7 205 / 7 208 |
+| *Linux (WSL2; cold is not the disk)* | | | | | | |
+| TFileStream | 3 040–4 670 | 11 090–11 740 | 3 430–4 030 | 13 740–15 130 | 3 510–5 560 | 14 550–16 290 |
+| the stream before | 4 365 / 4 233 | 9 571 / 10 117 | 4 187 / 4 021 | 10 025 / 9 785 | 4 618 / 5 120 | 11 632 / 11 806 |
+| the stream now | **5 249 / 5 155** | **11 154 / 11 439** | **4 651 / 4 772** | **12 065 / 12 405** | 3 256* / 5 445 | 10 227* / 11 963 |
+
+\* A slow run: `TFileStream` was slower in it too. 64 KiB calls never read
+directly.
+
+- **[VERIFIED] Warm, big calls come close to `TFileStream`:** 64 MiB calls
+  get 96–98 % of it on Windows (before: 89 %) and 97–101 % on Linux
+  (before: 83–89 %). 8 MiB calls get 86 % on Windows (before: 72 %) and
+  82–90 % on Linux (before: 65–68 %) – not all of it, because 2 of each
+  8 MiB were already asked for by the buffers, and those are still copied
+  (decision 2).
+- **[VERIFIED] Cold:** 8 MiB and 64 KiB calls as before. 64 MiB calls are
+  20–22 % faster on Linux, and **about 2 % slower on Windows** (the median of
+  all runs of the final version: 6 574 against 6 735 MiB/s).
+- **The process's CPU time** for 64 MiB calls, cold, on Windows: 125–188 ms
+  against 297–406 ms – the copy is gone (the kernel's copy is not counted,
+  Benchmarks.md "Known limits").
+
+- **4. Keep it?** Against the rule of decision 1 it does not win
+  everywhere: warm 8 MiB calls get 86 %, not all of `TFileStream`, and cold
+  64 MiB calls on Windows lose about 2 %. Proposed: keep it – warm big calls
+  gain 8–24 % on both systems, cold big calls gain 11–22 % on Linux, and a
+  program that works on the data between calls saves the copy's CPU time
+  (reasoning, not measured). Other choice: drop it (the code goes back; the
+  measurements stay here).
+
+**Phase 26 decision 4 (decided 2026-10-24):** keep it, as proposed. The
+open point – why cold 64 MiB calls on Windows are about 2 % slower – is not
+explained (§13).
+
 ---
 
 ## 13. Ideas parked for later
@@ -3227,8 +3316,10 @@ hold, unbuffered only when aligned (2), the Linux clock stays (3).
   zero-copy send (they need the CQE flags in the completion and a count
   that knows `IORING_CQE_F_MORE`); SQPOLL in `TLinuxIORing`, if a benchmark
   ever shows a gain.
-- Read directly into the caller's buffer for big aligned reads (§7, point
-  7). Planned: Phase 26.
+- Why cold 64 MiB `Read` calls on Windows are about 2 % slower when read
+  straight into the caller's memory than through the buffers (§12.8). Not
+  explained: the memory not being registered explains 0.7 %; bigger pieces
+  and more reading ahead did not help.
 
 ---
 
@@ -3267,3 +3358,4 @@ decision 17.)
 | 19 | 2026-10-24 | **The Linux ring** (§5.7): Phase 20 is the ring, the platform record and the atomics on Linux, Phase 21 the engine on Linux; `NativeResult` is 0 or a negative error code on both systems (bytes in `BytesTransferred`); registration on Linux is a system call at `Prepare` with a completion of its own; minimum Linux 5.11. |
 | 20 | 2026-10-24 | **The engine on Linux** (§10.14): the I/O thread sleeps as on Windows – a wake event and the ring's completion event, through a small event API in `TIORingPlatform` (`eventfd` and `poll` on Linux; the io_uring-only way measured no faster); the benchmarks run on Linux in this phase, WSL2 results marked as not disk numbers. |
 | 21 | 2026-10-24 | **Linux extras** (§5.8): `TLinuxIORing.PrepareSqe` (any io_uring operation, for example sockets) and `LinkToNext` (linked operations) in the low-level ring, one completion per entry; SQPOLL and all other definitions stay in the API unit (measured: no gain for file I/O); the shared `TIORingCapabilities` describes either system – `SystemDescription`, `NotAvailableReason`, `NativeFeatures`, `NativeOps`, `Extras`, `ToString` – and `IORingCapabilities` in `Delphi.IOUring`. |
+| 22 | 2026-10-24 | **Big reads straight into the caller's memory** (§12.8): `TIORingSequentialReader.Read` (and so the read stream) reads the part of a call beyond what its buffers have asked for straight into the caller's memory, unbuffered only into sector-aligned memory; the buffers read ahead after the call once all of its reads have started. Kept although cold 64 MiB calls on Windows are about 2 % slower: warm big calls gain 8–24 %, cold ones 11–22 % on Linux. The Linux clock stays as it is (measured: less than 0.1 %). |

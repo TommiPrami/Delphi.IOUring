@@ -26,6 +26,8 @@ type
     procedure CheckSizeAndChunkMatrix(const AOptions: TIORingSequentialReaderOptions;
       const ABufferCounts: array of Cardinal);
     procedure CheckZeroCopyReadAll(const ASize: Int64; const ABufferSize, ABufferCount: Cardinal);
+    function CheckBigReads(const ASize: Int64; const AOptions: TIORingSequentialReaderOptions;
+      const ABufferCount: Cardinal; const AChunkSize, AMisalign: Integer): TIORingReaderStats;
     function OpenRaisesIORingError(const AFileName: string; const ABufferSize, ABufferCount: Cardinal): Boolean;
   protected
     procedure SetUp; override;
@@ -39,8 +41,13 @@ type
     procedure ZeroCopy_DeliversSameContent;
     procedure ReadAndZeroCopy_Mixed;
     procedure EmptyFile_IsEndOfFileAtOnce;
+    procedure BigReads_GoStraightIntoTheCallersMemory;
+    procedure SmallReads_UseOnlyTheBuffers;
+    procedure BigReads_Unbuffered_OnlyIntoSectorAlignedMemory;
+    procedure BigReads_MixedWithSmallReadsAndChunks;
     procedure AppendedWhileReading_StopsAtSizeAtOpen;
     procedure ShortenedWhileReading_EndsAtNewEnd;
+    procedure ShortenedWhileBigReads_EndsAtNewEnd;
     procedure Close_InTheMiddle_IsClean;
     procedure EndOfScope_ClosesFile;
     procedure OpenHandle_NotOwned_KeepsHandleOpen;
@@ -189,6 +196,48 @@ begin
   AssertTrue(LContext + ': Eof', LReader.Eof);
 end;
 
+// Reads the whole file in calls of AChunkSize into page-aligned memory moved
+// by AMisalign bytes (unbuffered, the reader reads straight into the caller's
+// memory only when it starts on a sector boundary). SMALL_BUFFER buffers.
+function TSequentialReaderTests.CheckBigReads(const ASize: Int64; const AOptions: TIORingSequentialReaderOptions;
+  const ABufferCount: Cardinal; const AChunkSize, AMisalign: Integer): TIORingReaderStats;
+var
+  LReader: TIORingSequentialReader;
+  LMemory: PByte;
+  LMemorySize: NativeUInt;
+  LBuffer: PByte;
+  LRead: NativeInt;
+  LTotal: Int64;
+  LContext: string;
+begin
+  LContext := Format('big reads, size %d, %d buffers, chunk %d, misaligned by %d',
+    [ASize, ABufferCount, AChunkSize, AMisalign]);
+  LMemorySize := NativeUInt(AChunkSize + AMisalign);
+  LMemory := TIORingPlatform.AllocPages(LMemorySize);
+  try
+    LBuffer := LMemory + AMisalign;
+    LReader.Open(SharedPatternFile(ASize), AOptions, SMALL_BUFFER, ABufferCount);
+    LTotal := 0;
+    repeat
+      LRead := LReader.Read(LBuffer^, AChunkSize);
+      if LRead > 0 then
+        CheckPattern(UInt64(LTotal), LBuffer, LRead, LContext);
+      Inc(LTotal, LRead);
+    until LRead < AChunkSize;
+
+    AssertEquals(LContext + ': total', ASize, LTotal);
+    AssertEquals(LContext + ': position', ASize, LReader.Position);
+    AssertTrue(LContext + ': Eof', LReader.Eof);
+    AssertEquals(LContext + ': read after EOF', Int64(0), Int64(LReader.Read(LBuffer^, AChunkSize)));
+    Result := LReader.Stats;
+    // The buffers and the direct reads never read the same bytes
+    CheckEqualsU64(LContext + ': bytes from disk', UInt64(ASize), Result.BytesFromDisk);
+    LReader.Close;
+  finally
+    TIORingPlatform.FreePages(LMemory, LMemorySize);
+  end;
+end;
+
 function TSequentialReaderTests.OpenRaisesIORingError(const AFileName: string;
   const ABufferSize, ABufferCount: Cardinal): Boolean;
 var
@@ -321,6 +370,108 @@ begin
   AssertEquals('Size', Int64(0), LReader.Size);
 end;
 
+{ Big Read calls (straight into the caller's memory) }
+
+procedure TSequentialReaderTests.BigReads_GoStraightIntoTheCallersMemory;
+const
+  B = SMALL_BUFFER;
+  FILE_SIZE = 20 * B + 123;
+var
+  LStats: TIORingReaderStats;
+begin
+  // Calls of 8 buffers: what the buffers have not asked for is read directly
+  LStats := CheckBigReads(FILE_SIZE, [], 4, 8 * B, 0);
+  Log(Format('Calls of 8 buffers: %d direct reads, %d bytes; %d reads into the buffers',
+    [LStats.DirectReads, LStats.DirectBytes, LStats.ReadsIssued]));
+  // At least 6 buffers in the first call (2 asked for at open) and 4 in the
+  // second (at most 4 asked for ahead); how many more depends on timing
+  AssertTrue('Bytes read directly', LStats.DirectBytes >= 10 * B);
+
+  // Odd call sizes and memory, one buffer, a call bigger than the file
+  AssertTrue('Odd calls: direct reads', CheckBigReads(FILE_SIZE, [], 4, 3 * B + 1, 1).DirectReads > 0);
+  AssertTrue('One buffer: direct reads', CheckBigReads(FILE_SIZE, [sroFixedReadAhead], 1, 5 * B, 0).DirectReads > 0);
+  AssertTrue('Whole file: direct reads', CheckBigReads(FILE_SIZE, [], 8, 30 * B, 0).DirectReads > 0);
+  AssertTrue('No registration: direct reads',
+    CheckBigReads(FILE_SIZE, [sroNoRegistration], 2, 8 * B, 0).DirectReads > 0);
+end;
+
+procedure TSequentialReaderTests.SmallReads_UseOnlyTheBuffers;
+const
+  B = SMALL_BUFFER;
+  FILE_SIZE = 20 * B + 123;
+begin
+  // The buffers always have at least one buffer asked for ahead
+  CheckEqualsU64('Calls of one buffer', 0, CheckBigReads(FILE_SIZE, [], 4, B, 0).DirectReads);
+  CheckEqualsU64('Calls of 4 KiB', 0, CheckBigReads(FILE_SIZE, [], 4, 4096, 0).DirectReads);
+  CheckEqualsU64('One buffer, calls of one buffer', 0,
+    CheckBigReads(FILE_SIZE, [sroFixedReadAhead], 1, B, 0).DirectReads);
+end;
+
+procedure TSequentialReaderTests.BigReads_Unbuffered_OnlyIntoSectorAlignedMemory;
+const
+  B = SMALL_BUFFER;
+  FILE_SIZE = 20 * B + 123;
+begin
+  AssertTrue('Page-aligned memory: direct reads',
+    CheckBigReads(FILE_SIZE, [sroUnbuffered], 4, 8 * B, 0).DirectReads > 0);
+  CheckEqualsU64('One byte off: only the buffers', 0,
+    CheckBigReads(FILE_SIZE, [sroUnbuffered], 4, 8 * B, 1).DirectReads);
+  // Calls that end inside a sector: the direct part stops at a sector
+  // boundary, the buffers deliver the rest
+  AssertTrue('Calls ending inside a sector: direct reads',
+    CheckBigReads(FILE_SIZE, [sroUnbuffered], 4, 8 * B + 1000, 0).DirectReads > 0);
+  AssertTrue('Whole file: direct reads', CheckBigReads(FILE_SIZE, [sroUnbuffered], 8, 30 * B, 0).DirectReads > 0);
+end;
+
+procedure TSequentialReaderTests.BigReads_MixedWithSmallReadsAndChunks;
+const
+  B = SMALL_BUFFER;
+  FILE_SIZE = 40 * B + 77;
+  BIG = 6 * B + 3;
+var
+  LReader: TIORingSequentialReader;
+  LBuffer: TBytes;
+  LData: PByte;
+  LLength: NativeInt;
+  LRead: NativeInt;
+  LTotal: Int64;
+  LStep: Integer;
+begin
+  SetLength(LBuffer, BIG);
+  LReader.Open(SharedPatternFile(FILE_SIZE), [], B, 4);
+  LTotal := 0;
+  LStep := 0;
+  repeat
+    case LStep mod 3 of
+      0:
+        LRead := LReader.Read(LBuffer[0], BIG);
+      1:
+        LRead := LReader.Read(LBuffer[0], 1000);
+    else
+      if LReader.TryAcquireChunk(LData, LLength) then
+      begin
+        CheckPattern(UInt64(LTotal), LData, LLength, 'Chunk');
+        Inc(LTotal, LLength);
+        LReader.ReleaseChunk;
+        LRead := LLength;
+      end
+      else
+        LRead := 0;
+    end;
+    if (LStep mod 3 <> 2) and (LRead > 0) then
+    begin
+      CheckPattern(UInt64(LTotal), @LBuffer[0], LRead, 'Read');
+      Inc(LTotal, LRead);
+    end;
+    Inc(LStep);
+  until LRead = 0;
+
+  AssertEquals('Total', Int64(FILE_SIZE), LTotal);
+  AssertEquals('Position', Int64(FILE_SIZE), LReader.Position);
+  AssertTrue('Direct reads', LReader.Stats.DirectReads > 0);
+  CheckEqualsU64('Bytes from disk', FILE_SIZE, LReader.Stats.BytesFromDisk);
+end;
+
 { Files that change while being read }
 
 procedure TSequentialReaderTests.AppendedWhileReading_StopsAtSizeAtOpen;
@@ -399,6 +550,46 @@ begin
   AssertEquals('Bytes read', Int64(NEW_SIZE), LTotal);
   AssertTrue('Eof', LReader.Eof);
   AssertEquals('Size stays the size at open', Int64(FILE_SIZE), LReader.Size);
+end;
+
+procedure TSequentialReaderTests.ShortenedWhileBigReads_EndsAtNewEnd;
+const
+  B = SMALL_BUFFER;
+  FILE_SIZE = 40 * B;
+  // After the two buffers asked for at open, so the result does not depend
+  // on whether they were read before the file got shorter
+  NEW_SIZE = 10 * B + B div 2;
+var
+  LFileName: string;
+  LReader: TIORingSequentialReader;
+  LWriter: TFileStream;
+  LBuffer: TBytes;
+  LTotal: Int64;
+  LRead: NativeInt;
+begin
+  LFileName := TTestFileHelpers.CreatePatternFile(FILE_SIZE, 'ShortenBig');
+  FResources.AddFile(LFileName);
+  LReader.Open(LFileName, [], B, 2);
+
+  LWriter := TFileStream.Create(LFileName, fmOpenReadWrite or fmShareDenyNone);
+  try
+    LWriter.Size := NEW_SIZE;
+  finally
+    LWriter.Free;
+  end;
+
+  SetLength(LBuffer, 8 * B);
+  LTotal := 0;
+  repeat
+    LRead := LReader.Read(LBuffer[0], Length(LBuffer));
+    if LRead > 0 then
+      CheckPattern(UInt64(LTotal), @LBuffer[0], LRead);
+    Inc(LTotal, LRead);
+  until LRead = 0;
+
+  AssertEquals('Bytes read', Int64(NEW_SIZE), LTotal);
+  AssertTrue('Eof', LReader.Eof);
+  AssertTrue('Direct reads', LReader.Stats.DirectReads > 0);
 end;
 
 { Life cycle }

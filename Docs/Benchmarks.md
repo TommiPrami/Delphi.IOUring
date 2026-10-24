@@ -81,6 +81,13 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
   finished 24–42 % sooner. **On ARM64 the lock-free structures sometimes
   lose to a mutex** (0.87–0.90 for the queue under contention): planned
   Phase 27.
+- **Big `Read` calls (Phase 26):** the part of a call beyond what the
+  stream's buffers have asked for is read straight into the caller's
+  memory. With cached data, 64 MiB calls now get **96–101 % of
+  `TFileStream`** (before: 83–89 %), 8 MiB calls 82–90 % (before: 65–73 %).
+  Cold, on Linux 11–22 % faster; on Windows as before, except 64 MiB calls
+  about 2 % slower. Calls up to the buffers' size (64 KiB, 1 MiB) are
+  unchanged.
 
 ## Machine
 
@@ -916,6 +923,44 @@ everywhere on ARM64. The likely cause: on AArch64 every atomic operation
 has full barriers (DMB) around it, and FPC 3.2.2 does not inline its
 `ReadWriteBarrier` there (the compiler says so 109 times), so every
 operation makes two calls. Planned: Phase 27.
+
+## Big Read calls (Phase 26)
+
+A 4 GiB file read with `Read` calls of 64 MiB, 8 MiB and 64 KiB into
+page-aligned memory, cold and warm, 2026-10-24. A small measuring program
+outside the repository (Free Pascal, Win64 and Linux64 in WSL2): the reader
+before and after Phase 26 built from the same sources and run in turns, two
+runs each, each the median of 3. MiB/s:
+
+| | 64 MiB calls, cold | warm | 8 MiB calls, cold | warm | 64 KiB calls, cold | warm |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| *Windows (NVMe)* | | | | | | |
+| TFileStream | 3 280–3 320 | 7 160–7 360 | 4 060–4 200 | 8 720–9 020 | 1 410–1 610 | 8 000–8 130 |
+| IoRing stream before | 6 703 / 6 737 | 6 530 / 6 418 | 6 742 / 6 696 | 6 492 / 6 356 | 6 740 / 6 782 | 7 296 / 7 111 |
+| IoRing stream now | 6 601 / 6 568 | **6 879 / 7 061** | 6 716 / 6 724 | **7 685 / 7 744** | 6 755 / 6 735 | 7 205 / 7 208 |
+| *Linux (WSL2; cold is not the disk)* | | | | | | |
+| TFileStream | 3 040–4 670 | 11 090–11 740 | 3 430–4 030 | 13 740–15 130 | 3 510–5 560 | 14 550–16 290 |
+| IoRing stream before | 4 365 / 4 233 | 9 571 / 10 117 | 4 187 / 4 021 | 10 025 / 9 785 | 4 618 / 5 120 | 11 632 / 11 806 |
+| IoRing stream now | **5 249 / 5 155** | **11 154 / 11 439** | **4 651 / 4 772** | **12 065 / 12 405** | 3 256* / 5 445 | 10 227* / 11 963 |
+
+\* A slow run: `TFileStream` was slower in it too.
+
+- **Warm, the extra copy is mostly gone for big calls:** 64 MiB calls get
+  96–98 % of `TFileStream` on Windows and 97–101 % on Linux. 8 MiB calls
+  get 82–90 %: the buffers had already asked for 2 MiB of each call, and
+  those 2 MiB are still copied.
+- **Cold:** on Linux 11–22 % faster. On Windows 8 MiB and 64 KiB calls are
+  as before, and 64 MiB calls about 2 % slower (median of all runs: 6 574
+  against 6 735) – not explained; registering the memory explains a small
+  part only (Design §12.8).
+- **One version measured on the way lost 6 %** cold with 64 MiB calls on
+  Windows: the buffers read ahead 64 MiB further on while the call's own
+  reads were still running. Windows reads ahead in its file cache when the
+  reads come in file order; now the buffers wait until all of the call's
+  reads have started.
+- `TMemoryStream.LoadFromStream` and `TBytesStream` read the whole stream
+  in one call, so they get this; `CopyFrom` reads 1 MiB at a time (one
+  buffer), so it does not.
 
 ## Known limits of these measurements
 

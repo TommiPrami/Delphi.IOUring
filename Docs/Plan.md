@@ -362,7 +362,16 @@ free, ARM64 included.)
 
 Only what a benchmark has already shown:
 
-- **Phase 26** – Read straight into the caller's buffer for big aligned reads (Design §7, point 7): with cached data the read stream is 16–31 % slower than `TFileStream`, on every system measured, because of one more copy. On Linux also the clock through the C library (13 ns instead of 94 ns; Design §10.14). Proposal: Design §12.8 (measured on this machine and in WSL2); waits for the decisions marked [DECIDE].
+- **Phase 26** – Read straight into the caller's buffer for big aligned reads (Design §7, point 7): with cached data the read stream is 16–31 % slower than `TFileStream`, on every system measured, because of one more copy. On Linux also the clock through the C library (13 ns instead of 94 ns; Design §10.14). Decided: Design §12.8 – build it and keep it only if it wins; the Linux clock stays.
+  - [x] `TIORingSequentialReader.Read`: the part of a call beyond what the buffers have asked for is read straight into the caller's memory (pieces of the buffer size, up to the buffer count in flight); the buffers read ahead after the end of the call once all of its pieces have started. Unbuffered only into sector-aligned memory, in whole sectors. The stream gets it through the reader.
+  - [x] Never a read in flight into the caller's memory when `Read` returns or raises; a failed big read makes every later call fail (going on would leave a gap).
+  - [x] `Stats.DirectReads` and `Stats.DirectBytes`; `BytesFromDisk` counts both kinds.
+  - [x] Tests: 6 new (big reads buffered and unbuffered, aligned and not, small reads use only the buffers, mixed with small reads and chunks, a file shortened during big reads, `TMemoryStream.LoadFromStream`); the stream's statistics test updated.
+  - [x] Measured, the reader before and after in turns (Design §12.8): warm big calls 8–24 % faster on Windows and Linux (64 MiB calls 96–101 % of `TFileStream`, 8 MiB calls 82–90 %); cold 8 MiB and 64 KiB calls as before; cold 64 MiB calls 20–22 % faster on Linux, about 2 % slower on Windows. Changed on the way: the buffers wait with their reading ahead until all of a call's pieces have started (cold 64 MiB calls on Windows lost 6 % before that).
+  - [x] Kept (Design §12.8, decision 4; decisions log 22), although the rule of decision 1 is not met everywhere. Why cold 64 MiB calls on Windows are about 2 % slower is parked (Design §13).
+  - [x] README (the stream section) and Benchmarks.md ("Big Read calls") describe it.
+
+  **Done 2026-10-24** – Tests: Delphi 252 (Win32 and Win64, Debug and Release), FPC 251 (Win32 and Win64, with and without `-O3`), Linux 249 (WSL2, with and without `-O3`); the demos run on Win64 and Linux; the benchmarks and the Lazarus package compile. The Linux clock stays as it is (measured: less than 0.1 %).
 - **Phase 27** – The atomics on AArch64: on GitHub's ARM64 runner the lock-free structures sometimes lose to a mutex (queue with 2–3 producers in a tight loop 0.87–0.90; free list with 4 threads and work 0.88), while on x86-64 they always win. Every atomic operation there has full barriers around it, and FPC 3.2.2 does not inline its `ReadWriteBarrier` on AArch64. Measure inline barriers and lighter ordering (acquire/release instructions); keep the lock-free structures only where they win (Design §10.5).
 
 Small things, any time: run the Windows benchmarks once more (the shared
@@ -374,8 +383,8 @@ of git (they are ignored now, but still tracked).
 
 ## Immediate next step
 
-Phase 25 is done, and with it Milestone 5: CI on three runners, a Lazarus
-package, six demos, version 0.1.0 (no tag yet). Next is Milestone 6:
-**Phase 26** (read straight into the caller's buffer; the Linux clock): the
-proposal is in Design §12.8, with the measurements; it waits for the
-decisions marked [DECIDE]. Then Phase 27 (the atomics on AArch64).
+Phase 26 is done: big `Read` calls read straight into the caller's memory
+(warm big calls 8–24 % faster; Design §12.8). Next is **Phase 27** (the
+atomics on AArch64): first a proposal with the decisions marked [DECIDE] –
+among them where to measure, since this machine is x86-64 and the
+benchmarks do not run in CI.

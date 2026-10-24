@@ -121,6 +121,12 @@ than the current position raise `EIORingStreamError` (an `EStreamError`).
 `Position` and `Size` work as usual. A file that cannot be opened raises
 `EFOpenError`, like `TFileStream`.
 
+Big `Read` calls – for example `TMemoryStream.LoadFromStream`, which reads
+the whole file in one call – read most of the data straight into your
+memory, without a copy through the stream's buffers. With cached data a
+64 MiB call is then about as fast as with `TFileStream`
+([Benchmarks](Docs/Benchmarks.md#big-read-calls-phase-26)).
+
 ### Zero-copy reader
 
 ```pascal
