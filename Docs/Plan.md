@@ -343,8 +343,14 @@ free, ARM64 included.)
   - [x] The benchmarks once on the runners (2026-10-24, Benchmarks.md "GitHub's runners"): slow cloud disks (about 400 MiB/s, 20–27 thousand random reads per second); the block reader reaches the disk's limit where plain reads do not (Windows 3.6× `ReadFile` random, 7.5–12.6× sorted); the write stream with work 24–42 % sooner. Found: on ARM64 the lock-free structures sometimes lose to a mutex (Phase 27).
 
   **Done 2026-10-24** – CI green on Linux x64, Linux ARM64 and Windows Server 2025 (Free Pascal 3.2.2: tests debug and `-O3`, layout check, benchmarks built); AArch64 verified, one AArch64 bug found and fixed (`O_DIRECT`); failed tests become annotations. Locally unchanged: Delphi 246 tests, FPC 245 on Windows, 243 on Linux (WSL2).
-- **Phase 24** – Packages: a Delphi runtime package (`.dpk`) and a Lazarus package (`.lpk`), so a project adds the library in one step; later maybe GetIt or Lazarus's Online Package Manager.
-- **Phase 25** – Examples and a 1.0 release: small example programs (the two streams, the block reader, the engine with callbacks, `IORingCapabilities`, a socket echo on Linux); a version number, a tag and a CHANGELOG.
+- **Phase 24** – A Lazarus package (`.lpk`), so a Lazarus project adds the library in one step. No Delphi package: Delphi compiles the library into the program from `Source/Units`. Decided: Design §12.6.
+  - [x] `Source/Packages/Lazarus/DelphiIOUring.lpk`, version 0.1, runtime only; the four backend units are not in its main unit, so each system compiles only its own. Lazarus's generated `DelphiIOUring.pas` committed with it (the normalize script leaves it alone).
+  - [x] `Build-FPC.ps1 -Project Package` compiles the package's main unit with FPC (Win32, Win64, Linux64; on Linux machines also LinuxArm64); CI does it on all three runners.
+  - [x] CI no longer runs the benchmarks (the workflow's inputs and artifacts are gone); the tests stay on every push.
+  - [x] README: how to use the library from Delphi (search path) and Lazarus (the package).
+
+  **Done 2026-10-24** – The package builds with `lazbuild` (Lazarus 5.0 RC1: Win32 and Win64; trunk: Win64) and through `Build-FPC.ps1` (Win32, Win64, Linux64 in WSL; Win64 also with FPC trunk). Library code unchanged.
+- **Phase 25** – Examples and a first tagged version: small example programs (the two streams, the block reader, the engine with callbacks, `IORingCapabilities`, a socket echo on Linux); a version number (0.x – the version stays below 1.0 for a long time, Design §12.6), a tag and a CHANGELOG.
 
 ## Milestone 6 – Faster where it still loses
 
@@ -362,7 +368,6 @@ of git (they are ignored now, but still tracked).
 
 ## Immediate next step
 
-Phase 23 is done: CI runs the Free Pascal tests on Linux x64, Linux ARM64
-and Windows on every push, and the benchmarks ran once on those runners.
-Next: **Phase 24 – packages** (Delphi `.dpk`, Lazarus `.lpk`). It starts
-with a proposal and its decisions, as before.
+Phase 24 is done: a Lazarus package (version 0.1); Delphi keeps compiling
+the library from source. Next: **Phase 25 – examples and a first tagged
+version** (0.x). It starts with a proposal and its decisions, as before.

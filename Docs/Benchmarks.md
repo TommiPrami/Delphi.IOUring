@@ -823,10 +823,11 @@ here.
 ## GitHub's runners (Phase 23)
 
 The first numbers from other machines: the four Free Pascal benchmarks on
-GitHub's hosted runners (started by hand: Actions → CI → Run workflow),
-2026-10-24, files of 1 and 4 GiB, median of 3 runs. Raw output:
-[2026-10-24-ci-*.txt](BenchmarkResults/). Each runner has 4 processors,
-16 GB of memory and a cloud disk:
+GitHub's hosted runners, run once by hand, 2026-10-24, files of 1 and 4
+GiB, median of 3 runs. Raw output: [2026-10-24-ci-*.txt](BenchmarkResults/).
+(The workflow no longer runs the benchmarks: the runs took 19–38 minutes per
+runner on slow cloud machines – Design §12.6.) Each runner has 4
+processors, 16 GB of memory and a cloud disk:
 
 | Runner | System |
 | --- | --- |

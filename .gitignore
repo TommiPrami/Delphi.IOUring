@@ -100,5 +100,10 @@ Source/Benchmarks/FPC/Win64/
 Source/Benchmarks/FPC/Linux64/
 Source/Benchmarks/FPC/bin/
 Source/Benchmarks/FPC/lib/
+Source/Packages/Lazarus/lib/
+Source/Packages/Lazarus/Win32/
+Source/Packages/Lazarus/Win64/
+Source/Packages/Lazarus/Linux64/
+Source/Packages/Lazarus/LinuxArm64/
 *.lps
 backup/

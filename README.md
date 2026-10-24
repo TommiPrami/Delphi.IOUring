@@ -35,6 +35,7 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Linux ring `TLinuxIORing` (`Delphi.IOUring.Backend.Posix`; `TIORing` on Linux), the read-ahead reader and the atomics on Linux | done, tested on x86-64 (WSL2) and ARM64 (CI) |
 | The engine, block reader, overlap rule and both streams on Linux | done, tested on x86-64 (WSL2) and ARM64 (CI); benchmarks run in WSL2 (a first look, not disk numbers) |
 | Linux extras: any io_uring operation (sockets …) and linked operations on the ring; capabilities that describe the system | done, tested on x86-64 (WSL2) and ARM64 (CI) |
+| Lazarus package `DelphiIOUring` (version 0.1) | done, built with Lazarus 5.0 RC1 and trunk (Win32, Win64); its units compile on Linux too (CI) |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
 
@@ -63,7 +64,18 @@ The test program prints what the system offers first
 
 ## Usage
 
-Add `Source\Units` to the search path.
+- **Delphi:** add `Source\Units` to the project's search path. The library is
+  compiled into the program; there is no Delphi package.
+- **Lazarus:** open `Source/Packages/Lazarus/DelphiIOUring.lpk` once
+  (Package → Open Package File) and compile it; then add it to a project
+  (Project Inspector → Add → New Requirement → `DelphiIOUring`). From the
+  command line, `lazbuild --add-package-link=Source/Packages/Lazarus/DelphiIOUring.lpk`
+  registers it. The package compiles only the backend of the system it is
+  built for. (Plain Free Pascal: add `Source/Units` to the unit and include
+  paths.)
+
+The version is 0.1, and it will stay below 1.0 for a while: the API may
+still change, especially once others have used it.
 
 ### Drop-in stream
 

@@ -1,10 +1,12 @@
 # Free Pascal tests on Linux x64, Linux ARM64 and Windows (Docs/Design.md
 # §12.5). Delphi is tested locally (its compiler needs a licensed IDE).
 #
-# Every push to main and every pull request: the tests (debug build and -O3),
-# the layout check of the Linux API translation, and the benchmarks built.
-# Started by hand (Actions > CI > Run workflow) the benchmarks also run; their
-# output is kept as an artifact of the run.
+# Every push to main, every pull request, and by hand (Actions > CI > Run
+# workflow): the tests (debug build and -O3), the layout check of the Linux
+# API translation, the benchmarks and the Lazarus package built. The
+# benchmarks are not run here: the runners are slow cloud machines, and the
+# runs take long (Docs/Design.md 12.6; the numbers of the one run are in
+# Docs/Benchmarks.md).
 
 name: CI
 
@@ -13,15 +15,6 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      benchmarks:
-        description: 'Also run the benchmarks (several minutes per runner)'
-        type: boolean
-        default: false
-      sizes:
-        description: 'File sizes in GiB for the read and write benchmarks (the runners have 14 GB of disk)'
-        type: string
-        default: '1,4'
 
 permissions:
   contents: read
@@ -97,37 +90,14 @@ jobs:
           fi
           echo "The same $(grep -cF 'ACheck(' Tests.Linux.Backend.Posix.API.Layout.inc) checks as the committed file"
 
-      - name: Build the benchmarks
+      # The Lazarus package's main unit, compiled with FPC (no Lazarus here)
+      - name: Build the benchmarks and the Lazarus package
+        if: success() || failure()
         run: |
-          foreach ($project in 'Benchmarks', 'Structures', 'Blocks', 'Writes') {
+          foreach ($project in 'Benchmarks', 'Structures', 'Blocks', 'Writes', 'Package') {
             ./Source/Build-FPC.ps1 -Project $project
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-
-      - name: Run the benchmarks
-        if: github.event_name == 'workflow_dispatch' && inputs.benchmarks
-        env:
-          SIZES: ${{ inputs.sizes }}
-        run: |
-          New-Item -ItemType Directory -Force -Path bench-results | Out-Null
-          $runs = @(
-            @{ Project = 'Benchmarks'; Arguments = @('--sizes', $env:SIZES, '--runs', '3') },
-            @{ Project = 'Blocks';     Arguments = @('--runs', '3') },
-            @{ Project = 'Writes';     Arguments = @('--sizes', $env:SIZES, '--runs', '3') },
-            @{ Project = 'Structures'; Arguments = @('--runs', '3') }
-          )
-          foreach ($run in $runs) {
-            ./Source/Build-FPC.ps1 -Project $run.Project -Run -RunArguments $run.Arguments |
-              Tee-Object -FilePath "bench-results/$($run.Project).txt"
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-
-      - name: Keep the benchmark output
-        if: github.event_name == 'workflow_dispatch' && inputs.benchmarks
-        uses: actions/upload-artifact@v7
-        with:
-          name: benchmarks-linux-${{ matrix.arch }}
-          path: bench-results
 
   windows:
     name: Windows (Win32, Win64)
@@ -175,36 +145,12 @@ jobs:
           }
           if ($failed) { exit 1 }
 
-      - name: Build the benchmarks
+      - name: Build the benchmarks and the Lazarus package
+        if: success() || failure()
         run: |
           foreach ($platform in 'Win32', 'Win64') {
-            foreach ($project in 'Benchmarks', 'Structures', 'Blocks', 'Writes') {
+            foreach ($project in 'Benchmarks', 'Structures', 'Blocks', 'Writes', 'Package') {
               ./Source/Build-FPC.ps1 -Project $project -Platform $platform -FpcDir $env:FPC_DIR
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             }
           }
-
-      - name: Run the benchmarks (Win64)
-        if: github.event_name == 'workflow_dispatch' && inputs.benchmarks
-        env:
-          SIZES: ${{ inputs.sizes }}
-        run: |
-          New-Item -ItemType Directory -Force -Path bench-results | Out-Null
-          $runs = @(
-            @{ Project = 'Benchmarks'; Arguments = @('--sizes', $env:SIZES, '--runs', '3') },
-            @{ Project = 'Blocks';     Arguments = @('--runs', '3') },
-            @{ Project = 'Writes';     Arguments = @('--sizes', $env:SIZES, '--runs', '3') },
-            @{ Project = 'Structures'; Arguments = @('--runs', '3') }
-          )
-          foreach ($run in $runs) {
-            ./Source/Build-FPC.ps1 -Project $run.Project -Platform Win64 -FpcDir $env:FPC_DIR -Run -RunArguments $run.Arguments |
-              Tee-Object -FilePath "bench-results/$($run.Project).txt"
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-
-      - name: Keep the benchmark output
-        if: github.event_name == 'workflow_dispatch' && inputs.benchmarks
-        uses: actions/upload-artifact@v7
-        with:
-          name: benchmarks-windows-x64
-          path: bench-results

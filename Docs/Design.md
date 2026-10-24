@@ -2979,6 +2979,89 @@ capabilities report at the top of the test program's output (3).
   against 20 thousand blocks per second); on Windows unbuffered block reads
   gain nothing over `ReadFile` there (6.2 against 5.8 thousand).
 
+### 12.6 Packages (Phase 24)
+
+Today a program adds `Source/Units` to its search path. A package makes it
+one step: the IDE knows the library, and the units are compiled once.
+
+**Facts found before Phase 24** (trial packages in a scratch folder,
+2026-10-24):
+
+- **[VERIFIED] Delphi 13:** a runtime package named `Delphi.IOUring` – the
+  same name as its main unit – builds without warnings for Win32 and Win64
+  from the command line, with every unit except the two Linux ones. With
+  `{$LIBSUFFIX AUTO}` the file is `Delphi.IOUring370.bpl` (the compiler
+  version in the name, so packages of several Delphi versions can be
+  installed side by side), the compiled interface `Delphi.IOUring.dcp`. A
+  program that uses `Delphi.IOUring` with runtime packages (`rtl`,
+  `Delphi.IOUring`) builds and runs (a 21 KB program).
+- **[VERIFIED] Lazarus:** a package name must be an identifier, so
+  `DelphiIOUring`. A runtime-only package with all 14 units builds with
+  `lazbuild` for Win64 and Win32 (Lazarus 5.0 RC1) and with the trunk
+  Lazarus. The four backend units are not in the package's main unit
+  (`AddToUsesPkgSection` False): each system then compiles only its own
+  backend. Lazarus writes that main unit (`DelphiIOUring.pas`, a plain
+  `uses` list); compiled with FPC in WSL it takes the Linux backend.
+- The library has no components, so no design-time package is needed.
+- GitHub's runners have Free Pascal but no Lazarus; Delphi only runs here.
+
+**Phase 24 proposal:**
+
+- **[DECIDE] 1. Names and places.** Proposed:
+  `Source/Packages/Delphi/Delphi.IOUring.dpk` (with its `.dproj`; Win32
+  and Win64; runtime only; `{$LIBSUFFIX AUTO}`) and
+  `Source/Packages/Lazarus/DelphiIOUring.lpk` (runtime only; all units, the
+  backends kept out of the main unit as above; Lazarus's generated
+  `DelphiIOUring.pas` committed with it, as Lazarus packages usually are).
+  Other choice: the plain name `DelphiIOUring` for both.
+- **[DECIDE] 2. Version and settings.** Proposed: both packages say version
+  0.9 until the 1.0 release (Phase 25 sets it). The Delphi package's Debug
+  configuration turns inlining off, like the test project; Release is
+  optimized. Output folders: Delphi's defaults (the `Bpl` and `Dcp` folders
+  of the Delphi version), Lazarus `lib/<cpu>-<os>` next to the package;
+  both ignored by git.
+- **[DECIDE] 3. How the packages are kept working.** Proposed: the local
+  test run also builds the Delphi package (Win32 and Win64, Debug and
+  Release) and the Lazarus package (`lazbuild`, Win32 and Win64); CI
+  compiles the package's main unit with FPC on all three runners (no
+  Lazarus needed there). The tests and benchmarks keep using
+  `Source/Units` directly – nothing changes for them.
+- Docs: the README tells how to install each package; GetIt, Lazarus's
+  Online Package Manager or a `boss.json` for Boss come later (Phase 25 or
+  after), once there is a version to point at.
+
+**Phase 24 decisions (decided 2026-10-24):**
+
+- **1 changed: no Delphi package.** In Delphi the library is compiled into
+  the program from `Source/Units`; a package adds nothing there. Only the
+  Lazarus package, in the place proposed:
+  `Source/Packages/Lazarus/DelphiIOUring.lpk`, with its generated main unit.
+- **2 changed: the version stays below 1.0 for a long time** – also when
+  everything planned now is done. Once others use the library, suggestions
+  (also for the API) are expected first. The package starts at **0.1**;
+  Phase 25 tags a first version (0.x), not 1.0.
+- **3 changed: local first.** The packages are checked in the local test
+  run (`lazbuild`, and `Build-FPC.ps1 -Project Package`). CI keeps its tests
+  on every push (about 2.5 minutes), compiles the package there too, and is
+  looked at when a change needs it. **The benchmarks no longer run in CI**:
+  they take a long time and resources on GitHub's side, and the slow cloud
+  machines say little (the one run of Phase 23 stays in Benchmarks.md).
+
+**Phase 24 implementation notes** (2026-10-24):
+
+- `Source/Packages/Lazarus/DelphiIOUring.lpk`: runtime only, version 0.1,
+  requires FCL, all 14 units and the include file; the four backend units
+  with `AddToUsesPkgSection` False. Paths are relative (`../../Units`).
+  `lazbuild` left the hand-written `.lpk` as it was.
+- The generated main unit `DelphiIOUring.pas` is committed. Lazarus writes
+  it in its own format (ASCII, CRLF, no BOM) whenever the package is
+  compiled, so `Normalize-SourceEncoding.ps1` skips it by default – the two
+  would otherwise keep changing it back and forth.
+- `Build-FPC.ps1 -Project Package` compiles that main unit with FPC, like
+  Lazarus does: the same check on Windows, in WSL and on the CI runners,
+  where there is no Lazarus. Each build takes its own backend (Windows on
+  Win32/Win64, Posix on Linux).
+
 ---
 
 ## 13. Ideas parked for later

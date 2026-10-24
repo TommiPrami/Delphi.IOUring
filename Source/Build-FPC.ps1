@@ -12,6 +12,8 @@
       Structures  Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.Structures.FPC.lpr (optimized)
       Blocks      Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.Blocks.FPC.lpr (optimized)
       Writes      Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.Writes.FPC.lpr (optimized)
+      Package     Source\Packages\Lazarus\DelphiIOUring.pas: the main unit of the
+                  Lazarus package, compiled without Lazarus (optimized; no -Run)
 
     Linux: on Windows, Linux64 builds and runs inside WSL, with the FPC of the
     default WSL distribution (Ubuntu: sudo apt install fpc). On a Linux
@@ -21,7 +23,7 @@
     benchmarks without their Windows-only contenders.
 
 .PARAMETER Project
-    Tests, Benchmarks, Structures, Blocks or Writes. Default Tests.
+    Tests, Benchmarks, Structures, Blocks, Writes or Package. Default Tests.
 
 .PARAMETER Platform
     Win32, Win64, Linux64 or LinuxArm64. Default: Win32 on Windows, the
@@ -73,7 +75,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Tests', 'Benchmarks', 'Structures', 'Blocks', 'Writes')]
+    [ValidateSet('Tests', 'Benchmarks', 'Structures', 'Blocks', 'Writes', 'Package')]
     [string] $Project = 'Tests',
     [ValidateSet('Win32', 'Win64', 'Linux64', 'LinuxArm64')]
     [string] $Platform = '',
@@ -239,6 +241,16 @@ if ($Project -eq 'Tests') {
     } else {
         $codeOptions += '-dIORING_NO_INLINE'                 # debug build: no inlining (Delphi.IOUring.inc)
     }
+} elseif ($Project -eq 'Package') {
+    # A unit, not a program: it pulls in every unit of the package and the
+    # backend of this platform, as Lazarus compiles it
+    if ($Run) {
+        throw '-Run: the package is a unit, there is nothing to run.'
+    }
+    $projectDir = Join-Source 'Packages\Lazarus'
+    $programFile = 'DelphiIOUring.pas'
+    $extraUnits = @()
+    $codeOptions = @('-O3')
 } else {
     $projectDir = Join-Source 'Benchmarks\FPC'
     switch ($Project) {
