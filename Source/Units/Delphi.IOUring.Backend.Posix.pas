@@ -259,6 +259,15 @@ const
   SYNC_FILE_RANGE_WRITE = 2;
   SYNC_FILE_RANGE_WAIT_AFTER = 4;
   O_CLOEXEC_FLAG = &02000000;
+  // ARM64 has fcntl.h values of its own: there 040000 (O_DIRECT elsewhere) is
+  // O_DIRECTORY. FPC 3.2.2's BaseUnix.O_DIRECT is 040000 on every CPU, so on
+  // AArch64 an unbuffered open failed with ENOTDIR (found by the first run
+  // on an ARM machine, Phase 23).
+{$IF defined(CPUAARCH64)}
+  O_DIRECT_FLAG = &0200000;
+{$ELSE}
+  O_DIRECT_FLAG = &040000;
+{$ENDIF}
   MAP_POPULATE_FLAG = $8000;
   EFD_CLOEXEC = O_CLOEXEC_FLAG;
   EFD_NONBLOCK = &04000;
@@ -1191,7 +1200,7 @@ function OpenFlags(const AUnbuffered: Boolean): Integer;
 begin
   Result := O_CLOEXEC_FLAG;
   if AUnbuffered then
-    Result := Result or O_DIRECT;
+    Result := Result or O_DIRECT_FLAG;
 end;
 
 class function TLinuxIORingPlatform.OpenFileForRead(const AFileName: string; const AUnbuffered,

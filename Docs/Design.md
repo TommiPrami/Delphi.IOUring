@@ -2926,6 +2926,31 @@ notes, 2026-10-24):
 runners and jobs of 1, `Build-FPC.ps1` for Linux too (2), and the
 capabilities report at the top of the test program's output (3).
 
+**Phase 23 implementation notes** (2026-10-24):
+
+- **[VERIFIED] The first run** (commit cb6e612): Linux x64 passed, Windows
+  Server 2025 passed – it **has IoRing version 4**, Win32 and Win64 tested –
+  and Linux ARM64 failed in 9 of 243 tests. The Linux runners allow
+  io_uring (ARM64: Ubuntu 24.04.5, kernel 6.17 for Azure, SQPOLL allowed,
+  63 opcodes): the test program's first lines said so.
+- **[VERIFIED] AArch64 works**: the atomics with all their stress tests (the
+  DMB barriers of §5.7), the ring, the engine, the layout tests, sockets
+  and links passed on the first run on ARM.
+- **Found: `O_DIRECT` was wrong on AArch64.** ARM64 has `fcntl.h` values of
+  its own: there `040000` – `O_DIRECT` on x86-64 and in the generic header –
+  is `O_DIRECTORY`, and `O_DIRECT` is `0200000`. FPC 3.2.2's
+  `BaseUnix.O_DIRECT` is `040000` on every CPU, so every unbuffered open
+  failed: `ENOTDIR` when opening, `EINVAL` when creating. Fixed with an
+  own `O_DIRECT_FLAG` per CPU in `Delphi.IOUring.Backend.Posix` (and in
+  `TestPlatformHelpers`). The other open flags the library uses are the
+  same on both CPUs.
+- The logs of a run need a GitHub sign-in, the annotations do not (they
+  can be read through the API). So the workflow's test steps go through a
+  small script (`.github/scripts/Invoke-Tests.ps1`) that turns every failed
+  test into an annotation with the test's name. On Linux the `-O3` tests and
+  the layout check run also after a failed debug run, so one run shows
+  everything.
+
 ---
 
 ## 13. Ideas parked for later

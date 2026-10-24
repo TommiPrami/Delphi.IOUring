@@ -64,15 +64,18 @@ jobs:
           echo "Locked memory limit (ulimit -l): $(ulimit -l)"
           echo "Free Pascal: $(fpc -iV)"
 
+      # Every failed test also becomes an annotation of the run
       - name: Tests (debug build)
-        run: ./Source/Build-FPC.ps1 -Project Tests -Run
+        run: ./.github/scripts/Invoke-Tests.ps1
 
       - name: Tests (-O3)
-        run: ./Source/Build-FPC.ps1 -Project Tests -Optimize -Run
+        if: success() || failure()
+        run: ./.github/scripts/Invoke-Tests.ps1 -Optimize
 
       # The C header's layout on this CPU must give the same checks as the
       # committed file (git keeps it with LF, the generator writes CRLF)
       - name: Layout of the Linux API translation
+        if: success() || failure()
         shell: bash
         run: |
           cd Source/UnitTests/Linux
@@ -145,24 +148,15 @@ jobs:
 
       # Where IoRing version 4 is missing, the tests are only built: the test
       # program then reports "Not available: <reason>" first, and the step
-      # passes with a warning
+      # passes with a warning. Every failed test becomes an annotation.
       - name: Tests (Win32 and Win64, debug build and -O3)
         run: |
           $failed = $false
           foreach ($platform in 'Win32', 'Win64') {
             foreach ($optimize in $false, $true) {
               Write-Host "=== $platform, optimize: $optimize"
-              $output = ./Source/Build-FPC.ps1 -Project Tests -Platform $platform -FpcDir $env:FPC_DIR -Optimize:$optimize -Run 2>&1
-              $code = $LASTEXITCODE
-              $output | ForEach-Object { Write-Host $_ }
-              if ($code -ne 0) {
-                $reason = $output | Where-Object { "$_" -like 'Not available:*' } | Select-Object -First 1
-                if ($reason) {
-                  Write-Host "::warning::$platform built, not tested - $reason"
-                } else {
-                  $failed = $true
-                }
-              }
+              ./.github/scripts/Invoke-Tests.ps1 -Platform $platform -FpcDir $env:FPC_DIR -Optimize:$optimize -AllowNotAvailable
+              if ($LASTEXITCODE -ne 0) { $failed = $true }
             }
           }
           if ($failed) { exit 1 }

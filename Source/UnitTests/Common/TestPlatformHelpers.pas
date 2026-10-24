@@ -140,6 +140,13 @@ uses
 {$IFDEF UNIX}
 const
   O_CLOEXEC_FLAG = &02000000;
+  // ARM64's own fcntl.h value; FPC 3.2.2's BaseUnix.O_DIRECT is the x86 one
+  // (O_DIRECTORY on ARM64). As in Delphi.IOUring.Backend.Posix.
+{$IF defined(CPUAARCH64)}
+  O_DIRECT_FLAG = &0200000;
+{$ELSE}
+  O_DIRECT_FLAG = &040000;
+{$ENDIF}
 
 procedure RaiseLastErrno(const AOperation: string);
 var
@@ -375,7 +382,7 @@ function UnixFlags(const AFlags: TTestOpenFlags): Integer;
 begin
   Result := O_CLOEXEC_FLAG;
   if tofUnbuffered in AFlags then
-    Result := Result or O_DIRECT;
+    Result := Result or O_DIRECT_FLAG;
 end;
 
 function TTestResources.OpenFile(const AFileName: string; const AFlags: TTestOpenFlags): THandle;

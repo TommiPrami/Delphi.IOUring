@@ -337,7 +337,8 @@ free, ARM64 included.)
   - [x] `Build-FPC.ps1` builds natively on Linux (`Linux64`, new `LinuxArm64`; the RTL unit folder found from the installed fpc); on Windows unchanged, Linux64 through WSL.
   - [x] The test program prints `IORingCapabilities.ToString` first; `ToString` names the reason first when the ring is not available.
   - [x] `.github/workflows/ci.yml`: Linux x64 and ARM64 (tests debug and `-O3`, the layout generator against the committed file, benchmarks built), Windows Server 2025 (FPC 3.2.2 installer, cached; tests Win32 and Win64 debug and `-O3`, or built only with a warning when IoRing 4 is missing; benchmarks built); the benchmarks run when started by hand, output kept as an artifact.
-  - [ ] The first runs: read them, fix what fails (AArch64 first).
+  - [x] The first run: Linux x64 and Windows Server 2025 (it has IoRing 4) passed; Linux ARM64 found that FPC 3.2.2's `O_DIRECT` is the x86 value on AArch64 (there it means `O_DIRECTORY`): fixed with an own flag per CPU. Failed tests now also become annotations (readable without signing in).
+  - [ ] A green run on all three runners.
   - [ ] The benchmarks once on the runners (first Linux numbers outside WSL2).
 - **Phase 24** – Packages: a Delphi runtime package (`.dpk`) and a Lazarus package (`.lpk`), so a project adds the library in one step; later maybe GetIt or Lazarus's Online Package Manager.
 - **Phase 25** – Examples and a 1.0 release: small example programs (the two streams, the block reader, the engine with callbacks, `IORingCapabilities`, a socket echo on Linux); a version number, a tag and a CHANGELOG.
