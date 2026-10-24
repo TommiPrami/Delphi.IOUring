@@ -241,7 +241,8 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
 - Tests, Linux: `Source\Build-FPC.ps1 -Project Tests -Platform Linux64 -Run`
   builds and runs them in WSL, with the FPC installed there (Ubuntu:
   `sudo apt install fpc`). On Linux all tests run except the Windows API
-  tests, plus the Linux API tests.
+  tests, plus the Linux API tests. `-Distribution Ubuntu-26.04` picks another
+  WSL distribution than the default one.
 - Benchmarks: `Source\Benchmarks\Delphi.IOUring.Benchmarks.dproj`, and for Free
   Pascal `Source\Build-FPC.ps1 -Project Benchmarks` – see
   [Docs/Benchmarks.md](Docs/Benchmarks.md). The engine's data structures

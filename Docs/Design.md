@@ -2395,7 +2395,16 @@ Windows byte-range lock).
   Linux). Left out on Linux: the overlapped `ReadFile` contenders and the
   block reader on a synchronous handle (Windows-only ideas). The structures
   benchmark compares with a pthread mutex instead of the SRW lock.
-- Test counts: Linux 230 (WSL2, kernel 6.18), with and without `-O3`.
+- **Two Linux distributions:** `Build-FPC.ps1 -Distribution <name>` builds
+  and runs in a chosen WSL distribution. Ubuntu 24.04 (glibc 2.39) and
+  Ubuntu 26.04 (glibc 2.43), both with FPC 3.2.2, run the same WSL2 kernel,
+  so io_uring is the same; the C library and the packages differ. Ubuntu
+  26.04 has no gcc, so no `crtbegin.o`: the linker warns ("crtbegin.o not
+  found, this will probably cause a linking failure"), but the programs
+  link and work. Both use the same output folder (`Linux64`): run a program
+  in the distribution that built it.
+- Test counts: Linux 230 (WSL2, kernel 6.18; Ubuntu 24.04 and 26.04), with
+  and without `-O3`.
 
 ---
 

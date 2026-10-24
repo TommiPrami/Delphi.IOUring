@@ -180,7 +180,7 @@ end;
 
 procedure TIORingEngineTests.RecordCompletion(const ACompletion: TIORingCompletion);
 begin
-  FCallbackThreadId := GetCurrentThreadId;
+  FCallbackThreadId := TThread.CurrentThread.ThreadID;
   FCallbackCompletion := ACompletion;
   if ACompletion.IsCancelled then
     TAtomic.Increment(FCancelledCount);
@@ -201,7 +201,7 @@ begin
   LRead := PCallbackRead(ACompletion.UserData);
   if not ACompletion.Succeeded or (ACompletion.BytesTransferred <> LRead^.Count) or
     not TTestFileHelpers.CheckPattern(LRead^.Offset, LRead^.Buffer, LRead^.Count, LBadOffset) or
-    not FEngine.IsIOThread(GetCurrentThreadId) then
+    not FEngine.IsIOThread(TThread.CurrentThread.ThreadID) then
     TAtomic.Increment(FFailures);
   Dispose(LRead);
   TAtomic.Increment(FCallbackCount);

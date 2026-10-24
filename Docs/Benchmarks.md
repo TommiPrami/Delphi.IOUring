@@ -7,7 +7,8 @@ own: [Engine structures](#engine-structures-phase-11), and so has the engine
 with the block reader: [Blocks known in advance](#blocks-known-in-advance-phase-14),
 [Several I/O threads](#several-io-threads-phase-15) and
 [Overlap rule](#overlap-rule-phase-16); writing has its own:
-[Writing](#writing-phase-17).
+[Writing](#writing-phase-17). A first look at Linux (in WSL2):
+[Linux in WSL2](#linux-in-wsl2--a-first-look-phase-21).
 
 ## Short version
 
@@ -66,6 +67,13 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
   sooner** than with `TFileStream` (10 GiB: 3–21 %, where the disk is the
   limit); for writing alone there is no gain. Unbuffered, the data is on the
   disk soonest and with a third of the CPU time.
+- **Linux in WSL2 (Phase 21, a first look, not disk numbers):** Linux reads
+  ahead by itself for buffered sequential reads, so the reader gains nothing
+  there – but with CPU work, the unbuffered reader hides the reading
+  completely (29 % less time than `TFileStream`). Random 4 KiB blocks: the
+  block reader is **10–20× faster than `pread`**. The write stream with work:
+  26–29 % less time. The lock-free structures beat a pthread mutex
+  everywhere.
 
 ## Machine
 
@@ -692,7 +700,85 @@ MiB/s, FPC Linux64:
 - **Warm:** the zero-copy reader is as fast as `read` (11.4 against
   11.6 GiB/s); the stream is about 20 % slower (one more copy).
 
-LINUX_BLOCKS_WRITES_STRUCTURES
+### Blocks known in advance
+
+20 000 blocks of 4 KiB from a 4 GiB file, thousand blocks per second, FPC
+Linux64 (rows as in [Blocks known in advance](#blocks-known-in-advance-phase-14);
+the block reader on a synchronous handle is Windows-only):
+
+| Contender | random, cold | random, warm | random, unbuffered | sorted, cold | sorted, warm | sorted, unbuffered |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| TFileStream, Seek + Read | 12.7 | 1 329 | – | 289 | 1 571 | – |
+| pread | 11.9 | 1 667 | 11.9 | **336** | 2 023 | 12.8 |
+| pread, 8 threads | 76.2 | 904 | 73.1 | 75.8 | 648 | 67.5 |
+| Block reader, read-ahead 32 | 116 | 1 220 | 120 | 134 | 1 912 | 134 |
+| Block reader, read-ahead 128 | 114 | 1 444 | 111 | 131 | 1 949 | 130 |
+| Block reader, 128, 2 I/O threads | 220 | **2 748** | 165 | 255 | **3 191** | 215 |
+| Block reader, 128, 4 I/O threads | **239** | 2 393 | **257** | 245 | 2 413 | 243 |
+| Block reader, 128, overlap rule | 175 | 1 150 | 180 | 203 | 1 452 | 205 |
+| Block reader, 32, MaxGap 32 KiB | – | – | – | 192 | 772 | **344** |
+
+- **Random blocks: 10–20× faster than `pread`.** Not in the cache, the
+  block reader with one I/O thread got 9.6× as many blocks as `pread`, with
+  4 I/O threads 20× (and 3.1× as many as 8 threads with `pread`).
+  Unbuffered the same: 257 against 12 thousand blocks/s.
+- **More I/O threads help on Linux too**, also unbuffered (one I/O thread:
+  ~110 thousand blocks/s, four: ~250). In WSL2 every request goes through
+  the virtual disk, which costs time per request.
+- **Cached data:** one I/O thread gets 87 % of `pread`'s speed (Windows:
+  85–92 %), two I/O threads 1.6× `pread`.
+- **Sorted blocks with small gaps, buffered: plain `pread` is best here**
+  (336 thousand blocks/s): Linux reads ahead by itself, gaps included. The
+  block reader wins this case only unbuffered, with `MaxGap`: 27× `pread`.
+- **The overlap rule** cost 20 % with cached random blocks (1 444 → 1 150);
+  for the cold cases the noise is bigger than its cost.
+- **Noise:** between two whole runs, single values moved by up to 30 %
+  (cold random, read-ahead 128: 149, then 114 thousand blocks/s). The first
+  run was also before the `WaitFor` fix (Design §10.14): "pread, 8 threads"
+  then took exactly 0.1 or 0.3 s every time.
+
+### Writing
+
+Seconds, FPC Linux64:
+
+| Contender | 1 GiB, written | + flush | 1 GiB with work, written | + flush | 10 GiB, written | + flush | 10 GiB with work, written | + flush |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| TFileStream, 64 KiB writes | 0.15 | 0.33 | 0.35 | 0.54 | 2.97 | 3.28 | 5.33 | 5.75 |
+| TFileStream, 1 MiB writes | **0.13** | **0.29** | 0.52 | 0.70 | **1.83** | **2.26** | 4.06 | 4.44 |
+| Write stream, 64 KiB writes | 0.15 | 0.32 | **0.25** | **0.44** | 2.30 | 2.72 | **3.01** | **3.43** |
+| Write stream, unbuffered | 0.37 | 0.37 | 0.36 | 0.37 | 4.04 | 4.04 | 3.96 | 3.97 |
+
+- **Writing only: no gain**, as on Windows.
+- **With work, the writing happens meanwhile:** 1 GiB was written in
+  0.25 s against 0.35–0.52 s, 10 GiB in 3.0 s against 4.1–5.3 s (26 % less
+  than the better `TFileStream`).
+- **Unbuffered is slower here**, and the flush is cheap: in WSL2 the host
+  may keep the written data in its own cache, so "+ flush" does not prove
+  that the data is on the disk.
+- Before the `WaitFor` fix the write stream's `Free` took 0.1 s more
+  (1 GiB, writing only: 0.25 s, now 0.15 s).
+- Noise again: `TFileStream` with 1 MiB writes and work took 0.38 s for
+  1 GiB in the first run, 0.52 s in the second.
+
+### Engine structures
+
+Lock-free against a pthread mutex, 28 logical processors: lock-free speed ÷
+mutex speed (above 1: lock-free is faster):
+
+| Threads | Free list, tight | Free list, work 1 µs | Queue, tight | Queue, work 1 µs |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 1.36 | 1.00 | 8.7 | 1.00 |
+| 2 | 5.33 | 0.99 | 7.3 | 1.01 |
+| 4 | 2.76 | 1.87 | 14.9 | 1.57 |
+| 8 | 3.35 | 1.88 | 37.6 | 2.47 |
+| 16 | 2.52 | 1.91 | 104 | 7.6 |
+| 28 (queue: 27 producers) | 2.74 | 2.18 | 165 | 24.6 |
+
+**The lock-free structures win on Linux too**, as against the SRW lock on
+Windows: the free list ties with one thread and real work and is 1.4–5.3×
+faster in a tight loop; the queue is 7–165× faster under contention, where
+the mutex starves the consumer (with 27 producers it spent 752 s of CPU
+time for what the lock-free queue did in 4.7 s).
 
 ## Known limits of these measurements
 
@@ -774,4 +860,17 @@ largest size):
 ```
 Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Writes.exe --sizes 1,10 --runs 3 --csv writes.csv
 Source\Build-FPC.ps1 -Project Writes -Platform Win64 -Run
+```
+
+Linux: the same four Free Pascal programs with `-Platform Linux64`; they are
+built and run in WSL (`-Distribution Ubuntu-26.04` picks a distribution, the
+default is WSL's default one). The test files go to
+`/tmp/Delphi.IOUring.Bench`. The whole set (reader 1 and 10 GiB, blocks,
+writes 1 and 10 GiB, structures) took about 10 minutes in WSL2.
+
+```
+Source\Build-FPC.ps1 -Project Benchmarks -Platform Linux64 -Run -RunArguments '--sizes','1,10','--runs','3'
+Source\Build-FPC.ps1 -Project Blocks -Platform Linux64 -Run
+Source\Build-FPC.ps1 -Project Writes -Platform Linux64 -Run
+Source\Build-FPC.ps1 -Project Structures -Platform Linux64 -Run
 ```

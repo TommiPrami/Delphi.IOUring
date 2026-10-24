@@ -1,0 +1,39 @@
+Engine structures: FPC Linux64, 28 logical processors, 2026-10-24 07:41
+
+Free list: take one index, (work,) give it back.
+Mops/s = million take+give pairs per second, all threads; median of 3 runs.
+CPU ms = CPU time of all threads for the run (median).
+
+Scenario   Threads   lock-free       mutex  LF/mutex    LF CPU ms mutex CPU ms
+                        Mops/s      Mops/s                                    
+tight            1       60.19       44.30      1.36           65           89
+tight            2       41.46        7.79      5.33          187         1015
+tight            4       36.13       13.08      2.76          412          866
+tight            8       31.96        9.53      3.35          991         2292
+tight           16       14.98        5.95      2.52         4232         7554
+tight           28       13.09        4.78      2.74         8479        19491
+work 1 us        1        0.98        0.98      1.00          406          405
+work 1 us        2        1.93        1.95      0.99          422          407
+work 1 us        4        3.77        2.02      1.87          435          635
+work 1 us        8        4.14        2.20      1.88          775         1100
+work 1 us       16        3.53        1.85      1.91         1860         3096
+work 1 us       28        3.09        1.42      2.18         3604         6759
+
+Request queue: N producers put values in, one consumer takes them out.
+Threads = producers (plus the consumer). Mops/s = million values per second; median of 3 runs.
+CPU ms = CPU time of all threads for the run (median).
+
+Scenario   Threads   lock-free       mutex  LF/mutex    LF CPU ms mutex CPU ms
+                        Mops/s      Mops/s                                    
+tight            1       76.48        8.82      8.67          105          902
+tight            2       72.77       10.00      7.27          161          932
+tight            4       59.90        4.01     14.92          279         3778
+tight            8       39.63        1.05     37.60          711        27289
+tight           16       27.46        0.26    104.22         2384       216709
+tight           27       21.47        0.13    165.28         4677       752068
+work 1 us        1        0.98        0.98      1.00          811          823
+work 1 us        2        1.90        1.88      1.01          661          660
+work 1 us        4        3.24        2.06      1.57          708          801
+work 1 us        8        5.84        2.36      2.47          568         1154
+work 1 us       16        4.74        0.62      7.61         1386         9205
+work 1 us       27        3.53        0.14     24.64         3833        69336

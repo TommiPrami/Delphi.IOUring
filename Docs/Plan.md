@@ -311,9 +311,10 @@ Source/
   - [x] Found on the way: closed rings keep their registered buffers locked for a while, and quick open/close runs out of locked memory (`ENOMEM`). `Close` now unregisters first; the sequential reader reads without registration when a registration fails (Design §10.14).
   - [x] Found on the way: Free Pascal's `TThread.WaitFor` on Unix waits in 100 ms steps when called from the main thread, so freeing an engine took up to 100 ms. The engine now waits for the end of its I/O threads itself first; new test `Destroy_TenEngines_AreQuick` (Design §10.14).
   - [x] The four benchmarks build and run on Linux (`Build-FPC.ps1 -Platform Linux64 -Project …`); first WSL2 results in Benchmarks.md, marked: cold in WSL2 is not the disk.
+  - [x] `Build-FPC.ps1 -Distribution`: the tests also pass in Ubuntu 26.04 (no gcc there; the linker warns about `crtbegin.o` but works).
   - [ ] Benchmarks on a real Linux machine (not WSL2), and AArch64.
 
-  **Done 2026-10-24** – Linux: 230 tests pass in WSL2 (kernel 6.18), with and without `-O3`. Windows: WINDOWS_COUNTS.
+  **Done 2026-10-24** – Linux: 230 tests pass in WSL2 (kernel 6.18; Ubuntu 24.04 and 26.04), with and without `-O3`. Windows: Delphi 245 tests (Win32 and Win64, Debug and Release), FPC 244 (Win32 and Win64, with and without `-O3`; also FPC trunk 3.3.1, Win64); `lazbuild` builds the test project; the benchmarks compile with Delphi and FPC, and the FPC ones also on Linux.
 - **Phase 22** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only.
 
 ---

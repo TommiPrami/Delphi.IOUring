@@ -1,0 +1,57 @@
+Free Pascal 3.2.2, Linux64, 3 runs, files in /tmp/Delphi.IOUring.Bench
+
+Creating /tmp/Delphi.IOUring.Bench/Bench-10GiB.bin ...
+Linux64 FPC, 1 GiB, read-through, cold cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.279      3671        26       227       0
+  TFileStream 1 MiB reads                             0.199      5158        21       149       0
+  read 1 MiB, sequential hint                         0.198      5168        22       155       0
+  io_uring stream, 64 KiB reads                       0.209      4897        64       143       7
+  io_uring stream, 64 KiB reads, unbuffered           0.268      3817        77         6    1020
+  io_uring reader, zero-copy                          0.194      5290        42       143      44
+  io_uring reader, zero-copy, unbuffered              0.265      3857        43        12    1021
+
+Linux64 FPC, 1 GiB, read-through, warm cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.091     11277        24        67       0
+  TFileStream 1 MiB reads                             0.092     11130        28        60       0
+  read 1 MiB, sequential hint                         0.086     11909        20        66       0
+  io_uring stream, 64 KiB reads                       0.112      9158        47        64       0
+  io_uring reader, zero-copy                          0.088     11629        32        55       0
+
+Linux64 FPC, 1 GiB, work, cold cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.445      2301       237       212       0
+  TFileStream 1 MiB reads                             0.373      2743       230       136       0
+  read 1 MiB, sequential hint                         0.376      2726       223       161       0
+  io_uring stream, 64 KiB reads                       0.401      2552       250       151       1
+  io_uring stream, 64 KiB reads, unbuffered           0.297      3450       281         9       3
+  io_uring reader, zero-copy                          0.380      2693       238       153       1
+  io_uring reader, zero-copy, unbuffered              0.264      3884       250         2     312
+
+Linux64 FPC, 1 GiB, work, warm cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.297      3449       223        72       0
+  TFileStream 1 MiB reads                             0.294      3488       212        81       0
+  read 1 MiB, sequential hint                         0.292      3512       231        61       0
+  io_uring stream, 64 KiB reads                       0.317      3232       256        61       0
+  io_uring reader, zero-copy                          0.292      3505       232        61       0
+
+Linux64 FPC, 10 GiB, read-through, cold cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            3.237      3164       270      2952       0
+  TFileStream 1 MiB reads                             1.865      5491       279      1332       0
+  read 1 MiB, sequential hint                         2.186      4684       292      1763       0
+  io_uring stream, 64 KiB reads                       2.755      3717       837      1856       3
+  io_uring stream, 64 KiB reads, unbuffered           2.930      3495       777       188    9435
+  io_uring reader, zero-copy                          1.895      5404       436      1387     352
+  io_uring reader, zero-copy, unbuffered              2.895      3537       508       156   10182
+
+Linux64 FPC, 10 GiB, read-through, warm cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.929     11022       295       700       0
+  TFileStream 1 MiB reads                             0.926     11060       231       699       0
+  read 1 MiB, sequential hint                         0.891     11488       280       612       0
+  io_uring stream, 64 KiB reads                       1.116      9174       545       577       0
+  io_uring reader, zero-copy                          0.885     11575       280       585       0
+

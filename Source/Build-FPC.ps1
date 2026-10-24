@@ -31,6 +31,12 @@
     Linux64 only: the FPC unit folder inside WSL. Default
     /usr/lib/x86_64-linux-gnu/fpc/3.2.2/units/x86_64-linux (Ubuntu's fpc package).
 
+.PARAMETER Distribution
+    Linux64 only: the WSL distribution to build and run in (a name from
+    "wsl -l", for example Ubuntu-26.04). Default: WSL's default distribution.
+    All distributions use the same output folder: run a program in the
+    distribution that built it.
+
 .PARAMETER Optimize
     Tests only: compile with -O3 and with inlining. Without it the tests are a
     debug build: no inlining (IORING_NO_INLINE), so the debugger can step into
@@ -66,6 +72,7 @@ param(
     [string] $Platform = 'Win32',
     [string] $FpcDir = 'C:\lazarus\fpc\3.2.2',
     [string] $LinuxFpcUnits = '/usr/lib/x86_64-linux-gnu/fpc/3.2.2/units/x86_64-linux',
+    [string] $Distribution = '',
     [switch] $Optimize,
     [switch] $Run,
     [string[]] $RunArguments = @()
@@ -82,11 +89,16 @@ if ($isLinux64) {
     if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
         throw 'wsl.exe not found. Linux64 builds in WSL: install WSL, a Linux distribution and FPC in it.'
     }
-    & wsl.exe -e test -d $LinuxFpcUnits
+    # wsl.exe options before -e: the distribution, if one was given
+    $wslOptions = @()
+    if ($Distribution) {
+        $wslOptions = @('-d', $Distribution)
+    }
+    & wsl.exe @wslOptions -e test -d $LinuxFpcUnits
     if ($LASTEXITCODE -ne 0) {
         throw "FPC units not found in WSL: $LinuxFpcUnits. Install FPC in WSL (Ubuntu: sudo apt install fpc) or give -LinuxFpcUnits."
     }
-    $wslSourceDir = (& wsl.exe -e wslpath -a ($sourceDir -replace '\\', '/'))
+    $wslSourceDir = (& wsl.exe @wslOptions -e wslpath -a ($sourceDir -replace '\\', '/'))
     if ($LASTEXITCODE -ne 0 -or -not $wslSourceDir) {
         throw "wslpath could not convert $sourceDir"
     }
@@ -94,7 +106,7 @@ if ($isLinux64) {
     $rtlSearchPath = "$LinuxFpcUnits/*"
     # The programs use cthreads, which links the C library: the linker needs the
     # folder of gcc's crtbegin.o (fpc.cfg names it, but -n leaves fpc.cfg out)
-    $crtFile = & wsl.exe -e gcc '-print-file-name=crtbegin.o' 2>$null
+    $crtFile = & wsl.exe @wslOptions -e gcc '-print-file-name=crtbegin.o' 2>$null
     $linuxLibraryPath = $null
     if (($LASTEXITCODE -eq 0) -and $crtFile -and $crtFile.Trim().StartsWith('/')) {
         $crtFile = $crtFile.Trim()
@@ -177,8 +189,9 @@ if ($isLinux64 -and $linuxLibraryPath) {
 $arguments += (ConvertTo-CompilerPath (Join-Path $projectDir $programFile))
 
 if ($isLinux64) {
-    Write-Host "Compiling $programFile with the FPC of WSL for $Platform"
-    & wsl.exe -e fpc @arguments
+    $distributionName = if ($Distribution) { $Distribution } else { 'the default distribution' }
+    Write-Host "Compiling $programFile with the FPC of WSL ($distributionName) for $Platform"
+    & wsl.exe @wslOptions -e fpc @arguments
 } else {
     Write-Host "Compiling $programFile with $($compiler.FullName) for $Platform"
     & $compiler.FullName @arguments
@@ -189,7 +202,7 @@ if ($LASTEXITCODE -ne 0) {
 
 if ($Run) {
     if ($isLinux64) {
-        & wsl.exe -e (ConvertTo-CompilerPath (Join-Path $outputDir ([IO.Path]::GetFileNameWithoutExtension($programFile)))) @RunArguments
+        & wsl.exe @wslOptions -e (ConvertTo-CompilerPath (Join-Path $outputDir ([IO.Path]::GetFileNameWithoutExtension($programFile)))) @RunArguments
     } else {
         & (Join-Path $outputDir ([IO.Path]::ChangeExtension($programFile, '.exe'))) @RunArguments
     }

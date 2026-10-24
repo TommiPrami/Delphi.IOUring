@@ -1,0 +1,30 @@
+Writing a file front to back: FPC Linux64, 2026-10-24 07:39
+Median of 3 runs; work: 200 us of CPU time per MiB
+
+1 GiB, writing only
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               0.15     6711       0.33     3084       184
+  TFileStream, 1 MiB writes                                0.13     7960       0.29     3480       152
+  Write stream, 64 KiB writes                              0.15     7000       0.32     3166       230
+  Write stream, unbuffered, 64 KiB writes                  0.37     2798       0.37     2769       126
+
+1 GiB, with work
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               0.35     2914       0.54     1912       381
+  TFileStream, 1 MiB writes                                0.52     1986       0.70     1465       542
+  Write stream, 64 KiB writes                              0.25     4119       0.44     2339       426
+  Write stream, unbuffered, 64 KiB writes                  0.36     2831       0.37     2796       335
+
+10 GiB, writing only
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               2.97     3447       3.28     3122      3018
+  TFileStream, 1 MiB writes                                1.83     5591       2.26     4537      1862
+  Write stream, 64 KiB writes                              2.30     4455       2.72     3760      3279
+  Write stream, unbuffered, 64 KiB writes                  4.04     2537       4.04     2534      1409
+
+10 GiB, with work
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               5.33     1921       5.75     1779      5392
+  TFileStream, 1 MiB writes                                4.06     2525       4.44     2306      4090
+  Write stream, 64 KiB writes                              3.01     3397       3.43     2988      5201
+  Write stream, unbuffered, 64 KiB writes                  3.96     2584       3.97     2581      3560
