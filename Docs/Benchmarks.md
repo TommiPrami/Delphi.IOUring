@@ -647,6 +647,53 @@ What the numbers say:
   a third of the CPU time (1.0–1.8 s against 2.6–5.1 s) – no copy into the
   file cache. Use it for big files that are not read back soon.
 
+## Linux in WSL2 – a first look (Phase 21)
+
+The four Free Pascal benchmarks also run on Linux (`-Platform Linux64`).
+These first numbers come from **WSL2** on the same machine (kernel 6.18,
+ext4 on the WSL2 virtual disk, 28 logical processors, 31 GB memory given to
+WSL2, Free Pascal 3.2.2), measured 2026-10-24, median of 3 runs. Raw output:
+[2026-10-24-linux-wsl2-*.txt](BenchmarkResults/).
+
+**Read these as a first look, not as disk numbers.** In WSL2 the disk is a
+file on the Windows host: after the file is dropped from the Linux cache
+(`posix_fadvise(POSIX_FADV_DONTNEED)`), the host may still serve it from its
+own cache. "Cold" here means "not in the Linux cache", not "from the disk".
+Numbers from a real Linux machine come later.
+
+What is different on Linux: no overlapped `ReadFile` (the contenders are
+left out), the plain read contender is `read`/`pread`, and the lock in the
+structures benchmark is a pthread mutex.
+
+### Reading a file front to back
+
+MiB/s, FPC Linux64:
+
+| Contender | 1 GiB, cold | 1 GiB, warm | 1 GiB with work, cold | 10 GiB, cold | 10 GiB, warm |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| TFileStream 64 KiB reads | 3 671 | 11 277 | 2 301 | 3 164 | 11 022 |
+| TFileStream 1 MiB reads | 5 158 | 11 130 | 2 743 | 5 491 | 11 060 |
+| read 1 MiB, sequential hint | 5 168 | 11 909 | 2 726 | 4 684 | 11 488 |
+| io_uring stream, 64 KiB reads | 4 897 | 9 158 | 2 552 | 3 717 | 9 174 |
+| io_uring stream, unbuffered | 3 817 | – | 3 450 | 3 495 | – |
+| io_uring reader, zero-copy | 5 290 | 11 629 | 2 693 | 5 404 | 11 575 |
+| **io_uring reader, zero-copy, unbuffered** | 3 857 | – | **3 884** | 3 537 | – |
+
+- **Buffered, cold: no gain over 1 MiB reads.** Linux reads ahead by itself
+  for buffered sequential reads, so `TFileStream` with 1 MiB reads is
+  already as fast as the reader (5.0–5.4 against 5.2–5.3 GiB/s). On Windows
+  the reader was 2.7× faster than that.
+- **Unbuffered is slower than buffered here** (3.4–3.8 GiB/s), because in
+  WSL2 buffered "cold" reads can come from the host's cache.
+- **With work, unbuffered: the reading is free.** 1 GiB with 200 µs of work
+  per MiB took 0.264 s – as long as reading alone (0.265 s), and 29 % less
+  than `TFileStream` with 1 MiB reads (0.373 s). The buffered contenders
+  gain nothing here.
+- **Warm:** the zero-copy reader is as fast as `read` (11.4 against
+  11.6 GiB/s); the stream is about 20 % slower (one more copy).
+
+LINUX_BLOCKS_WRITES_STRUCTURES
+
 ## Known limits of these measurements
 
 - **One machine, one very fast disk.** The NVMe drive has low latency, so

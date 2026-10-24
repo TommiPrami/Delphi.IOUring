@@ -8,8 +8,8 @@
   unbuffered writing with a cut last buffer, failed writes, a shared engine,
   and TStream use.
 
-  Failed writes are made with a byte-range lock: the test locks a part of the
-  file through a second handle, and Windows refuses writes there.
+  Failed writes are made by TTestResources.MakeWritesFail: a byte-range lock
+  on Windows, a read-only descriptor in place of the writer's on Linux.
 }
 
 {$I Delphi.IOUring.inc}
@@ -42,9 +42,6 @@ type
     function NewFileName: string;
     // Fails unless the file has exactly ASize bytes of the pattern
     procedure CheckFile(const AFileName: string; const ASize: Int64);
-    // Locks bytes [AOffset, AOffset + ALength) of the file through a handle
-    // of its own (closed after the test): writes there fail
-    procedure LockRegion(const AFileName: string; const AOffset, ALength: UInt64);
   end;
 
   TSequentialWriterTests = class(TWriterTestsBase)
@@ -92,23 +89,11 @@ type
 implementation
 
 uses
-{$IFDEF FPC}
-  Windows,
-{$ELSE}
-  Winapi.Windows,
-{$ENDIF}
   Delphi.IOUring.Atomics,
   TestFileHelpers;
 
 const
   SMALL_BUFFER = 4096;
-  IORING_LOCKFILE_FAIL_IMMEDIATELY = 1;
-  IORING_LOCKFILE_EXCLUSIVE_LOCK = 2;
-
-// Own import: the declaration differs between FPC versions
-function IORingLockFileEx(hFile: THandle; dwFlags, dwReserved, nNumberOfBytesToLockLow,
-  nNumberOfBytesToLockHigh: DWORD; lpOverlapped: POverlapped): BOOL; stdcall;
-  external 'kernel32.dll' name 'LockFileEx';
 
 // Writes the pattern bytes of [AStart, AStart + ASize) to a stream, in pieces
 procedure WritePatternToStream(const AStream: TStream; const AStart, ASize, APiece: Int64);
@@ -165,25 +150,6 @@ begin
   end;
   if ASize > 0 then
     CheckPattern(0, @LData[0], ASize, 'File data');
-end;
-
-procedure TWriterTestsBase.LockRegion(const AFileName: string; const AOffset, ALength: UInt64);
-var
-  LHandle: THandle;
-  LOverlapped: TOverlapped;
-begin
-  // The writer lets others read; this handle lets the writer write
-  LHandle := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING,
-    FILE_ATTRIBUTE_NORMAL, 0);
-  if LHandle = INVALID_HANDLE_VALUE then
-    RaiseLastOSError;
-  FResources.AddHandle(LHandle);
-  FillChar(LOverlapped, SizeOf(LOverlapped), 0);
-  LOverlapped.Offset := DWORD(AOffset);
-  LOverlapped.OffsetHigh := DWORD(AOffset shr 32);
-  if not IORingLockFileEx(LHandle, IORING_LOCKFILE_EXCLUSIVE_LOCK or IORING_LOCKFILE_FAIL_IMMEDIATELY, 0,
-    DWORD(ALength), DWORD(ALength shr 32), @LOverlapped) then
-    RaiseLastOSError;
 end;
 
 { TSequentialWriterTests }
@@ -377,7 +343,7 @@ begin
   // 2 buffers: the third one waits for the first write, which failed
   LName := NewFileName;
   LWriter.Open(LName, [], SMALL_BUFFER, 2);
-  LockRegion(LName, 0, SMALL_BUFFER);
+  FResources.MakeWritesFail(LName);
   LRaised := False;
   try
     WritePattern(LWriter, 0, 3 * SMALL_BUFFER, SMALL_BUFFER);
@@ -408,7 +374,7 @@ var
 begin
   LName := NewFileName;
   LWriter.Open(LName, [], SMALL_BUFFER, 2);
-  LockRegion(LName, 0, SMALL_BUFFER);
+  FResources.MakeWritesFail(LName);
   WritePattern(LWriter, 0, 1000, 1000);    // only in the buffer: no write yet
   AssertFalse('Nothing written yet', LWriter.Failed);
   LRaised := 0;
@@ -438,7 +404,7 @@ var
 begin
   LName := NewFileName;
   LWriter.Open(LName, [], SMALL_BUFFER, 2);
-  LockRegion(LName, 0, SMALL_BUFFER);
+  FResources.MakeWritesFail(LName);
   WritePattern(LWriter, 0, 1000, 1000);
   LRaised := False;
   try
@@ -757,7 +723,7 @@ var
 begin
   LRaised := False;
   try
-    TSequentialWriteOnlyFileStream.Create(TTestFileHelpers.TestFolder + 'no such folder\file.dat').Free;
+    TSequentialWriteOnlyFileStream.Create(TTestFileHelpers.TestFolder + 'no such folder' + PathDelim + 'file.dat').Free;
   except
     on EFCreateError do
       LRaised := True;
@@ -774,7 +740,7 @@ begin
   LName := NewFileName;
   LStream := TSequentialWriteOnlyFileStream.Create(LName, [], SMALL_BUFFER, 2);
   try
-    LockRegion(LName, 0, SMALL_BUFFER);
+    FResources.MakeWritesFail(LName);
     WritePatternToStream(LStream, 0, 1000, 1000);
     LRaised := 0;
     try
@@ -804,7 +770,7 @@ var
 begin
   LName := NewFileName;
   LStream := TSequentialWriteOnlyFileStream.Create(LName, [], SMALL_BUFFER, 2);
-  LockRegion(LName, 0, SMALL_BUFFER);
+  FResources.MakeWritesFail(LName);
   WritePatternToStream(LStream, 0, 1000, 1000);    // only in the buffer
   // Free writes it, which fails, and nobody has seen that yet
   LRaised := False;

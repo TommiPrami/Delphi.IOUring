@@ -13,16 +13,17 @@
   on every MiB before it writes it (it computes the data), to see whether the
   writing happens in the background meanwhile.
   Reported: the time until the stream is freed ("written": the data may still
-  be in the file cache, which Windows writes to the disk later), and until it
-  is on the disk ("+ flush": FlushFileBuffers through a handle of its own
-  afterwards); MiB/s of both; CPU time of all threads. Median of the runs.
+  be in the file cache, which the system writes to the disk later), and until
+  it is on the disk ("+ flush": FlushFileBuffers / fsync through a handle of
+  its own afterwards); MiB/s of both; CPU time of all threads. Median of the
+  runs.
   The file is deleted after every run.
 
   Shared by Delphi (Delphi.IOUring.Benchmarks.Writes.dpr) and Free Pascal
   (FPC\Delphi.IOUring.Benchmarks.Writes.FPC.lpr).
 
   Options:
-    --dir <folder>     where the test file is written (default %TEMP%\Delphi.IOUring.Bench)
+    --dir <folder>     where the test file is written (default <temp>/Delphi.IOUring.Bench)
     --sizes <list>     file sizes in GiB, comma separated (default 1,10)
     --runs <n>         runs per contender and case; the median is reported (default 3)
     --work-us <n>      CPU work per MiB in the work scenario (default 200)
@@ -39,11 +40,9 @@ implementation
 
 uses
 {$IFDEF FPC}
-  Windows,
   SysUtils,
   Classes,
 {$ELSE}
-  Winapi.Windows,
   System.SysUtils,
   System.Classes,
 {$ENDIF}
@@ -90,15 +89,6 @@ var
   GCsvFile: string;
   GData: PByte;    // one MiB of data, written again and again
 
-function PlatformName: string;
-begin
-{$IF SizeOf(Pointer) = 8}
-  Result := 'Win64';
-{$ELSE}
-  Result := 'Win32';
-{$IFEND}
-end;
-
 // Does this contender run with this compiler?
 function Runs(const AContender: TContender): Boolean;
 begin
@@ -125,38 +115,18 @@ begin
   end;
 end;
 
-// Puts what the file cache still holds of the file onto the disk
-procedure FlushFile(const AFileName: string);
-var
-  LHandle: THandle;
-begin
-  LHandle := CreateFile(PChar(AFileName), GENERIC_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING,
-    FILE_ATTRIBUTE_NORMAL, 0);
-  if LHandle = INVALID_HANDLE_VALUE then
-    RaiseLastOSError;
-  try
-    if not FlushFileBuffers(LHandle) then
-      RaiseLastOSError;
-  finally
-    CloseHandle(LHandle);
-  end;
-end;
-
 function RunContender(const AContender: TContender; const AFileName: string; const ASizeGiB: Integer;
   const AScenario: TScenario): TRunResult;
 var
   LMeasurement: TBenchMeasurement;
-  LWatch: Int64;
-  LNow: Int64;
-  LFrequency: Int64;
+  LStart: UInt64;
   LStream: TStream;
   LMiB: Integer;
   LOffset: Integer;
 begin
   DeleteFile(AFileName);
-  QueryPerformanceFrequency(LFrequency);
   LMeasurement.Start;
-  QueryPerformanceCounter(LWatch);
+  LStart := BenchMicroseconds;
   LStream := CreateStream(AContender, AFileName);
   try
     for LMiB := 1 to ASizeGiB * 1024 do
@@ -173,9 +143,8 @@ begin
   finally
     LStream.Free;
   end;
-  QueryPerformanceCounter(LNow);
-  Result.WrittenSeconds := (LNow - LWatch) / LFrequency;
-  FlushFile(AFileName);
+  Result.WrittenSeconds := (BenchMicroseconds - LStart) / 1000000;
+  BenchFlushFile(AFileName);
   LMeasurement.Stop;
   Result.FlushedSeconds := LMeasurement.Seconds;
   Result.CpuMilliseconds := LMeasurement.UserMilliseconds + LMeasurement.KernelMilliseconds;
@@ -224,7 +193,7 @@ begin
     if LNew then
       Writeln(LFile, 'timestamp,compiler,platform,size_gib,scenario,contender,run,written_s,flushed_s,cpu_ms');
     Writeln(LFile, Format('%s,%s,%s,%d,%s,"%s",%d,%.4f,%.4f,%.1f',
-      [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now, GInvariant), COMPILER_NAME, PlatformName, ASizeGiB,
+      [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now, GInvariant), COMPILER_NAME, BenchPlatformName, ASizeGiB,
        SCENARIO_NAMES[AScenario], CONTENDER_NAMES[AContender], ARun, AResult.WrittenSeconds,
        AResult.FlushedSeconds, AResult.CpuMilliseconds], GInvariant));
   finally
@@ -239,7 +208,7 @@ var
   LList: TStringList;
   LItem: Integer;
 begin
-  GFolder := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'Delphi.IOUring.Bench';
+  GFolder := DefaultBenchFolder;
   SetLength(GSizes, 2);
   GSizes[0] := 1;
   GSizes[1] := 10;
@@ -307,7 +276,7 @@ begin
   ParseOptions;
   ForceDirectories(GFolder);
   LFileName := IncludeTrailingPathDelimiter(GFolder) + 'writes.dat';
-  Writeln(Format('Writing a file front to back: %s %s, %s', [COMPILER_NAME, PlatformName,
+  Writeln(Format('Writing a file front to back: %s %s, %s', [COMPILER_NAME, BenchPlatformName,
     FormatDateTime('yyyy-mm-dd hh:nn', Now, GInvariant)], GInvariant));
   Writeln(Format('Median of %d runs; work: %d us of CPU time per MiB', [GRuns, GWorkMicroseconds], GInvariant));
 

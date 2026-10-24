@@ -87,6 +87,7 @@ type
     procedure Destroy_CancelsRequestsInFlight;
     procedure Destroy_WakesAThreadInWait;
     procedure Destroy_IdleEngine_IsQuick;
+    procedure Destroy_TenEngines_AreQuick;
     // Several I/O threads
     procedure IOThreads_BadCount_Raises;
     procedure IOThreads_ABacklogIsShared;
@@ -104,10 +105,8 @@ implementation
 uses
 {$IFDEF FPC}
   SysUtils,
-  Windows,
 {$ELSE}
   System.SysUtils,
-  Winapi.Windows,
 {$ENDIF}
   Delphi.IOUring.Atomics,
   TestFileHelpers;
@@ -337,7 +336,7 @@ var
 begin
   FEngine := TIORingEngine.Create;
   // No exception: the request completes, with the error
-  AssertTrue(FEngine.Wait(FEngine.ReadAsync(0, LBuffer, SizeOf(LBuffer), 0, 9), LCompletion));
+  AssertTrue(FEngine.Wait(FEngine.ReadAsync(BAD_HANDLE, LBuffer, SizeOf(LBuffer), 0, 9), LCompletion));
   AssertFalse('Failed', LCompletion.Succeeded);
   CheckEqualsU64('UserData', 9, LCompletion.UserData);
   CheckEqualsU64('Counted as failed', 1, FEngine.Stats.Failed);
@@ -597,7 +596,7 @@ begin
   AssertTrue('Sleeps when idle', FEngine.Stats.Sleeps >= 1);
   for LIndex := 1 to 10 do
     FEngine.Wait(FEngine.ReadAsync(FFile, LBuffer, SizeOf(LBuffer), LIndex * 1000), LCompletion);
-  FEngine.Wait(FEngine.ReadAsync(0, LBuffer, SizeOf(LBuffer), 0), LCompletion);   // fails
+  FEngine.Wait(FEngine.ReadAsync(BAD_HANDLE, LBuffer, SizeOf(LBuffer), 0), LCompletion);   // fails
   LStats := FEngine.Stats;
   CheckEqualsU64('Requests', 11, LStats.Requests);
   CheckEqualsU64('Completed', 11, LStats.Completed);
@@ -672,6 +671,23 @@ begin
   AssertTrue(Format('Took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 1000);
 end;
 
+procedure TIORingEngineTests.Destroy_TenEngines_AreQuick;
+var
+  LStart: UInt64;
+  LIndex: Integer;
+begin
+  // Free Pascal on Unix: TThread.WaitFor from the main thread waits in 100 ms
+  // steps, so this took at least 1 s before the engine waited on its own
+  // (TIORingIOThread.WaitUntilEnded)
+  LStart := TThread.GetTickCount64;
+  for LIndex := 1 to 10 do
+  begin
+    FEngine := TIORingEngine.Create(IORING_ENGINE_DEFAULT_MAX_REQUESTS, IORING_ENGINE_DEFAULT_SUBMISSION_QUEUE_SIZE, 4);
+    FreeAndNil(FEngine);
+  end;
+  AssertTrue(Format('Took %d ms', [TThread.GetTickCount64 - LStart]), TThread.GetTickCount64 - LStart < 500);
+end;
+
 { Several I/O threads }
 
 procedure TIORingEngineTests.IOThreads_BadCount_Raises;
@@ -722,7 +738,7 @@ begin
   // call, plus the disk's time. With cached reads one I/O thread sometimes
   // finished all of them before a woken sibling got the CPU (3 of 25 runs),
   // and the test failed for no fault of the engine.
-  LFile := FResources.OpenFile(SharedPatternFile(PATTERN_FILE_SIZE), FILE_FLAG_OVERLAPPED or FILE_FLAG_NO_BUFFERING);
+  LFile := FResources.OpenFile(SharedPatternFile(PATTERN_FILE_SIZE), [tofUnbuffered]);
   LBuffers := FResources.AllocPages(READS * READ_SIZE);
   FEngine := TIORingEngine.Create(READS, 64, 4);
   SetLength(LHandles, READS);

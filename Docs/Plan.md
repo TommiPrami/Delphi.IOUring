@@ -305,16 +305,22 @@ Source/
   - [ ] AArch64: not compiled or run yet ([VERIFY], Design §5.7).
 
   **Done 2026-10-24** – Linux: 137 tests pass in WSL2 (kernel 6.18), with and without `-O3`. Windows: Delphi 244 tests (Win32 and Win64, Debug and Release), FPC 243 (Win32 and Win64, with and without `-O3`); `lazbuild` builds the test project; the benchmarks compile.
-- **Phase 21** – The engine on Linux (how its I/O thread sleeps and is woken); the block reader, overlap rule, read stream and write stream suites on Linux; the benchmarks on Linux.
+- **Phase 21** – The engine on Linux (how its I/O thread sleeps and is woken); the block reader, overlap rule, read stream and write stream suites on Linux; the benchmarks on Linux. Decided: Design §10.14, decision 20.
+  - [x] `TIORingPlatform` event API on both systems (Windows event and `WaitForMultipleObjects`; Linux `eventfd` and `poll`); the engine has no Windows calls left (`FileHash`, `IsFailure`).
+  - [x] Tests: `OpenPipePair` (socket pair on Linux), `MakeWritesFail` (`dup2` on Linux), `BAD_HANDLE`; the engine, overlap rule, block reader, read stream and write stream suites run on Linux. Two overlap tests stay Windows-only (they need a Windows pipe).
+  - [x] Found on the way: closed rings keep their registered buffers locked for a while, and quick open/close runs out of locked memory (`ENOMEM`). `Close` now unregisters first; the sequential reader reads without registration when a registration fails (Design §10.14).
+  - [x] Found on the way: Free Pascal's `TThread.WaitFor` on Unix waits in 100 ms steps when called from the main thread, so freeing an engine took up to 100 ms. The engine now waits for the end of its I/O threads itself first; new test `Destroy_TenEngines_AreQuick` (Design §10.14).
+  - [x] The four benchmarks build and run on Linux (`Build-FPC.ps1 -Platform Linux64 -Project …`); first WSL2 results in Benchmarks.md, marked: cold in WSL2 is not the disk.
+  - [ ] Benchmarks on a real Linux machine (not WSL2), and AArch64.
+
+  **Done 2026-10-24** – Linux: 230 tests pass in WSL2 (kernel 6.18), with and without `-O3`. Windows: WINDOWS_COUNTS.
 - **Phase 22** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only.
 
 ---
 
 ## Immediate next step
 
-Phase 20 is done: the Linux ring `TLinuxIORing`, its platform record and the
-atomics on Linux; the ring, reader, atomics and request structure tests run on
-Linux. Next: **Phase 21 – the engine on Linux**: how its I/O thread sleeps and
-is woken (on Windows it waits for two events at once), then the block reader,
-overlap rule, read stream and write stream suites and the benchmarks on Linux.
-Decisions first.
+Phase 21 is done: the engine, the block reader and both streams run on Linux,
+and so do the four benchmarks (a first look in WSL2). Next: **Phase 22 – Linux
+extras** (sockets, linked operations, SQPOLL). It starts with a proposal and
+its decisions, as before.

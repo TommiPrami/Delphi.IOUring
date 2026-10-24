@@ -31,7 +31,7 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Write stream `TSequentialWriteOnlyFileStream` and writer `TIORingSequentialWriter` (writing in the background) | done, tested, benchmarked |
 | Complete Linux io_uring API translation (`Delphi.IOUring.Backend.Posix.API`, Linux 6.8 header, Free Pascal) | done, tested on x86-64 (WSL2); AArch64 not tested yet |
 | Linux ring `TLinuxIORing` (`Delphi.IOUring.Backend.Posix`; `TIORing` on Linux), the read-ahead reader and the atomics on Linux | done, tested on x86-64 (WSL2) |
-| The engine, block reader and streams on Linux | planned (Phase 21) |
+| The engine, block reader, overlap rule and both streams on Linux | done, tested on x86-64 (WSL2); benchmarks run in WSL2 (a first look, not disk numbers) |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
 
@@ -42,9 +42,10 @@ See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
   and creating a ring raises `EIORingNotSupported`.
 - **Delphi 13**, or **Free Pascal 3.2.2** (Lazarus 5.0). Older Delphi versions
   may work but are not tested.
-- Linux (Free Pascal only, so far the ring and the read-ahead reader):
+- Linux (Free Pascal only; everything except the Windows API unit):
   **Linux 5.11 or newer**, x86-64 (AArch64 is written for but not tested),
   with io_uring not switched off. Otherwise `IORingAvailable` returns False.
+  Programs need `cthreads` as the first unit (the engine uses threads).
 
 ## Usage
 
@@ -239,9 +240,8 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
   Lazarus project: `Source\UnitTests\FPC\Delphi.IOUring.UnitTests.FPC.lpi`.
 - Tests, Linux: `Source\Build-FPC.ps1 -Project Tests -Platform Linux64 -Run`
   builds and runs them in WSL, with the FPC installed there (Ubuntu:
-  `sudo apt install fpc`). On Linux they test the API translation, the ring,
-  the read-ahead reader, the atomics and the request structures; the
-  engine's tests follow with Phase 21.
+  `sudo apt install fpc`). On Linux all tests run except the Windows API
+  tests, plus the Linux API tests.
 - Benchmarks: `Source\Benchmarks\Delphi.IOUring.Benchmarks.dproj`, and for Free
   Pascal `Source\Build-FPC.ps1 -Project Benchmarks` – see
   [Docs/Benchmarks.md](Docs/Benchmarks.md). The engine's data structures
@@ -250,6 +250,8 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
   reader and the engine): `Delphi.IOUring.Benchmarks.Blocks.dproj`, or
   `Build-FPC.ps1 -Project Blocks`. Writing (the write stream):
   `Delphi.IOUring.Benchmarks.Writes.dproj`, or `Build-FPC.ps1 -Project Writes`.
+  With `-Platform Linux64` the four Free Pascal benchmarks build (and with
+  `-Run` run) in WSL.
 
 ## License
 

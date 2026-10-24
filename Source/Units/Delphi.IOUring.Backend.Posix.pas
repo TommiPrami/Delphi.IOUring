@@ -201,6 +201,16 @@ type
     class procedure FreePages(const AMemory: Pointer; const ASize: NativeUInt); static;
     // Monotonic clock for statistics
     class function TimestampMicroseconds: UInt64; static;
+
+    // An auto-reset event for waking a thread (an eventfd): SignalWakeEvent
+    // sets it, WaitForEvents resets it when it returns because of it
+    class function CreateWakeEvent: THandle; static;
+    class procedure SignalWakeEvent(const AEvent: THandle); static;
+    class procedure CloseWakeEvent(const AEvent: THandle); static;
+    // Waits, without a time limit, until AEvent1 or AEvent2 is signalled
+    // (poll), and resets the signalled ones (reads them). AEvent2 may be a
+    // ring's CompletionEventHandle.
+    class procedure WaitForEvents(const AEvent1, AEvent2: THandle); static;
   end;
 
 implementation
@@ -233,6 +243,7 @@ const
   O_CLOEXEC_FLAG = &02000000;
   MAP_POPULATE_FLAG = $8000;
   EFD_CLOEXEC = O_CLOEXEC_FLAG;
+  EFD_NONBLOCK = &04000;
   POSIX_FADV_SEQUENTIAL = 2;
   AT_EMPTY_PATH = $1000;
   STATX_DIOALIGN = $2000;
@@ -533,6 +544,13 @@ begin
     // caller's buffers before Close returns
     WaitForAllPending;
   finally
+    // The kernel frees a closed ring later, in the background; registered
+    // buffers stay pinned and counted against RLIMIT_MEMLOCK until then, so
+    // readers opened one after another could run out of it. Unregistering
+    // gives the memory back at once.
+    if FRegisteredBuffers <> nil then
+      io_uring_register(FFd, IORING_UNREGISTER_BUFFERS, nil, 0);
+    io_uring_register(FFd, IORING_UNREGISTER_FILES, nil, 0);
     Unmap;
     if FEventFd >= 0 then
       FpClose(FEventFd);
@@ -1125,6 +1143,52 @@ var
 begin
   clock_gettime(CLOCK_MONOTONIC, @LTime);
   Result := UInt64(LTime.tv_sec) * 1000000 + UInt64(LTime.tv_nsec div 1000);
+end;
+
+class function TLinuxIORingPlatform.CreateWakeEvent: THandle;
+var
+  LFd: Integer;
+begin
+  // Non-blocking: resetting it never waits
+  LFd := Integer(do_SysCall(SYSCALL_EVENTFD2, 0, EFD_CLOEXEC or EFD_NONBLOCK));
+  if LFd < 0 then
+    raise EIORingError.CreateNative(-fpgeterrno, 'eventfd');
+  Result := THandle(LFd);
+end;
+
+class procedure TLinuxIORingPlatform.SignalWakeEvent(const AEvent: THandle);
+var
+  LOne: UInt64;
+begin
+  LOne := 1;
+  FpWrite(AEvent, LOne, SizeOf(LOne));
+end;
+
+class procedure TLinuxIORingPlatform.CloseWakeEvent(const AEvent: THandle);
+begin
+  FpClose(AEvent);
+end;
+
+class procedure TLinuxIORingPlatform.WaitForEvents(const AEvent1, AEvent2: THandle);
+var
+  LPoll: array[0..1] of TPollFd;
+  LIndex: Integer;
+  LValue: UInt64;
+begin
+  LPoll[0].fd := AEvent1;
+  LPoll[1].fd := AEvent2;
+  repeat
+    for LIndex := 0 to 1 do
+    begin
+      LPoll[LIndex].events := POLLIN;
+      LPoll[LIndex].revents := 0;
+    end;
+  until (FpPoll(@LPoll[0], 2, -1) > 0) or (fpgeterrno <> ESysEINTR);
+  // Reset what woke us: an eventfd read takes its count back to 0 (the ring's
+  // completion eventfd blocks on reading, so only when it is signalled)
+  for LIndex := 0 to 1 do
+    if LPoll[LIndex].revents and POLLIN <> 0 then
+      FpRead(LPoll[LIndex].fd, LValue, SizeOf(LValue));
 end;
 
 end.

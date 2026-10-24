@@ -221,6 +221,7 @@ var
   LSectorSize: Cardinal;
   LIndex: Cardinal;
   LBufferInfo: TIORingBufferInfo;
+  LRegistration: TIORingCompletion;
 begin
   if IsOpen then
     raise EIORingError.Create('The reader is already open');
@@ -270,7 +271,13 @@ begin
       LBufferInfo.Length := Cardinal(LTotalSize);
       FRing.PrepareRegisterFiles([AHandle], REGISTRATION_USER_DATA);
       FRing.PrepareRegisterBuffers([LBufferInfo], REGISTRATION_USER_DATA);
-      // Submitted together with the first reads; registration is a barrier for them
+      // Windows: submitted together with the first reads; registration is a
+      // barrier for them. Linux: registration is a system call, its results
+      // are there already - if it failed (for example RLIMIT_MEMLOCK), read
+      // without it.
+      while FRing.TryPopCompletion(LRegistration) do
+        if not LRegistration.Succeeded then
+          FRegistered := False;
     end;
 
     FAdaptive := not (sroFixedReadAhead in AOptions);

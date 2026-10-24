@@ -9,20 +9,26 @@
   for the library with Delphi's. The Delphi-only contenders (TBufferedFileStream,
   threads) are left out.
 
+  On Linux the overlapped contenders (Windows only) are left out, and the
+  plain read contender uses read instead of ReadFile.
+
   Delphi.IOUring.Benchmarks.FPC [options]
-    --dir <folder>   where the test files are created (default %TEMP%\Delphi.IOUring.Bench)
+    --dir <folder>   where the test files are created (default <temp>/Delphi.IOUring.Bench)
     --sizes <list>   file sizes in GiB, comma separated (default 1,10)
     --runs <n>       runs per contender and case; the median is reported (default 3)
     --work-us <n>    CPU work per MiB in the work scenario (default 200; first size only)
     --keep           keep the test files
 
   Build: Source\Build-FPC.ps1 -Project Benchmarks -Platform Win32
+         (Win64, or Linux64: built in WSL)
 }
 
 {$I Delphi.IOUring.inc}
 
 uses
-  Windows,
+{$IFDEF UNIX}
+  cthreads,           // threads on Linux: must come first
+{$ENDIF}
   SysUtils,
   Classes,
   Delphi.IOUring,
@@ -45,25 +51,30 @@ type
   end;
 
 const
+{$IFDEF MSWINDOWS}
+  RING_NAME = 'IoRing';
+  SEQUENTIAL_HINT_NAME = 'sequential scan';
+{$ELSE}
+  RING_NAME = 'io_uring';
+  SEQUENTIAL_HINT_NAME = 'sequential hint';
+{$ENDIF}
   CONTENDER_NAMES: array[TContender] of string = (
     'TFileStream 64 KiB reads',
     'TFileStream 1 MiB reads',
-    'ReadFile 1 MiB, sequential scan',
+    READ_CALL_NAME + ' 1 MiB, ' + SEQUENTIAL_HINT_NAME,
     'Overlapped ReadFile 1 MiB x 8',
     'Overlapped ReadFile 1 MiB x 8, unbuffered',
-    'IoRing stream, 64 KiB reads',
-    'IoRing stream, 64 KiB reads, unbuffered',
-    'IoRing reader, zero-copy',
-    'IoRing reader, zero-copy, unbuffered');
+    RING_NAME + ' stream, 64 KiB reads',
+    RING_NAME + ' stream, 64 KiB reads, unbuffered',
+    RING_NAME + ' reader, zero-copy',
+    RING_NAME + ' reader, zero-copy, unbuffered');
   CONTENDER_UNBUFFERED: array[TContender] of Boolean = (
     False, False, False, False, True, False, True, False, True);
+  // Overlapped I/O is Windows only
+  CONTENDER_ON_THIS_SYSTEM: array[TContender] of Boolean = (
+    True, True, True, {$IFDEF MSWINDOWS}True, True{$ELSE}False, False{$ENDIF}, True, True, True, True);
   SCENARIO_NAMES: array[TScenario] of string = ('read-through', 'work');
   CACHE_NAMES: array[TCacheState] of string = ('cold', 'warm');
-{$IFDEF CPUX64}
-  PLATFORM_NAME = 'Win64';
-{$ELSE}
-  PLATFORM_NAME = 'Win32';
-{$ENDIF}
 
 var
   GFolder: string;
@@ -89,7 +100,7 @@ var
   end;
 
 begin
-  GFolder := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'Delphi.IOUring.Bench';
+  GFolder := DefaultBenchFolder;
   SetLength(GSizes, 2);
   GSizes[0] := 1;
   GSizes[1] := 10;
@@ -156,10 +167,12 @@ begin
       ReadWithFileStream(AFileName, MiB, AConsumer);
     cnReadFile1M:
       ReadWithReadFile(AFileName, MiB, True, AConsumer);
+{$IFDEF MSWINDOWS}
     cnOverlapped:
       ReadWithOverlapped(AFileName, False, MiB, 8, AConsumer);
     cnOverlappedUnbuffered:
       ReadWithOverlapped(AFileName, True, MiB, 8, AConsumer);
+{$ENDIF}
     cnIORingStream:
       Result := ReadWithIORingStream(AFileName, [], AConsumer);
     cnIORingStreamUnbuffered:
@@ -248,7 +261,7 @@ begin
 
       for LContender := Low(TContender) to High(TContender) do
       begin
-        if CONTENDER_UNBUFFERED[LContender] <> LUnbufferedPass then
+        if (CONTENDER_UNBUFFERED[LContender] <> LUnbufferedPass) or not CONTENDER_ON_THIS_SYSTEM[LContender] then
           Continue;
         if ACache = csCold then
           PurgeFileCache(LFileName);
@@ -277,7 +290,7 @@ begin
     end;
 
   Writeln(Format('%s FPC, %d GiB, %s, %s cache (median of %d runs)',
-    [PLATFORM_NAME, ASizeGiB, SCENARIO_NAMES[AScenario], CACHE_NAMES[ACache], GRuns]));
+    [BenchPlatformName, ASizeGiB, SCENARIO_NAMES[AScenario], CACHE_NAMES[ACache], GRuns]));
   Writeln(Format('  %-48s %8s %9s %9s %9s %7s', ['Contender', 'Seconds', 'MiB/s', 'User ms', 'Kernel ms', 'Stalls']));
   for LContender := Low(TContender) to High(TContender) do
   begin
@@ -318,9 +331,9 @@ begin
   try
     ParseOptions;
     if not IORingAvailable then
-      raise Exception.Create('IoRing is not available on this system');
+      raise Exception.Create(RING_NAME + ' is not available on this system');
 
-    Writeln(Format('Free Pascal %s, %s, %d runs, files in %s', [{$I %FPCVERSION%}, PLATFORM_NAME, GRuns, GFolder]));
+    Writeln(Format('Free Pascal %s, %s, %d runs, files in %s', [{$I %FPCVERSION%}, BenchPlatformName, GRuns, GFolder]));
     Writeln;
 
     for LSizeIndex := 0 to High(GSizes) do

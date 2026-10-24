@@ -7,12 +7,13 @@
 
   Free list (Phase 11): the free slots of the request pool.
     lock-free   TIORingFreeList (Treiber stack, one 64-bit compare-exchange)
-    SRW lock    the same stack (an array) behind a Windows SRW lock
+    SRW lock    the same stack (an array) behind a Windows SRW lock (Linux: a
+                pthread mutex)
   Each thread repeats: take one index, work, give it back.
 
   Request queue (Phase 12): producers -> one consumer (the I/O thread).
     lock-free   TIORingRequestQueue (Vyukov's bounded queue)
-    SRW lock    a ring buffer behind a Windows SRW lock
+    SRW lock    a ring buffer behind a Windows SRW lock (Linux: a pthread mutex)
   N producers put values in, one consumer takes them all out.
 
   Scenarios:
@@ -45,11 +46,9 @@ implementation
 
 uses
 {$IFDEF FPC}
-  Windows,
   SysUtils,
   Classes,
 {$ELSE}
-  Winapi.Windows,
   System.SysUtils,
   System.Classes,
 {$ENDIF}
@@ -77,32 +76,67 @@ const
 
 type
   TStructure = (stFreeList, stQueue);
-  TContender = (cnLockFree, cnSrwLock);
+  TContender = (cnLockFree, cnLock);
   TScenario = (scTight, scWork);
 
 const
+{$IFDEF MSWINDOWS}
+  LOCK_NAME = 'SRW lock';
+  LOCK_SHORT_NAME = 'SRW';
+  // Bytes the lock takes at the start of its cache line
+  LOCK_SIZE = 8;
+{$ELSE}
+  LOCK_NAME = 'mutex';
+  LOCK_SHORT_NAME = 'mutex';
+  // pthread_mutex_t: 40 bytes on x86-64, 48 on AArch64
+  LOCK_SIZE = 48;
+{$ENDIF}
   STRUCTURE_NAMES: array[TStructure] of string = ('free list', 'queue');
   STRUCTURE_OPTIONS: array[TStructure] of string = ('freelist', 'queue');
-  CONTENDER_NAMES: array[TContender] of string = ('lock-free', 'SRW lock');
+  CONTENDER_NAMES: array[TContender] of string = ('lock-free', LOCK_NAME);
   SCENARIO_NAMES: array[TScenario] of string = ('tight', 'work 1 us');
 
-// Windows SRW lock (Vista and newer); own names, so the Windows units'
-// declarations do not matter
+// The lock: Windows SRW lock (Vista and newer), Linux pthread mutex. Both
+// start unlocked when their memory is zero. Own names, so the Windows units'
+// declarations do not matter.
+{$IFDEF MSWINDOWS}
 procedure BenchAcquireSRWLockExclusive(var ALock: Pointer); stdcall;
   external 'kernel32.dll' name 'AcquireSRWLockExclusive';
 procedure BenchReleaseSRWLockExclusive(var ALock: Pointer); stdcall;
   external 'kernel32.dll' name 'ReleaseSRWLockExclusive';
+{$ELSE}
+function BenchMutexLock(const AMutex: Pointer): Integer; cdecl; external 'c' name 'pthread_mutex_lock';
+function BenchMutexUnlock(const AMutex: Pointer): Integer; cdecl; external 'c' name 'pthread_mutex_unlock';
+{$ENDIF}
+
+procedure LockAcquire(const ALock: Pointer); inline;
+begin
+{$IFDEF MSWINDOWS}
+  BenchAcquireSRWLockExclusive(PPointer(ALock)^);
+{$ELSE}
+  BenchMutexLock(ALock);
+{$ENDIF}
+end;
+
+procedure LockRelease(const ALock: Pointer); inline;
+begin
+{$IFDEF MSWINDOWS}
+  BenchReleaseSRWLockExclusive(PPointer(ALock)^);
+{$ELSE}
+  BenchMutexUnlock(ALock);
+{$ENDIF}
+end;
 
 type
   TNativeUIntArray = array[0..MaxInt div SizeOf(NativeUInt) - 1] of NativeUInt;
   PNativeUIntArray = ^TNativeUIntArray;
 
-  // The same stack as TIORingFreeList, behind an SRW lock. The lock and the
+  // The same stack as TIORingFreeList, behind the lock. The lock and the
   // count share one cache line of their own (like the lock-free head).
   TLockedFreeList = record
   private
     FMemory: Pointer;
-    FLock: ^Pointer;
+    FLock: Pointer;
     FCount: PCardinal;
     FItems: PCardinalArray;
   public
@@ -114,12 +148,12 @@ type
   PLockedFreeList = ^TLockedFreeList;
   PIORingFreeList = ^TIORingFreeList;
 
-  // A ring buffer behind an SRW lock. The lock, the head and the count share
+  // A ring buffer behind the lock. The lock, the head and the count share
   // one cache line of their own.
   TLockedQueue = record
   private
     FMemory: Pointer;
-    FLock: ^Pointer;
+    FLock: Pointer;
     FHead: PCardinal;     // the next value to take
     FCount: PCardinal;
     FItems: PNativeUIntArray;
@@ -195,7 +229,7 @@ var
 begin
   LBlock := IORingAllocCacheAligned(IORING_CACHE_LINE_SIZE + ACapacity * SizeOf(Cardinal), FMemory);
   FLock := Pointer(LBlock);
-  FCount := Pointer(LBlock + 8);
+  FCount := Pointer(LBlock + LOCK_SIZE);
   FItems := Pointer(LBlock + IORING_CACHE_LINE_SIZE);
   // Same order as TIORingFreeList: 0 on top
   for LIndex := 0 to ACapacity - 1 do
@@ -211,7 +245,7 @@ end;
 
 function TLockedFreeList.TryPop(out AIndex: Cardinal): Boolean;
 begin
-  BenchAcquireSRWLockExclusive(FLock^);
+  LockAcquire(FLock);
   Result := FCount^ > 0;
   if Result then
   begin
@@ -220,15 +254,15 @@ begin
   end
   else
     AIndex := 0;
-  BenchReleaseSRWLockExclusive(FLock^);
+  LockRelease(FLock);
 end;
 
 procedure TLockedFreeList.Push(const AIndex: Cardinal);
 begin
-  BenchAcquireSRWLockExclusive(FLock^);
+  LockAcquire(FLock);
   FItems^[FCount^] := AIndex;
   Inc(FCount^);
-  BenchReleaseSRWLockExclusive(FLock^);
+  LockRelease(FLock);
 end;
 
 { TLockedQueue }
@@ -239,8 +273,8 @@ var
 begin
   LBlock := IORingAllocCacheAligned(IORING_CACHE_LINE_SIZE + ACapacity * SizeOf(NativeUInt), FMemory);
   FLock := Pointer(LBlock);
-  FHead := Pointer(LBlock + 8);
-  FCount := Pointer(LBlock + 12);
+  FHead := Pointer(LBlock + LOCK_SIZE);
+  FCount := Pointer(LBlock + LOCK_SIZE + 4);
   FItems := Pointer(LBlock + IORING_CACHE_LINE_SIZE);
   FMask := ACapacity - 1;
 end;
@@ -258,14 +292,14 @@ function TLockedQueue.TryEnqueue(const AValue: NativeUInt): Boolean;
 begin
   if TAtomic.LoadAcquire(FCount^) > FMask then
     Exit(False);
-  BenchAcquireSRWLockExclusive(FLock^);
+  LockAcquire(FLock);
   Result := FCount^ <= FMask;
   if Result then
   begin
     FItems^[(FHead^ + FCount^) and FMask] := AValue;
     Inc(FCount^);
   end;
-  BenchReleaseSRWLockExclusive(FLock^);
+  LockRelease(FLock);
 end;
 
 function TLockedQueue.TryDequeue(out AValue: NativeUInt): Boolean;
@@ -273,7 +307,7 @@ begin
   AValue := 0;
   if TAtomic.LoadAcquire(FCount^) = 0 then
     Exit(False);
-  BenchAcquireSRWLockExclusive(FLock^);
+  LockAcquire(FLock);
   Result := FCount^ > 0;
   if Result then
   begin
@@ -283,7 +317,7 @@ begin
   end
   else
     AValue := 0;
-  BenchReleaseSRWLockExclusive(FLock^);
+  LockRelease(FLock);
 end;
 
 { TBenchWorker }
@@ -328,7 +362,7 @@ begin
         end
         else
           Inc(Misses);
-    cnSrwLock:
+    cnLock:
       for LPair := 1 to FOperations do
         if Locked^.TryPop(LIndex) then
         begin
@@ -361,7 +395,7 @@ begin
           end
           else
             TAtomic.CpuPause;
-      cnSrwLock:
+      cnLock:
         while LItem < FOperations do
           if Locked^.TryDequeue(LValue) then
           begin
@@ -382,7 +416,7 @@ begin
           while not LockFree^.TryEnqueue(NativeUInt(LItem)) do
             TAtomic.CpuPause;
         end;
-      cnSrwLock:
+      cnLock:
         for LItem := 1 to FOperations do
         begin
           if FWorkMicroseconds > 0 then
@@ -551,21 +585,9 @@ begin
   Result := LSorted[High(LSorted) div 2];
 end;
 
-function PlatformName: string;
-begin
-{$IF SizeOf(Pointer) = 8}
-  Result := 'Win64';
-{$ELSE}
-  Result := 'Win32';
-{$ENDIF}
-end;
-
 function LogicalProcessorCount: Integer;
-var
-  LInfo: TSystemInfo;
 begin
-  GetSystemInfo(LInfo);
-  Result := LInfo.dwNumberOfProcessors;
+  Result := BenchProcessorCount;
 end;
 
 procedure AppendCsv(const AStructure: TStructure; const AContender: TContender; const AScenario: TScenario;
@@ -587,7 +609,7 @@ begin
     if LNew then
       Writeln(LFile, 'timestamp,compiler,platform,structure,variant,scenario,threads,run,ops_per_s,cpu_ms');
     Writeln(LFile, Format('%s,%s,%s,%s,%s,%s,%d,%d,%.0f,%.1f',
-      [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now, GInvariant), COMPILER_NAME, PlatformName,
+      [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now, GInvariant), COMPILER_NAME, BenchPlatformName,
        STRUCTURE_NAMES[AStructure], CONTENDER_NAMES[AContender], SCENARIO_NAMES[AScenario], AThreads, ARun,
        AResult.OperationsPerSecond, AResult.CpuMilliseconds], GInvariant));
   finally
@@ -697,7 +719,8 @@ begin
   Writeln('CPU ms = CPU time of all threads for the run (median).');
   Writeln;
   Writeln(Format('%-10s %7s %11s %11s %9s %12s %12s',
-    ['Scenario', 'Threads', 'lock-free', 'SRW lock', 'LF/SRW', 'LF CPU ms', 'SRW CPU ms'], GInvariant));
+    ['Scenario', 'Threads', 'lock-free', LOCK_NAME, 'LF/' + LOCK_SHORT_NAME, 'LF CPU ms', LOCK_SHORT_NAME + ' CPU ms'],
+    GInvariant));
   Writeln(Format('%-10s %7s %11s %11s %9s %12s %12s', ['', '', 'Mops/s', 'Mops/s', '', '', ''], GInvariant));
 
   for LScenario := Low(TScenario) to High(TScenario) do
@@ -738,8 +761,8 @@ begin
       for LContender := Low(TContender) to High(TContender) do
         LRate[LContender] := Median(LRates[LContender]);
       Writeln(Format('%-10s %7d %11.2f %11.2f %9.2f %12.0f %12.0f',
-        [SCENARIO_NAMES[LScenario], LThreads, LRate[cnLockFree] / 1E6, LRate[cnSrwLock] / 1E6,
-         LRate[cnLockFree] / LRate[cnSrwLock], Median(LCpu[cnLockFree]), Median(LCpu[cnSrwLock])], GInvariant));
+        [SCENARIO_NAMES[LScenario], LThreads, LRate[cnLockFree] / 1E6, LRate[cnLock] / 1E6,
+         LRate[cnLockFree] / LRate[cnLock], Median(LCpu[cnLockFree]), Median(LCpu[cnLock])], GInvariant));
     end;
   end;
 end;
@@ -750,7 +773,7 @@ var
 begin
   ParseOptions;
   Writeln(Format('Engine structures: %s %s, %d logical processors, %s',
-    [COMPILER_NAME, PlatformName, LogicalProcessorCount, FormatDateTime('yyyy-mm-dd hh:nn', Now, GInvariant)],
+    [COMPILER_NAME, BenchPlatformName, LogicalProcessorCount, FormatDateTime('yyyy-mm-dd hh:nn', Now, GInvariant)],
     GInvariant));
   for LStructure := Low(TStructure) to High(TStructure) do
     if LStructure in GStructures then

@@ -64,9 +64,16 @@ type
     // Exact cases with pipes
     procedure PendingRead_HoldsBackAWriteOfTheSameBytes;
     procedure ReadsDoNotWaitForReads;
+{$IFDEF MSWINDOWS}
+    // Windows only: a pipe with offsets (Linux: ESPIPE on a socket)
     procedure OtherBytes_DoNotWait;
+{$ENDIF}
     procedure HeldBackRequests_StartInOrder;
+{$IFDEF MSWINDOWS}
+    // Windows only: a pending pipe write and a flush of a pipe (Linux: a
+    // large socket write does not wait, and a flush there is EINVAL)
     procedure Flush_WaitsForAnEarlierWrite;
+{$ENDIF}
     procedure Destroy_CancelsHeldBackRequests;
     procedure RuleOff_NothingIsHeldBack;
     // Routing
@@ -79,11 +86,6 @@ type
 implementation
 
 uses
-{$IFDEF FPC}
-  Windows,
-{$ELSE}
-  Winapi.Windows,
-{$ENDIF}
   Delphi.IOUring.Atomics;
 
 const
@@ -111,34 +113,6 @@ begin
   AState := AState xor (AState shr 17);
   AState := AState xor (AState shl 5);
   Result := AState;
-end;
-
-// Reads ACount bytes from the server end of a pipe (waits for them)
-procedure ReadFromPipe(const APipe: THandle; const ACount: Cardinal);
-var
-  LBuffer: TBytes;
-  LRead: DWORD;
-  LTotal: Cardinal;
-  LOverlapped: TOverlapped;
-begin
-  SetLength(LBuffer, ACount);
-  LTotal := 0;
-  while LTotal < ACount do
-  begin
-    FillChar(LOverlapped, SizeOf(LOverlapped), 0);
-    LOverlapped.hEvent := CreateEvent(nil, True, False, nil);
-    try
-      LRead := 0;
-      if not ReadFile(APipe, LBuffer[LTotal], ACount - LTotal, LRead, @LOverlapped) then
-        if GetLastError <> ERROR_IO_PENDING then
-          RaiseLastOSError;
-      if not GetOverlappedResult(APipe, LOverlapped, LRead, True) then
-        RaiseLastOSError;
-    finally
-      CloseHandle(LOverlapped.hEvent);
-    end;
-    Inc(LTotal, LRead);
-  end;
 end;
 
 { TEngineOverlapTests }
@@ -358,6 +332,7 @@ begin
   AssertTrue('Both reads', LCompletions[0].Succeeded and LCompletions[1].Succeeded);
 end;
 
+{$IFDEF MSWINDOWS}
 procedure TEngineOverlapTests.OtherBytes_DoNotWait;
 var
   LServer: THandle;
@@ -379,6 +354,7 @@ begin
   WriteByteToPipe(LServer, 1);
   AssertTrue('Read', FEngine.Wait(LRead, LCompletion, 5000));
 end;
+{$ENDIF}
 
 procedure TEngineOverlapTests.HeldBackRequests_StartInOrder;
 var
@@ -416,6 +392,7 @@ begin
   AssertEquals('Read 3 data', 30, LIn[1]);
 end;
 
+{$IFDEF MSWINDOWS}
 procedure TEngineOverlapTests.Flush_WaitsForAnEarlierWrite;
 const
   SIZE = 8192;    // more than the pipe's buffer of 4 KiB: the write stays pending
@@ -438,6 +415,7 @@ begin
   CheckEqualsU64('The write first', 1, FOrder[0]);
   CheckEqualsU64('Then the flush', 2, FOrder[1]);
 end;
+{$ENDIF}
 
 procedure TEngineOverlapTests.Destroy_CancelsHeldBackRequests;
 var

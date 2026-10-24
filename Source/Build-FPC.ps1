@@ -14,8 +14,9 @@
       Writes      Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.Writes.FPC.lpr (optimized)
 
     Linux64 builds and runs inside WSL, with the FPC of the default WSL
-    distribution (Ubuntu: sudo apt install fpc). So far only the tests: the
-    same program, with the Linux-only tests of Source\UnitTests\Linux.
+    distribution (Ubuntu: sudo apt install fpc). All projects: the tests with
+    the Linux-only tests of Source\UnitTests\Linux, the benchmarks without
+    their Windows-only contenders.
 
 .PARAMETER Project
     Tests, Benchmarks, Structures, Blocks or Writes. Default Tests.
@@ -53,6 +54,9 @@
 
 .EXAMPLE
     .\Build-FPC.ps1 -Project Benchmarks -Run -RunArguments '--sizes','1,10','--runs','3'
+
+.EXAMPLE
+    .\Build-FPC.ps1 -Project Blocks -Platform Linux64 -Run -RunArguments '--size-gib','2'
 #>
 [CmdletBinding()]
 param(
@@ -75,9 +79,6 @@ $libraryUnits = Join-Path $sourceDir 'Units'
 $isLinux64 = $Platform -eq 'Linux64'
 
 if ($isLinux64) {
-    if ($Project -ne 'Tests') {
-        throw "Linux64: only -Project Tests can be built so far."
-    }
     if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
         throw 'wsl.exe not found. Linux64 builds in WSL: install WSL, a Linux distribution and FPC in it.'
     }
@@ -91,7 +92,7 @@ if ($isLinux64) {
     }
     $wslSourceDir = $wslSourceDir.Trim()
     $rtlSearchPath = "$LinuxFpcUnits/*"
-    # The tests use cthreads, which links the C library: the linker needs the
+    # The programs use cthreads, which links the C library: the linker needs the
     # folder of gcc's crtbegin.o (fpc.cfg names it, but -n leaves fpc.cfg out)
     $crtFile = & wsl.exe -e gcc '-print-file-name=crtbegin.o' 2>$null
     $linuxLibraryPath = $null

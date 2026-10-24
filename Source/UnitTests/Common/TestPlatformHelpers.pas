@@ -59,10 +59,15 @@ type
     function CreateNewFile(const AFlags: TTestOpenFlags = []): THandle;
     // Page-aligned, zero-filled memory
     function AllocPages(const ASize: NativeUInt): Pointer;
-    // A connected pipe: reads from AClient stay pending until something is
-    // written to AServer. Windows: a named pipe, both ends overlapped. Linux:
-    // pipe() (AServer is the write end).
+    // A connected duplex pipe: reads from one end stay pending until something
+    // is written to the other. Windows: a named pipe, both ends overlapped.
+    // Linux: a Unix socket pair.
     procedure OpenPipePair(out AServer, AClient: THandle);
+    // Makes every later write to the open file AFileName fail: Windows locks
+    // the file through another handle (byte-range lock); Linux puts a
+    // read-only descriptor in place of the writer's (dup2): EBADF. Linux has
+    // no mandatory byte-range locks.
+    procedure MakeWritesFail(const AFileName: string);
   end;
 
   // Writes one byte to a pipe after a delay. Create, then Start; WaitFor and
@@ -79,6 +84,14 @@ type
   end;
 
 const
+  // A file handle that is not open: requests on it fail (on Linux 0 is
+  // standard input, a valid descriptor)
+{$IFDEF MSWINDOWS}
+  BAD_HANDLE = THandle(0);
+{$ELSE}
+  BAD_HANDLE = THandle(1000000);
+{$ENDIF}
+
   // NativeResult of a read on a file opened for writing only
 {$IFDEF MSWINDOWS}
   RESULT_ACCESS_DENIED = Integer($80070005);   // E_ACCESSDENIED
@@ -88,6 +101,9 @@ const
 
 // Writes one byte to a pipe and waits until it is written
 procedure WriteByteToPipe(const APipe: THandle; const AValue: Byte);
+
+// Reads ACount bytes from a pipe (waits for them)
+procedure ReadFromPipe(const APipe: THandle; const ACount: Cardinal);
 
 // True when the event (Windows event / Linux eventfd) is signalled within
 // ATimeoutMs
@@ -111,6 +127,8 @@ uses
 {$IFDEF FPC}
   {$IFDEF UNIX}
   BaseUnix,
+  Unix,       // fpReadLink
+  Sockets,    // fpsocketpair
   Delphi.IOUring,
   {$ENDIF}
   SysUtils,
@@ -251,6 +269,33 @@ begin
   AddHandle(AClient);
 end;
 
+const
+  LOCKFILE_FAIL_IMMEDIATELY_FLAG = 1;
+  LOCKFILE_EXCLUSIVE_LOCK_FLAG = 2;
+
+// Own import: the declaration differs between FPC versions
+function IORingLockFileEx(hFile: THandle; dwFlags, dwReserved, nNumberOfBytesToLockLow,
+  nNumberOfBytesToLockHigh: DWORD; lpOverlapped: POverlapped): BOOL; stdcall;
+  external 'kernel32.dll' name 'LockFileEx';
+
+procedure TTestResources.MakeWritesFail(const AFileName: string);
+var
+  LHandle: THandle;
+  LOverlapped: TOverlapped;
+begin
+  // The writer lets others read; this handle lets the writer write. The lock
+  // covers the whole file (and beyond).
+  LHandle := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING,
+    FILE_ATTRIBUTE_NORMAL, 0);
+  if LHandle = INVALID_HANDLE_VALUE then
+    RaiseLastOSError;
+  AddHandle(LHandle);
+  FillChar(LOverlapped, SizeOf(LOverlapped), 0);
+  if not IORingLockFileEx(LHandle, LOCKFILE_EXCLUSIVE_LOCK_FLAG or LOCKFILE_FAIL_IMMEDIATELY_FLAG, 0,
+    $FFFFFFFF, $7FFFFFFF, @LOverlapped) then
+    RaiseLastOSError;
+end;
+
 procedure WriteByteToPipe(const APipe: THandle; const AValue: Byte);
 var
   LValue: Byte;
@@ -268,6 +313,33 @@ begin
       RaiseLastOSError;
   finally
     CloseHandle(LOverlapped.hEvent);
+  end;
+end;
+
+procedure ReadFromPipe(const APipe: THandle; const ACount: Cardinal);
+var
+  LBuffer: TBytes;
+  LRead: DWORD;
+  LTotal: Cardinal;
+  LOverlapped: TOverlapped;
+begin
+  SetLength(LBuffer, ACount);
+  LTotal := 0;
+  while LTotal < ACount do
+  begin
+    FillChar(LOverlapped, SizeOf(LOverlapped), 0);
+    LOverlapped.hEvent := CreateEvent(nil, True, False, nil);
+    try
+      LRead := 0;
+      if not ReadFile(APipe, LBuffer[LTotal], ACount - LTotal, LRead, @LOverlapped) then
+        if GetLastError <> ERROR_IO_PENDING then
+          RaiseLastOSError;
+      if not GetOverlappedResult(APipe, LOverlapped, LRead, True) then
+        RaiseLastOSError;
+    finally
+      CloseHandle(LOverlapped.hEvent);
+    end;
+    Inc(LTotal, LRead);
   end;
 end;
 
@@ -346,14 +418,48 @@ end;
 
 procedure TTestResources.OpenPipePair(out AServer, AClient: THandle);
 var
-  LPipe: TFilDes;
+  LPair: array[0..1] of cint;
 begin
-  if FpPipe(LPipe) < 0 then
-    RaiseLastErrno('pipe');
-  AClient := LPipe[0];   // read end
-  AServer := LPipe[1];   // write end
+  // pipe() goes one way only; a socket pair both ways, like the named pipe
+  if fpsocketpair(AF_UNIX, SOCK_STREAM, 0, @LPair[0]) <> 0 then
+    RaiseLastErrno('socketpair');
+  AServer := LPair[0];
+  AClient := LPair[1];
   AddHandle(AServer);
   AddHandle(AClient);
+end;
+
+procedure TTestResources.MakeWritesFail(const AFileName: string);
+var
+  LPath: string;
+  LReadOnly: Integer;
+  LSearch: TSearchRec;
+  LFound: Boolean;
+begin
+  LPath := ExpandFileName(AFileName);
+  LReadOnly := FpOpen(LPath, O_RDONLY or O_CLOEXEC_FLAG);
+  if LReadOnly < 0 then
+    RaiseLastErrno('Open "' + LPath + '"');
+  AddHandle(LReadOnly);
+  // Every descriptor of this process that points to the file gets the
+  // read-only one in its place (the same number, so the writer goes on using it)
+  LFound := False;
+  if FindFirst('/proc/self/fd/*', faAnyFile, LSearch) = 0 then
+  try
+    repeat
+      if (LSearch.Name <> '.') and (LSearch.Name <> '..') and (StrToIntDef(LSearch.Name, -1) <> LReadOnly) and
+        (fpReadLink('/proc/self/fd/' + LSearch.Name) = LPath) then
+      begin
+        if FpDup2(LReadOnly, StrToInt(LSearch.Name)) < 0 then
+          RaiseLastErrno('dup2');
+        LFound := True;
+      end;
+    until FindNext(LSearch) <> 0;
+  finally
+    FindClose(LSearch);
+  end;
+  if not LFound then
+    raise EOSError.CreateFmt('MakeWritesFail: "%s" is not open', [LPath]);
 end;
 
 procedure WriteByteToPipe(const APipe: THandle; const AValue: Byte);
@@ -363,6 +469,23 @@ begin
   LValue := AValue;
   if FpWrite(APipe, LValue, 1) <> 1 then
     RaiseLastErrno('Write to the pipe');
+end;
+
+procedure ReadFromPipe(const APipe: THandle; const ACount: Cardinal);
+var
+  LBuffer: TBytes;
+  LTotal: Cardinal;
+  LRead: Integer;
+begin
+  SetLength(LBuffer, ACount);
+  LTotal := 0;
+  while LTotal < ACount do
+  begin
+    LRead := FpRead(APipe, LBuffer[LTotal], ACount - LTotal);
+    if LRead <= 0 then
+      RaiseLastErrno('Read from the pipe');
+    Inc(LTotal, LRead);
+  end;
 end;
 
 function WaitForEvent(const AHandle: THandle; const ATimeoutMs: Cardinal): Boolean;

@@ -78,11 +78,9 @@ interface
 
 uses
 {$IFDEF FPC}
-  Windows,
   SysUtils,
   Classes,
 {$ELSE}
-  Winapi.Windows,
   System.SysUtils,
   System.Classes,
 {$ENDIF}
@@ -265,7 +263,9 @@ type
     FIndex: Integer;
     FRing: TIORing;
     FWakeEvent: THandle;          // auto-reset: "new requests" (or Destroy)
+    FHasWakeEvent: Boolean;       // (on Linux, 0 is a valid file descriptor)
     FSleeping: PInteger;          // 1: sleeps (or is about to); on its own cache line
+    FEnded: Integer;              // 1: Execute has ended (for WaitUntilEnded)
     // orKeepOrder: the requests of the file handles routed to this thread
     FQueue: TIORingRequestQueue;
     // Written by this thread only (FStats is also read by others)
@@ -312,6 +312,9 @@ type
     // Any thread: if this I/O thread sleeps, claims the wake-up and wakes it
     function TryWake: Boolean;
     procedure Signal;
+    // WaitFor, without FPC's 100 ms steps on Unix (see the implementation).
+    // Only for a thread whose Execute ran.
+    procedure WaitUntilEnded;
     function GetStats: TIORingEngineStats;
   end;
 
@@ -350,10 +353,32 @@ begin
   end;
 end;
 
-// The I/O thread of a file handle (orKeepOrder). Handles are multiples of 4.
+// A number for a file handle that spreads the files evenly: Windows handles
+// are multiples of 4, Linux file descriptors are small numbers in a row
+function FileHash(const AFile: THandle): NativeUInt; inline;
+begin
+{$IFDEF MSWINDOWS}
+  Result := NativeUInt(AFile) shr 2;
+{$ELSE}
+  Result := NativeUInt(AFile);
+{$ENDIF}
+end;
+
+// The I/O thread of a file handle (orKeepOrder)
 function IOThreadIndexOf(const AFile: THandle; const AIOThreadCount: Integer): Integer; inline;
 begin
-  Result := Integer((NativeUInt(AFile) shr 2) mod NativeUInt(AIOThreadCount));
+  Result := Integer(FileHash(AFile) mod NativeUInt(AIOThreadCount));
+end;
+
+// A failed request: an error, but not the end of the file (Windows reports
+// that as an error code; Linux as a read of 0 bytes)
+function IsFailure(const ANativeResult: Integer): Boolean; inline;
+begin
+{$IFDEF MSWINDOWS}
+  Result := (ANativeResult < 0) and (ANativeResult <> IORING_RESULT_END_OF_FILE);
+{$ELSE}
+  Result := ANativeResult < 0;
+{$ENDIF}
 end;
 
 { TIORingIOThread - life cycle }
@@ -370,8 +395,8 @@ destructor TIORingIOThread.Destroy;
 begin
   inherited;    // the thread has ended
   FRing.Close;
-  if FWakeEvent <> 0 then
-    CloseHandle(FWakeEvent);
+  if FHasWakeEvent then
+    TIORingPlatform.CloseWakeEvent(FWakeEvent);
 end;
 
 procedure TIORingIOThread.Prepare(const ASubmissionQueueSize: Cardinal);
@@ -402,28 +427,48 @@ begin
     FFileMask := NativeUInt(LBuckets - 1);
   end;
   FRing.Open(ASubmissionQueueSize);
-  FWakeEvent := CreateEvent(nil, False, False, nil);   // auto-reset
-  if FWakeEvent = 0 then
-    RaiseLastOSError;
+  FWakeEvent := TIORingPlatform.CreateWakeEvent;      // auto-reset
+  FHasWakeEvent := True;
 end;
 
 procedure TIORingIOThread.Execute;
 begin
-  // Terminated before it ran: the engine's constructor failed
-  if not Terminated then
-    Run;
+  try
+    // Terminated before it ran: the engine's constructor failed
+    if not Terminated then
+      Run;
+  finally
+    TAtomic.Exchange(FEnded, 1);
+    TAtomic.WakeAll(FEnded);
+  end;
+end;
+
+// Free Pascal 3.2.2 on Unix: TThread.WaitFor, called from the main thread,
+// checks every 100 ms whether the thread has finished (it waits in
+// CheckSynchronize(100)), so freeing an engine took up to 100 ms. When
+// Finished is already True it returns at once. So first wait for the end of
+// Execute (futex), then for Finished, which is set right after Execute.
+procedure TIORingIOThread.WaitUntilEnded;
+begin
+{$IF defined(FPC) and defined(UNIX)}
+  while TAtomic.LoadAcquire(FEnded) = 0 do
+    TAtomic.WaitWhileEqual(FEnded, 0);
+  while not Finished do
+    TThread.Yield;
+{$ENDIF}
+  WaitFor;
 end;
 
 function TIORingIOThread.TryWake: Boolean;
 begin
   Result := (TAtomic.LoadAcquire(FSleeping^) <> 0) and (TAtomic.Exchange(FSleeping^, 0) <> 0);
   if Result then
-    SetEvent(FWakeEvent);
+    TIORingPlatform.SignalWakeEvent(FWakeEvent);
 end;
 
 procedure TIORingIOThread.Signal;
 begin
-  SetEvent(FWakeEvent);
+  TIORingPlatform.SignalWakeEvent(FWakeEvent);
 end;
 
 function TIORingIOThread.GetStats: TIORingEngineStats;
@@ -625,7 +670,7 @@ function TIORingIOThread.FindOrAddFile(const AFile: THandle): Integer;
 var
   LBucket: NativeUInt;
 begin
-  LBucket := (NativeUInt(AFile) shr 2) and FFileMask;
+  LBucket := FileHash(AFile) and FFileMask;
   Result := FFileBuckets[LBucket];
   while Result >= 0 do
   begin
@@ -650,7 +695,7 @@ var
   LPrevious: Integer;
   LEntry: Integer;
 begin
-  LBucket := (NativeUInt(FFiles[AIndex].Handle) shr 2) and FFileMask;
+  LBucket := FileHash(FFiles[AIndex].Handle) and FFileMask;
   LPrevious := -1;
   LEntry := FFileBuckets[LBucket];
   while LEntry <> AIndex do
@@ -792,7 +837,7 @@ begin
   CountStat(FStats.Completed);
   if ANativeResult = IORING_RESULT_CANCELLED then
     CountStat(FStats.Cancelled)
-  else if (ANativeResult < 0) and (ANativeResult <> IORING_RESULT_END_OF_FILE) then
+  else if IsFailure(ANativeResult) then
     CountStat(FStats.Failed);
 
   LCallback := LRequest^.OnComplete;
@@ -817,7 +862,6 @@ end;
 
 procedure TIORingIOThread.SleepUntilWork;
 var
-  LEvents: array[0..1] of THandle;
   LStayAwake: Boolean;
 begin
   // Say "sleeping" first, then look once more: a producer that queued a
@@ -844,9 +888,7 @@ begin
   if not LStayAwake then
   begin
     CountStat(FStats.Sleeps);
-    LEvents[0] := FWakeEvent;
-    LEvents[1] := FRing.CompletionEventHandle;
-    WaitForMultipleObjects(2, @LEvents[0], False, INFINITE);
+    TIORingPlatform.WaitForEvents(FWakeEvent, FRing.CompletionEventHandle);
   end;
   // (If a producer claimed the wake-up meanwhile, its event comes later:
   // one extra round, harmless)
@@ -983,7 +1025,7 @@ begin
     for LIndex := 0 to High(FIOThreads) do
       IOThread(FIOThreads[LIndex]).Signal;
     for LIndex := 0 to High(FIOThreads) do
-      FIOThreads[LIndex].WaitFor;
+      IOThread(FIOThreads[LIndex]).WaitUntilEnded;
     // 4. Threads in Wait have been woken (every request has completed): let
     //    them leave before the pool goes away
     while TAtomic.LoadAcquire(FWaitCalls^) > 0 do

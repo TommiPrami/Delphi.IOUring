@@ -413,8 +413,8 @@ var
   LTry: Integer;
   LRaised: Boolean;
 begin
-  // File handle 0: the read fails
-  LReader.Open(FEngine, 0, [TIORingBlock.Create(0, 10)]);
+  // A handle that is not open: the read fails
+  LReader.Open(FEngine, BAD_HANDLE, [TIORingBlock.Create(0, 10)]);
   for LTry := 1 to 2 do
   begin
     LRaised := False;

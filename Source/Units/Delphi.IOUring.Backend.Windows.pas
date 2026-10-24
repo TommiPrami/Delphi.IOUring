@@ -168,6 +168,15 @@ type
     class procedure FreePages(const AMemory: Pointer; const ASize: NativeUInt); static;
     // Monotonic clock for statistics
     class function TimestampMicroseconds: UInt64; static;
+
+    // An auto-reset event for waking a thread (an event): SignalWakeEvent sets
+    // it, WaitForEvents resets it when it returns because of it
+    class function CreateWakeEvent: THandle; static;
+    class procedure SignalWakeEvent(const AEvent: THandle); static;
+    class procedure CloseWakeEvent(const AEvent: THandle); static;
+    // Waits, without a time limit, until AEvent1 or AEvent2 is signalled
+    // (WaitForMultipleObjects). AEvent2 may be a ring's CompletionEventHandle.
+    class procedure WaitForEvents(const AEvent1, AEvent2: THandle); static;
   end;
 
 implementation
@@ -837,6 +846,32 @@ begin
   QueryPerformanceCounter(LCounter);
   QueryPerformanceFrequency(LFrequency);
   Result := UInt64(LCounter div LFrequency) * 1000000 + UInt64((LCounter mod LFrequency) * 1000000 div LFrequency);
+end;
+
+class function TWindowsIORingPlatform.CreateWakeEvent: THandle;
+begin
+  Result := CreateEvent(nil, False, False, nil);   // auto-reset
+  if Result = 0 then
+    raise EIORingError.CreateNative(LastErrorAsHResult, 'CreateEvent');
+end;
+
+class procedure TWindowsIORingPlatform.SignalWakeEvent(const AEvent: THandle);
+begin
+  SetEvent(AEvent);
+end;
+
+class procedure TWindowsIORingPlatform.CloseWakeEvent(const AEvent: THandle);
+begin
+  CloseHandle(AEvent);
+end;
+
+class procedure TWindowsIORingPlatform.WaitForEvents(const AEvent1, AEvent2: THandle);
+var
+  LEvents: array[0..1] of THandle;
+begin
+  LEvents[0] := AEvent1;
+  LEvents[1] := AEvent2;
+  WaitForMultipleObjects(2, @LEvents[0], False, INFINITE);
 end;
 
 end.

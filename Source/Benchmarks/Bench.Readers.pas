@@ -12,10 +12,12 @@
 interface
 
 uses
-{$IFDEF FPC}
+{$IFDEF MSWINDOWS}
+  {$IFDEF FPC}
   Windows,
-{$ELSE}
+  {$ELSE}
   Winapi.Windows,
+  {$ENDIF}
 {$ENDIF}
   Delphi.IOUring.SequentialReader,
   Bench.Common;
@@ -26,15 +28,18 @@ const
 // TFileStream.Read with AReadSize blocks
 procedure ReadWithFileStream(const AFileName: string; const AReadSize: Integer; var AConsumer: TBenchConsumer);
 
-// Plain synchronous ReadFile
-procedure ReadWithReadFile(const AFileName: string; const AReadSize: DWORD; const ASequentialScanHint: Boolean;
+// Plain synchronous ReadFile (Linux: read). ASequentialScanHint:
+// FILE_FLAG_SEQUENTIAL_SCAN (Linux: POSIX_FADV_SEQUENTIAL).
+procedure ReadWithReadFile(const AFileName: string; const AReadSize: Cardinal; const ASequentialScanHint: Boolean;
   var AConsumer: TBenchConsumer);
 
+{$IFDEF MSWINDOWS}
 // Classic asynchronous I/O without IoRing: ABufferCount overlapped ReadFile
 // calls in flight, consumed in order. The fair "is IoRing better than what
 // Windows always had?" baseline.
 procedure ReadWithOverlapped(const AFileName: string; const AUnbuffered: Boolean;
   const ABufferSize, ABufferCount: Cardinal; var AConsumer: TBenchConsumer);
+{$ENDIF}
 
 // TSequentialReadOnlyFileStream with STREAM_READ_SIZE reads; returns the stalls
 function ReadWithIORingStream(const AFileName: string; const AOptions: TIORingSequentialReaderOptions;
@@ -61,6 +66,7 @@ uses
   System.SysUtils,
   System.Classes,
 {$ENDIF}
+  Delphi.IOUring,
   Delphi.IOUring.Streams;
 
 procedure ReadWithFileStream(const AFileName: string; const AReadSize: Integer; var AConsumer: TBenchConsumer);
@@ -82,38 +88,31 @@ begin
   end;
 end;
 
-procedure ReadWithReadFile(const AFileName: string; const AReadSize: DWORD; const ASequentialScanHint: Boolean;
+procedure ReadWithReadFile(const AFileName: string; const AReadSize: Cardinal; const ASequentialScanHint: Boolean;
   var AConsumer: TBenchConsumer);
 var
   LHandle: THandle;
   LBuffer: Pointer;
-  LRead: DWORD;
-  LFlags: DWORD;
+  LRead: Cardinal;
 begin
-  LFlags := FILE_ATTRIBUTE_NORMAL;
-  if ASequentialScanHint then
-    LFlags := LFlags or FILE_FLAG_SEQUENTIAL_SCAN;
-
-  LBuffer := VirtualAlloc(nil, AReadSize, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
+  LBuffer := TIORingPlatform.AllocPages(AReadSize);
   try
-    LHandle := CreateFile(PChar(AFileName), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, LFlags, 0);
-    if LHandle = INVALID_HANDLE_VALUE then
-      RaiseLastOSError;
+    LHandle := BenchOpenForReading(AFileName, False, False, ASequentialScanHint);
     try
       repeat
-        if not ReadFile(LHandle, LBuffer^, AReadSize, LRead, nil) then
-          RaiseLastOSError;
+        LRead := BenchRead(LHandle, LBuffer^, AReadSize);
         if LRead > 0 then
           AConsumer.Consume(LBuffer, LRead);
       until LRead = 0;
     finally
-      CloseHandle(LHandle);
+      BenchCloseFile(LHandle);
     end;
   finally
-    VirtualFree(LBuffer, 0, MEM_RELEASE);
+    TIORingPlatform.FreePages(LBuffer, AReadSize);
   end;
 end;
 
+{$IFDEF MSWINDOWS}
 procedure ReadWithOverlapped(const AFileName: string; const AUnbuffered: Boolean;
   const ABufferSize, ABufferCount: Cardinal; var AConsumer: TBenchConsumer);
 type
@@ -199,6 +198,7 @@ begin
     VirtualFree(LMemory, 0, MEM_RELEASE);
   end;
 end;
+{$ENDIF}
 
 function ReadWithIORingStream(const AFileName: string; const AOptions: TIORingSequentialReaderOptions;
   var AConsumer: TBenchConsumer): UInt64;

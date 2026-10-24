@@ -2266,6 +2266,137 @@ gain of more threads (unbuffered: 396 → 128 thousand reads/s), as decided.
 If the read cost matters later: a file could count its unfinished writes,
 and a read could skip the scan when there are none.
 
+### 10.14 The engine on Linux (Phase 21)
+
+What is Windows-only above the ring today: in the engine, the I/O thread's
+wake event (`CreateEvent`, `SetEvent`, `CloseHandle`), its wait for two
+events at once (`WaitForMultipleObjects`: the wake event and the ring's
+completion event), the file hash (`handle shr 2`: Windows handles are
+multiples of 4, Linux file descriptors are small numbers one after the
+other) and one Windows-only constant. The writer, block reader and streams
+have no Windows code. In the tests: the duplex named pipe (Linux `pipe()`
+goes one way only), reading from the pipe, and the failed writes (a
+Windows byte-range lock).
+
+**Facts found before Phase 21** (WSL2, kernel 6.18, 2026-10-24):
+
+- **[VERIFIED] Two ways for the I/O thread to sleep, measured** (a
+  producer wakes the thread, the thread answers; 100 000 round trips, three
+  tries each):
+  - A – like Windows: the wake event is an `eventfd`, the ring's completion
+    event too, and the thread waits for both with `poll`: **23–24 µs** per
+    round trip.
+  - B – the io_uring way: a read on the wake `eventfd` always waits inside
+    the ring, so the thread sleeps only in `io_uring_enter` (and submits in
+    the same call): **24 µs**.
+  The time is the waking of the threads, not the system calls. A
+  registered completion `eventfd` costs about 2 % on the cheapest operation
+  (0.102 → 0.104 µs per 0-byte read), so nothing that real I/O would show.
+- **[VERIFIED]** A Unix socket pair (`socketpair`) is the Linux duplex
+  "pipe": a ring read on one end stays pending until the other end writes,
+  data goes both ways, and a cancelled read ends with `-ECANCELED`.
+- **[VERIFIED]** Failed writes without a lock: replacing the writer's file
+  descriptor with a read-only one (`dup2`; the descriptor found through
+  `/proc/self/fd`) makes every later ring write fail with `-EBADF`. Linux
+  has no mandatory byte-range locks.
+- **[VERIFIED] Cold reads in WSL2 are not disk reads:** after dropping a
+  1 GiB file from the cache (`posix_fadvise(POSIX_FADV_DONTNEED)`) it still
+  reads at 5.7 GB/s (warm 17.5 GB/s; `dd` with `O_DIRECT` 2.7 GB/s). WSL2
+  sees a virtual disk, and the Windows host may serve it from its own cache.
+
+**Phase 21 decisions (decided 2026-10-24):**
+
+- **The I/O thread sleeps like on Windows (A).** `TIORingPlatform`
+  gets a small event API – `CreateWakeEvent`, `SignalWakeEvent`,
+  `CloseWakeEvent` and `WaitForEvents(AEvent1, AEvent2)` – an auto-reset
+  event and `WaitForMultipleObjects` on Windows, an `eventfd` and `poll`
+  (then reading the signalled `eventfd` to reset it) on Linux. The engine
+  uses only that, so its code stays the same on both systems. B is the
+  same speed in the measurement and needs more Linux-only code (a read that
+  always waits in every ring, and its own handling in `Destroy`), so it is
+  left out unless a benchmark later shows a gain.
+- The engine's file hash per system: `handle shr 2` on Windows, the file
+  descriptor itself on Linux (a small inline function in the engine).
+- Tests: `OpenPipePair` is a socket pair on Linux; `ReadFromPipe` moves to
+  `TestPlatformHelpers`; the failed writes use a helper,
+  `MakeWritesFail(AFileName)`: the byte-range lock on Windows, the `dup2`
+  on Linux. Then the engine, overlap rule, block reader, read stream and
+  write stream suites run on Linux too – everything except the Windows API
+  tests.
+- **The benchmarks on Linux in this phase.** The four programs
+  (reader, structures, blocks, writes) build and run on Linux:
+  `Build-FPC.ps1 -Platform Linux64 -Project …`; the contenders with
+  `pread`/`TFileStream` instead of `ReadFile`; the cache dropped with
+  `posix_fadvise(POSIX_FADV_DONTNEED)`; CPU time with `getrusage`. The WSL2
+  results go into Benchmarks.md as a first look, marked: cold in WSL2 is
+  not the disk (above). Numbers from a real Linux machine come later.
+
+**Phase 21 implementation notes** (2026-10-24):
+
+- Built as decided. `TIORingPlatform` has the event API on both systems
+  (Linux: `eventfd2` with `EFD_CLOEXEC or EFD_NONBLOCK`, `poll` that starts
+  again after `EINTR`, then an 8-byte read of each signalled `eventfd`). The
+  engine has no Windows calls left; the two things that differ are small
+  inline functions with one line per system: `FileHash` (the hash of a file
+  handle) and `IsFailure` (a negative result is a failure, except Windows'
+  end of file).
+- Tests: `BAD_HANDLE` for "not a valid handle" – handle 0 is valid on Linux
+  (standard input). `OpenPipePair` is a socket pair on Linux,
+  `MakeWritesFail` does the `dup2` (every descriptor of the file found in
+  `/proc/self/fd`). Two overlap tests stay Windows-only, both need a
+  Windows pipe: `OtherBytes_DoNotWait` uses offsets on a pipe (a socket
+  gives `-ESPIPE`), `Flush_WaitsForAnEarlierWrite` needs a write that stays
+  pending and a flush of a pipe (a large socket write does not wait, and
+  `fsync` on a socket or pipe gives `-EINVAL`).
+- **[VERIFIED] Rings that are closed quickly one after another can run out
+  of locked memory (`ENOMEM`).** Registered buffers stay pinned, and count
+  against `RLIMIT_MEMLOCK` (64 MiB in WSL2; the count is per user, over all
+  processes), until the kernel frees the closed ring – later, in the
+  background. The ring memory counts too. Measured: 1000 rings opened and
+  closed in a row, each with 8 MiB registered: 996 setups failed; with the
+  buffers unregistered before `close`: none. Found because the `-O3` test
+  build failed now and then. Two changes:
+  - `TLinuxIORing.Close` unregisters the buffers and the files before it
+    closes the ring.
+  - The sequential reader looks at the completions of its registrations at
+    once: when one fails (for example `ENOMEM` under a low limit) it reads
+    without registration, as it already does where the system has none.
+    Tested with `RLIMIT_MEMLOCK` at 1 MiB: the reader falls back and reads
+    32 MiB correctly.
+- **[VERIFIED]** Registering the buffers helps more on Linux than on
+  Windows: +8–10 % for cached reads (15.2 against 14.0 GiB/s in WSL2,
+  Windows ~1–2 %); unbuffered no difference (~3.6 GiB/s both).
+- **[VERIFIED] FPC 3.2.2 on Unix: `TThread.WaitFor` from the main thread
+  waits in 100 ms steps.** It calls `CheckSynchronize(100)` until the thread
+  has finished, and nothing wakes it earlier: a thread that ends after 1 ms
+  takes 100 ms to wait for. If the thread has already finished, it returns
+  at once. Found in the first WSL2 benchmark runs ("8 threads" took exactly
+  0.1 or 0.3 s). It made every `TIORingEngine.Free` from the main thread take
+  up to 100 ms on Linux – also every write stream's `Free`. Fixed: the I/O
+  thread sets a flag (and wakes, with the futex) when its `Execute` ends;
+  `Destroy` waits for that, then for `Finished`, and only then calls
+  `WaitFor` (`TIORingIOThread.WaitUntilEnded`, Free Pascal on Unix only). New
+  test `Destroy_TenEngines_AreQuick` (10 engines with 4 I/O threads freed in
+  under 500 ms; without the fix 1005 ms); the Linux test run went from 19 to
+  9 s. Programs that use `TThread.WaitFor` themselves on Linux meet the same
+  thing.
+- **[VERIFIED]** FPC 3.2.2's `TThread.ProcessorCount` is 1 on Linux. The
+  library does not use it; the structures benchmark counts the processors
+  with `sched_getaffinity`.
+- **[VERIFIED] FPC 3.2.2's `clock_gettime` is a system call** (it does not
+  use the vDSO): 94 ns in WSL2, the C library's 13 ns. The library reads the
+  clock only on slow paths (a stall, a wait, the pool's spin), so it stays
+  as it is for now; the benchmarks use the C library's (their busy-wait
+  "work" would otherwise be mostly kernel time).
+- The benchmarks on Linux: `Bench.Common` has the file calls for both
+  systems (`BenchOpenForReading`, `BenchRead`, `BenchReadAt`,
+  `BenchFlushFile`, the platform name and the default folder); CPU time
+  from the `getrusage` system call (FPC 3.2.2 has no function for it on
+  Linux). Left out on Linux: the overlapped `ReadFile` contenders and the
+  block reader on a synchronous handle (Windows-only ideas). The structures
+  benchmark compares with a pthread mutex instead of the SRW lock.
+- Test counts: Linux 230 (WSL2, kernel 6.18), with and without `-O3`.
+
 ---
 
 ## 11. Overlapping reads and writes – options and the decision (Phase 16)
@@ -2608,3 +2739,4 @@ decision 17.)
 | 17 | 2026-10-23 | **Linux: raw system calls, no liburing**; the API unit translates the **kernel 6.8** `linux/io_uring.h` (Ubuntu 24.04 LTS), checked by layout tests generated from the C header; Linux tests are built and run in WSL through `Build-FPC.ps1 -Platform Linux64` (§6.4). |
 | 18 | 2026-10-23 | **One set of tests** for Delphi, Free Pascal and Linux in `Source/UnitTests/Common`: a base class over DUnitX and FPCUnit with the FPCUnit check names; one Free Pascal test program for Windows and Linux; done on main (§12.4). |
 | 19 | 2026-10-24 | **The Linux ring** (§5.7): Phase 20 is the ring, the platform record and the atomics on Linux, Phase 21 the engine on Linux; `NativeResult` is 0 or a negative error code on both systems (bytes in `BytesTransferred`); registration on Linux is a system call at `Prepare` with a completion of its own; minimum Linux 5.11. |
+| 20 | 2026-10-24 | **The engine on Linux** (§10.14): the I/O thread sleeps as on Windows – a wake event and the ring's completion event, through a small event API in `TIORingPlatform` (`eventfd` and `poll` on Linux; the io_uring-only way measured no faster); the benchmarks run on Linux in this phase, WSL2 results marked as not disk numbers. |

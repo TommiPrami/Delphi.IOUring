@@ -5,9 +5,8 @@
 
   The tests are the same units as for Delphi (Source\UnitTests\Common: the
   base class in Tests.Support hides the difference between FPCUnit and
-  DUnitX). Linux-only tests are in Source\UnitTests\Linux. On Linux the
-  suites that need the engine are left out until Phase 21 (the engine on
-  Linux).
+  DUnitX). Linux-only tests are in Source\UnitTests\Linux; the Windows API
+  tests run on Windows only.
 
   Build and run:  Source\Build-FPC.ps1 -Project Tests -Platform Win32 -Run
                   (Win64, or Linux64: built and run in WSL)
@@ -36,19 +35,14 @@ uses
 {$ENDIF}
   Tests.Ring,
   Tests.SequentialReader,
-{$IFDEF MSWINDOWS}
-  // Linux: with the engine (Phase 21)
   Tests.Streams,
-{$ENDIF}
   Tests.Atomics,
   Tests.RequestPool,
   Tests.RequestQueue,
-{$IFDEF MSWINDOWS}
   Tests.Engine,
   Tests.BlockReader,
   Tests.EngineOverlap,
   Tests.SequentialWriter,
-{$ENDIF}
 {$IFDEF LINUX}
   Tests.Linux.Backend.Posix.API.Layout,
   Tests.Linux.Backend.Posix.API,
