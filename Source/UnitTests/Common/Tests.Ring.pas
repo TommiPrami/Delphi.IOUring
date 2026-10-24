@@ -174,6 +174,7 @@ begin
   AssertEquals('Not-available reason', '', LCapabilities.NotAvailableReason);
   AssertTrue('Text names the backend', Pos(BACKEND_NAME, LText) > 0);
   AssertTrue('Text names the system', Pos(LCapabilities.SystemDescription, LText) > 0);
+  AssertTrue('Text names the library version', Pos('Library: Delphi.IOUring ' + IORING_LIBRARY_VERSION, LText) > 0);
 {$IFDEF MSWINDOWS}
   AssertTrue('Windows', Pos('Windows ', LCapabilities.SystemDescription) = 1);
   AssertTrue('Version 4 (IORING_VERSION_4 = 400)', Pos(BACKEND_NAME + ', version 4', LText) = 1);

@@ -14,6 +14,8 @@
       Writes      Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.Writes.FPC.lpr (optimized)
       Package     Source\Packages\Lazarus\DelphiIOUring.pas: the main unit of the
                   Lazarus package, compiled without Lazarus (optimized; no -Run)
+      Demos       Source\Demos\<Name>\<Name>.dpr, every demo of the platform
+                  (optimized); -Run runs each one once without arguments
 
     Linux: on Windows, Linux64 builds and runs inside WSL, with the FPC of the
     default WSL distribution (Ubuntu: sudo apt install fpc). On a Linux
@@ -23,7 +25,7 @@
     benchmarks without their Windows-only contenders.
 
 .PARAMETER Project
-    Tests, Benchmarks, Structures, Blocks, Writes or Package. Default Tests.
+    Tests, Benchmarks, Structures, Blocks, Writes, Package or Demos. Default Tests.
 
 .PARAMETER Platform
     Win32, Win64, Linux64 or LinuxArm64. Default: Win32 on Windows, the
@@ -75,7 +77,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Tests', 'Benchmarks', 'Structures', 'Blocks', 'Writes', 'Package')]
+    [ValidateSet('Tests', 'Benchmarks', 'Structures', 'Blocks', 'Writes', 'Package', 'Demos')]
     [string] $Project = 'Tests',
     [ValidateSet('Win32', 'Win64', 'Linux64', 'LinuxArm64')]
     [string] $Platform = '',
@@ -228,9 +230,10 @@ function ConvertTo-CompilerPath([string] $Path) {
     return $wslSourceDir + ($Path.Substring($sourceDir.Length) -replace '\\', '/')
 }
 
+# What to build: one program (or unit), or for Demos several. Each entry: its
+# folder, its main file, extra unit folders, code options.
+$builds = @()
 if ($Project -eq 'Tests') {
-    $projectDir = Join-Source 'UnitTests\FPC'
-    $programFile = 'Delphi.IOUring.UnitTests.FPC.lpr'
     $extraUnits = @(Join-Source 'UnitTests\Common')         # Tests.Support, the shared tests and helpers
     if ($isLinuxTarget) {
         $extraUnits += Join-Source 'UnitTests\Linux'          # the Linux-only tests
@@ -241,70 +244,105 @@ if ($Project -eq 'Tests') {
     } else {
         $codeOptions += '-dIORING_NO_INLINE'                 # debug build: no inlining (Delphi.IOUring.inc)
     }
+    $builds += @{ Dir = (Join-Source 'UnitTests\FPC'); File = 'Delphi.IOUring.UnitTests.FPC.lpr';
+        Units = $extraUnits; Options = $codeOptions }
 } elseif ($Project -eq 'Package') {
     # A unit, not a program: it pulls in every unit of the package and the
     # backend of this platform, as Lazarus compiles it
     if ($Run) {
         throw '-Run: the package is a unit, there is nothing to run.'
     }
-    $projectDir = Join-Source 'Packages\Lazarus'
-    $programFile = 'DelphiIOUring.pas'
-    $extraUnits = @()
-    $codeOptions = @('-O3')
+    $builds += @{ Dir = (Join-Source 'Packages\Lazarus'); File = 'DelphiIOUring.pas'; Units = @(); Options = @('-O3') }
+} elseif ($Project -eq 'Demos') {
+    # -Run runs each demo once, without arguments (each one checks its own result)
+    $demoNames = @('Capabilities', 'CopyFile', 'Checksum', 'ReadBlocks', 'EngineCallbacks')
+    if ($isLinuxTarget) {
+        $demoNames += 'SocketEcho'                           # Linux only
+    }
+    foreach ($demoName in $demoNames) {
+        $builds += @{ Dir = (Join-Source "Demos\$demoName"); File = "$demoName.dpr";
+            Units = @(Join-Source 'Demos\Common'); Options = @('-O3') }
+    }
 } else {
-    $projectDir = Join-Source 'Benchmarks\FPC'
     switch ($Project) {
         'Benchmarks' { $programFile = 'Delphi.IOUring.Benchmarks.FPC.lpr' }
         'Structures' { $programFile = 'Delphi.IOUring.Benchmarks.Structures.FPC.lpr' }
         'Blocks'     { $programFile = 'Delphi.IOUring.Benchmarks.Blocks.FPC.lpr' }
         'Writes'     { $programFile = 'Delphi.IOUring.Benchmarks.Writes.FPC.lpr' }
     }
-    $extraUnits = @(Join-Source 'Benchmarks')                # Bench.Common, Bench.Readers, Bench.Structures, Bench.Blocks, Bench.Writes
-    $codeOptions = @('-O3', '-CX', '-XX', '-Xs')             # optimized, smart linking, stripped
+    # Bench.Common, Bench.Readers, Bench.Structures, Bench.Blocks, Bench.Writes;
+    # optimized, smart linking, stripped
+    $builds += @{ Dir = (Join-Source 'Benchmarks\FPC'); File = $programFile;
+        Units = @(Join-Source 'Benchmarks'); Options = @('-O3', '-CX', '-XX', '-Xs') }
 }
 
-$outputDir = Join-Path $projectDir $Platform
-$unitOutputDir = Join-Path $outputDir 'units'
-New-Item -ItemType Directory -Force -Path $unitOutputDir | Out-Null
+# Each entry: compiled into <its folder>\<Platform>, then (-Run) run. No
+# functions here: the compiler's and the program's output must stay in this
+# script's output, where callers read it (the CI test script does).
+$failed = @()
+foreach ($build in $builds) {
+    $outputDir = Join-Path $build.Dir $Platform
+    $unitOutputDir = Join-Path $outputDir 'units'
+    New-Item -ItemType Directory -Force -Path $unitOutputDir | Out-Null
 
-$arguments = @('-n', '-B', '-vewn') + $codeOptions + @(
-    "-Fu$rtlSearchPath",
-    "-Fu$(ConvertTo-CompilerPath $libraryUnits)",
-    "-Fi$(ConvertTo-CompilerPath $libraryUnits)",
-    "-FU$(ConvertTo-CompilerPath $unitOutputDir)",
-    "-FE$(ConvertTo-CompilerPath $outputDir)"
-)
-foreach ($unitDir in $extraUnits) {
-    $arguments += "-Fu$(ConvertTo-CompilerPath $unitDir)"
-}
-if ($isLinuxTarget -and $linuxLibraryPath) {
-    $arguments += "-Fl$linuxLibraryPath"
-}
-$arguments += (ConvertTo-CompilerPath (Join-Path $projectDir $programFile))
-
-if ($viaWsl) {
-    $distributionName = if ($Distribution) { $Distribution } else { 'the default distribution' }
-    Write-Host "Compiling $programFile with the FPC of WSL ($distributionName) for $Platform"
-    & wsl.exe @wslOptions -e fpc @arguments
-} elseif ($isLinuxTarget) {
-    Write-Host "Compiling $programFile with the FPC of this machine for $Platform"
-    & fpc @arguments
-} else {
-    Write-Host "Compiling $programFile with $($compiler.FullName) for $Platform"
-    & $compiler.FullName @arguments
-}
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
-
-if ($Run) {
-    $programName = [IO.Path]::GetFileNameWithoutExtension($programFile)
-    if ($viaWsl) {
-        & wsl.exe @wslOptions -e (ConvertTo-CompilerPath (Join-Path $outputDir $programName)) @RunArguments
-    } elseif ($isLinuxTarget) {
-        & (Join-Path $outputDir $programName) @RunArguments
-    } else {
-        & (Join-Path $outputDir "$programName.exe") @RunArguments
+    $arguments = @('-n', '-B', '-vewn') + $build.Options + @(
+        "-Fu$rtlSearchPath",
+        "-Fu$(ConvertTo-CompilerPath $libraryUnits)",
+        "-Fi$(ConvertTo-CompilerPath $libraryUnits)",
+        "-FU$(ConvertTo-CompilerPath $unitOutputDir)",
+        "-FE$(ConvertTo-CompilerPath $outputDir)"
+    )
+    foreach ($unitDir in $build.Units) {
+        $arguments += "-Fu$(ConvertTo-CompilerPath $unitDir)"
     }
-    exit $LASTEXITCODE
+    if ($isLinuxTarget -and $linuxLibraryPath) {
+        $arguments += "-Fl$linuxLibraryPath"
+    }
+    $arguments += (ConvertTo-CompilerPath (Join-Path $build.Dir $build.File))
+
+    if ($viaWsl) {
+        $distributionName = if ($Distribution) { $Distribution } else { 'the default distribution' }
+        Write-Host "Compiling $($build.File) with the FPC of WSL ($distributionName) for $Platform"
+        & wsl.exe @wslOptions -e fpc @arguments
+    } elseif ($isLinuxTarget) {
+        Write-Host "Compiling $($build.File) with the FPC of this machine for $Platform"
+        & fpc @arguments
+    } else {
+        Write-Host "Compiling $($build.File) with $($compiler.FullName) for $Platform"
+        & $compiler.FullName @arguments
+    }
+    $code = $LASTEXITCODE
+    if ($code -ne 0) {
+        if ($builds.Count -eq 1) {
+            exit $code
+        }
+        $failed += "$($build.File): build failed ($code)"
+        continue
+    }
+
+    if ($Run) {
+        if ($builds.Count -gt 1) {
+            Write-Host "=== $($build.File)"
+        }
+        $programName = [IO.Path]::GetFileNameWithoutExtension($build.File)
+        if ($viaWsl) {
+            & wsl.exe @wslOptions -e (ConvertTo-CompilerPath (Join-Path $outputDir $programName)) @RunArguments
+        } elseif ($isLinuxTarget) {
+            & (Join-Path $outputDir $programName) @RunArguments
+        } else {
+            & (Join-Path $outputDir "$programName.exe") @RunArguments
+        }
+        $code = $LASTEXITCODE
+        if ($builds.Count -eq 1) {
+            exit $code
+        }
+        if ($code -ne 0) {
+            $failed += "$($build.File): exit code $code"
+        }
+    }
 }
+if ($failed.Count -gt 0) {
+    $failed | ForEach-Object { Write-Host "FAILED: $_" }
+    exit 1
+}
+exit 0

@@ -350,7 +350,13 @@ free, ARM64 included.)
   - [x] README: how to use the library from Delphi (search path) and Lazarus (the package).
 
   **Done 2026-10-24** – The package builds with `lazbuild` (Lazarus 5.0 RC1: Win32 and Win64; trunk: Win64) and through `Build-FPC.ps1` (Win32, Win64, Linux64 in WSL; Win64 also with FPC trunk). Library code unchanged.
-- **Phase 25** – Examples and a first tagged version: small example programs (the two streams, the block reader, the engine with callbacks, `IORingCapabilities`, a socket echo on Linux); a version number (0.x – the version stays below 1.0 for a long time, Design §12.6), a tag and a CHANGELOG.
+- **Phase 25** – Demos: small programs in `Source/Demos` (`IORingCapabilities`, the two streams, the zero-copy reader, the block reader, the engine with callbacks, a socket echo on Linux), each one source for Delphi, Lazarus and FPC; the version constant 0.1.0 (the version stays below 1.0 for a long time, Design §12.6). No tag yet. Decided: Design §12.7.
+  - [x] `Source/Demos`: `Capabilities`, `CopyFile`, `Checksum`, `ReadBlocks`, `EngineCallbacks`, `SocketEcho` (Linux only), and `Common/Demo.Common.pas` (a temporary file, a clock). Each runs without arguments and checks its own result, or takes a file name.
+  - [x] Each demo: one `.dpr`, a `.dproj` (Delphi, Win32 and Win64; not `SocketEcho`) and an `.lpi` (Lazarus, through the package).
+  - [x] `Build-FPC.ps1 -Project Demos [-Run]`; CI builds and runs the demos on all three runners.
+  - [x] `IORING_LIBRARY_VERSION = '0.1.0'`; `IORingCapabilities.ToString` ends with "Library: Delphi.IOUring 0.1.0".
+
+  **Done 2026-10-24** – The demos build and run with FPC (Win32, Win64, Ubuntu 24.04 and 26.04), Delphi (Win32 and Win64, Debug and Release) and Lazarus (Win32, Win64). Tests: Delphi 246, FPC 245 on Windows, 243 on Linux.
 
 ## Milestone 6 – Faster where it still loses
 
@@ -368,6 +374,8 @@ of git (they are ignored now, but still tracked).
 
 ## Immediate next step
 
-Phase 24 is done: a Lazarus package (version 0.1); Delphi keeps compiling
-the library from source. Next: **Phase 25 – examples and a first tagged
-version** (0.x). It starts with a proposal and its decisions, as before.
+Phase 25 is done, and with it Milestone 5: CI on three runners, a Lazarus
+package, six demos, version 0.1.0 (no tag yet). Next is Milestone 6:
+**Phase 26** (read straight into the caller's buffer; the Linux clock) or
+**Phase 27** (the atomics on AArch64). Each starts with a proposal and its
+decisions, as before.

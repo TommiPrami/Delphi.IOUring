@@ -36,6 +36,7 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | The engine, block reader, overlap rule and both streams on Linux | done, tested on x86-64 (WSL2) and ARM64 (CI); benchmarks run in WSL2 (a first look, not disk numbers) |
 | Linux extras: any io_uring operation (sockets …) and linked operations on the ring; capabilities that describe the system | done, tested on x86-64 (WSL2) and ARM64 (CI) |
 | Lazarus package `DelphiIOUring` (version 0.1) | done, built with Lazarus 5.0 RC1 and trunk (Win32, Win64); its units compile on Linux too (CI) |
+| Demos (`Source/Demos`: six small programs) | done, built and run with Delphi, Lazarus and Free Pascal (Windows, Linux) |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
 
@@ -74,8 +75,28 @@ The test program prints what the system offers first
   built for. (Plain Free Pascal: add `Source/Units` to the unit and include
   paths.)
 
-The version is 0.1, and it will stay below 1.0 for a while: the API may
-still change, especially once others have used it.
+The version is 0.1 (`IORING_LIBRARY_VERSION`), and it will stay below 1.0
+for a while: the API may still change, especially once others have used it.
+
+### Demos
+
+Small programs in `Source/Demos`, each one source file (`.dpr`) for Delphi
+(open the `.dproj`), Lazarus (open the `.lpi`; it uses the package) and plain
+Free Pascal. Each runs without arguments – it makes a temporary file, checks
+its own result and deletes the file – or takes a file name.
+
+| Demo | Shows |
+| --- | --- |
+| `Capabilities` | what the ring offers on this system (`IORingCapabilities.ToString`) |
+| `CopyFile` | the read and write streams as drop-in `TStream`s: copy, then compare |
+| `Checksum` | the zero-copy reader: a checksum computed right in its buffers |
+| `ReadBlocks` | the block reader: blocks known in advance, read ahead, in order |
+| `EngineCallbacks` | the engine: start and wait, a batch with callbacks, several threads |
+| `SocketEcho` | Linux only: an echo over TCP whose socket I/O goes through the ring |
+
+All of them with Free Pascal, and each run once:
+`Source\Build-FPC.ps1 -Project Demos -Platform Win64 -Run` (or `Win32`,
+`Linux64`).
 
 ### Drop-in stream
 

@@ -19,6 +19,10 @@ uses
 {$ENDIF}
 
 const
+  // The version of the library. It stays below 1.0 for a long time: the API
+  // may still change (Docs/Design.md §12.6).
+  IORING_LIBRARY_VERSION = '0.1.0';
+
   // Timeout value meaning "wait forever"
   IORING_INFINITE = Cardinal($FFFFFFFF);
 
@@ -237,43 +241,47 @@ begin
     Result := Result + sLineBreak;
   end;
   Result := Result + 'System: ' + SystemDescription;
-  if BackendName = '' then
-    Exit;
 
-  Result := Result + sLineBreak + Format('Queues: submission up to %d, completion up to %d',
-    [MaxSubmissionQueueSize, MaxCompletionQueueSize]);
-  LList := '';
-  for LOp := Low(TIORingOp) to High(TIORingOp) do
-    if LOp in SupportedOps then
-    begin
-      if LList <> '' then
-        LList := LList + ', ';
-      LList := LList + OP_NAMES[LOp];
-    end;
-  Result := Result + sLineBreak + 'Operations: ' + LList;
+  if BackendName <> '' then
+  begin
+    Result := Result + sLineBreak + Format('Queues: submission up to %d, completion up to %d',
+      [MaxSubmissionQueueSize, MaxCompletionQueueSize]);
+    LList := '';
+    for LOp := Low(TIORingOp) to High(TIORingOp) do
+      if LOp in SupportedOps then
+      begin
+        if LList <> '' then
+          LList := LList + ', ';
+        LList := LList + OP_NAMES[LOp];
+      end;
+    Result := Result + sLineBreak + 'Operations: ' + LList;
 
-  LCount := 0;
-  LHighest := -1;
-  for LOpcode := 0 to 255 do
-    if Byte(LOpcode) in NativeOps then
-    begin
-      Inc(LCount);
-      LHighest := LOpcode;
-    end;
-  Result := Result + sLineBreak + Format('Native: %d opcodes (highest %d), features $%x',
-    [LCount, LHighest, NativeFeatures]);
+    LCount := 0;
+    LHighest := -1;
+    for LOpcode := 0 to 255 do
+      if Byte(LOpcode) in NativeOps then
+      begin
+        Inc(LCount);
+        LHighest := LOpcode;
+      end;
+    Result := Result + sLineBreak + Format('Native: %d opcodes (highest %d), features $%x',
+      [LCount, LHighest, NativeFeatures]);
 
-  LList := '';
-  for LExtra := Low(TIORingExtra) to High(TIORingExtra) do
-    if LExtra in Extras then
-    begin
-      if LList <> '' then
-        LList := LList + ', ';
-      LList := LList + EXTRA_NAMES[LExtra];
-    end;
-  if LList = '' then
-    LList := 'none';
-  Result := Result + sLineBreak + 'Extras: ' + LList;
+    LList := '';
+    for LExtra := Low(TIORingExtra) to High(TIORingExtra) do
+      if LExtra in Extras then
+      begin
+        if LList <> '' then
+          LList := LList + ', ';
+        LList := LList + EXTRA_NAMES[LExtra];
+      end;
+    if LList = '' then
+      LList := 'none';
+    Result := Result + sLineBreak + 'Extras: ' + LList;
+  end;
+
+  // Last, also when the ring is not available: which version ran
+  Result := Result + sLineBreak + 'Library: Delphi.IOUring ' + IORING_LIBRARY_VERSION;
 end;
 
 { TIORingCompletion }

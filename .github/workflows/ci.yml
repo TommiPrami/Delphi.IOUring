@@ -3,7 +3,8 @@
 #
 # Every push to main, every pull request, and by hand (Actions > CI > Run
 # workflow): the tests (debug build and -O3), the layout check of the Linux
-# API translation, the benchmarks and the Lazarus package built. The
+# API translation, the benchmarks and the Lazarus package built, the demos
+# built and run once. The
 # benchmarks are not run here: the runners are slow cloud machines, and the
 # runs take long (Docs/Design.md 12.6; the numbers of the one run are in
 # Docs/Benchmarks.md).
@@ -99,6 +100,11 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+      # Each demo runs once without arguments and checks its own result
+      - name: Build and run the demos
+        if: success() || failure()
+        run: ./Source/Build-FPC.ps1 -Project Demos -Run
+
   windows:
     name: Windows (Win32, Win64)
     runs-on: windows-2025
@@ -153,4 +159,13 @@ jobs:
               ./Source/Build-FPC.ps1 -Project $project -Platform $platform -FpcDir $env:FPC_DIR
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             }
+          }
+
+      # Each demo runs once without arguments and checks its own result
+      - name: Build and run the demos (Win32, Win64)
+        if: success() || failure()
+        run: |
+          foreach ($platform in 'Win32', 'Win64') {
+            ./Source/Build-FPC.ps1 -Project Demos -Platform $platform -FpcDir $env:FPC_DIR -Run
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }

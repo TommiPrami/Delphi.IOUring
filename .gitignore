@@ -105,5 +105,11 @@ Source/Packages/Lazarus/Win32/
 Source/Packages/Lazarus/Win64/
 Source/Packages/Lazarus/Linux64/
 Source/Packages/Lazarus/LinuxArm64/
+Source/Demos/*/Win32/
+Source/Demos/*/Win64/
+Source/Demos/*/Linux64/
+Source/Demos/*/LinuxArm64/
+Source/Demos/*/lib/
+Source/Demos/*/*.res
 *.lps
 backup/

@@ -3062,6 +3062,90 @@ one step: the IDE knows the library, and the units are compiled once.
   where there is no Lazarus. Each build takes its own backend (Windows on
   Win32/Win64, Posix on Linux).
 
+### 12.7 Examples and the first tagged version (Phase 25)
+
+Today the README has short snippets; there is no program a user can open
+and run. And there is no version anyone can point at.
+
+**Facts found before Phase 25** (a trial example in a scratch folder,
+2026-10-24):
+
+- **[VERIFIED] One program file serves every compiler.** A `.dpr` with
+  `{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}` and `cthreads` under `{$IFDEF UNIX}`
+  builds with Delphi through a `.dproj` made from the benchmarks' template
+  (Win32 and Win64, Debug and Release), with Lazarus through an `.lpi`
+  whose main file is the `.dpr` and which requires the `DelphiIOUring`
+  package (`lazbuild` finds it through a relative path), and with plain FPC.
+  The programs run.
+- The README's examples use only the library and the RTL – no Windows
+  calls – so the same file works on Linux.
+
+**Phase 25 proposal:**
+
+- **[DECIDE] 1. The examples.** Proposed, in `Source/Examples/<Name>/`:
+  - `Capabilities` – what the ring offers on this system (`ToString`).
+  - `CopyFile` – the two streams as drop-in `TStream`s: copy a file,
+    then compare.
+  - `Checksum` – the zero-copy reader (`TryAcquireChunk` /
+    `ReleaseChunk`): a checksum of a file and its MiB/s.
+  - `ReadBlocks` – the block reader: blocks known in advance, read ahead
+    and handed out in order.
+  - `EngineCallbacks` – the engine: reads started from several threads,
+    callbacks on the I/O thread, `Wait`, a batch.
+  - `SocketEcho` – Linux only: an echo over TCP on loopback through
+    `PrepareSqe` (accept, receive, send).
+
+  Each one short and commented, and it runs without arguments (it makes a
+  temporary file and deletes it) or takes a file name. Other choice: fewer
+  examples, for example only the first three.
+- **[DECIDE] 2. Project files and checks.** Proposed: each example is a
+  `.dpr` with a `.dproj` (Delphi, Win32 and Win64; not for `SocketEcho`)
+  and an `.lpi` (Lazarus, through the package). `Build-FPC.ps1 -Project
+  Examples` builds all examples of a platform with plain FPC. The local
+  test run builds them (Delphi, FPC, Linux) and runs each once without
+  arguments – they take seconds; CI does the same on its runners.
+- **[DECIDE] 3. The first tagged version, 0.1.0.** Proposed:
+  - `CHANGELOG.md` with what 0.1.0 has (in short, by milestone);
+  - a constant `IORING_LIBRARY_VERSION = '0.1.0'` in `Delphi.IOUring`, and
+    `IORingCapabilities.ToString` names it, so a log says which version
+    ran;
+  - the README links the examples and says how to get a version;
+  - you make the tag `v0.1.0` (and, if you like, a GitHub release with the
+    CHANGELOG text) – tags and releases are yours, like commits.
+
+  Other choice: no version constant (the tag and the CHANGELOG only).
+
+**Phase 25 decisions (decided 2026-10-24):**
+
+- **1:** the six programs as proposed, but called **demos**, in
+  `Source/Demos/<Name>/`.
+- **2** as proposed.
+- **3 changed: no tag yet** – and so no CHANGELOG yet either. The version
+  constant `IORING_LIBRARY_VERSION = '0.1.0'` comes now: `ToString` names it
+  on its last line, so a log says which version ran.
+
+**Phase 25 implementation notes** (2026-10-24):
+
+- Six demos and a small shared unit (`Demos/Common/Demo.Common.pas`: a
+  temporary file written with `TFileStream`, a clock; nothing from the
+  library). Each demo compares its result with a plain way of doing the
+  same – `CopyFile` the two files, `Checksum` an Adler-32 over
+  `TFileStream`, `ReadBlocks` the sum of the same blocks read with `Seek` +
+  `Read` – so running it is also a check.
+- The `.dproj` files come from the benchmarks' template; the `.lpi` files
+  require the package through a relative path (`lazbuild` finds it without
+  a registered package).
+- `SocketEcho` closes its sockets before it frees the client thread, and
+  the client sends with `MSG_NOSIGNAL`: after an error neither a hang nor a
+  `SIGPIPE` ends the program.
+- `Build-FPC.ps1` builds a list of programs now (one, or every demo).
+  The compiler's and the programs' output stays in the script's output –
+  `Invoke-Tests.ps1` in CI reads the test program's lines from there – so
+  the steps are in the loop itself, not in PowerShell functions (whose
+  output would become their return value).
+- `ToString` ends with the library line also when the ring is not
+  available.
+
 ---
 
 ## 13. Ideas parked for later
