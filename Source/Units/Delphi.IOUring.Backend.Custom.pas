@@ -31,6 +31,12 @@ const
   // requests it cancels before they reach the ring.
   IORING_RESULT_CANCELLED = Integer($800703E3);
 {$ENDIF}
+{$IFDEF LINUX}
+  // NativeResult of a cancelled operation: -ECANCELED. The engine uses it also
+  // for requests it cancels before they reach the ring. (A read at or after
+  // the end of the file succeeds on Linux, with 0 bytes: IsEndOfFile.)
+  IORING_RESULT_CANCELLED = -125;
+{$ENDIF}
 
 type
   // Value that identifies an operation in its completion. Pointer-sized, like
@@ -91,10 +97,13 @@ type
 
   // Result of one operation. Field order and sizes match Windows IORING_CQE,
   // so the Windows backend pops straight into this record.
+  // The same meaning on every system: NativeResult is 0 (success) or a
+  // negative error code (HRESULT on Windows, -errno on Linux), the bytes are
+  // in BytesTransferred. End of file differs: check IsEndOfFile first.
   PIORingCompletion = ^TIORingCompletion;
   TIORingCompletion = record
     UserData: TIORingUserData;
-    NativeResult: Integer;          // HRESULT on Windows, res on Linux
+    NativeResult: Integer;          // 0, or HRESULT (Windows) / -errno (Linux)
     BytesTransferred: NativeUInt;
     function Succeeded: Boolean;
     // Read started at or after the end of the file (not an error)
@@ -172,17 +181,14 @@ begin
 {$IFDEF MSWINDOWS}
   Result := NativeResult = IORING_RESULT_END_OF_FILE;
 {$ELSE}
-  Result := NativeResult = 0;
+  // Linux: the read succeeded with 0 bytes
+  Result := (NativeResult = 0) and (BytesTransferred = 0);
 {$ENDIF}
 end;
 
 function TIORingCompletion.IsCancelled: Boolean;
 begin
-{$IFDEF MSWINDOWS}
   Result := NativeResult = IORING_RESULT_CANCELLED;
-{$ELSE}
-  Result := NativeResult = -125; // -ECANCELED
-{$ENDIF}
 end;
 
 function TIORingCompletion.ErrorMessage: string;

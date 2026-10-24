@@ -84,6 +84,8 @@ type
     function PrepareRead(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
       const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
       const AFlags: TIORingSubmitFlags = []): Boolean;
+    // AWriteThrough: only on a file opened with FILE_FLAG_NO_BUFFERING; on a
+    // cached file the write fails with 0x800701FD (found by testing)
     function PrepareWrite(const AFile: TIORingFileRef; const ABuffer: TIORingBufferRef;
       const ACount: Cardinal; const AOffset: UInt64; const AUserData: TIORingUserData;
       const AFlags: TIORingSubmitFlags = []; const AWriteThrough: Boolean = False): Boolean;
@@ -160,9 +162,10 @@ type
     // the system does not tell.
     class function GetSectorSize(const AHandle: THandle): Cardinal; static;
     class function PageSize: Cardinal; static;
-    // Page-aligned memory (VirtualAlloc); FreePages(nil) does nothing
+    // Page-aligned memory (VirtualAlloc); FreePages(nil, ...) does nothing.
+    // ASize: the size given to AllocPages (Linux needs it; Windows not)
     class function AllocPages(const ASize: NativeUInt): Pointer; static;
-    class procedure FreePages(const AMemory: Pointer); static;
+    class procedure FreePages(const AMemory: Pointer; const ASize: NativeUInt); static;
     // Monotonic clock for statistics
     class function TimestampMicroseconds: UInt64; static;
   end;
@@ -820,7 +823,7 @@ begin
     raise EIORingError.CreateNative(LastErrorAsHResult, 'VirtualAlloc');
 end;
 
-class procedure TWindowsIORingPlatform.FreePages(const AMemory: Pointer);
+class procedure TWindowsIORingPlatform.FreePages(const AMemory: Pointer; const ASize: NativeUInt);
 begin
   if AMemory <> nil then
     VirtualFree(AMemory, 0, MEM_RELEASE);

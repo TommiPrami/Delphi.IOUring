@@ -89,6 +89,7 @@ type
     FListIndex: Integer;
     FUseList: Boolean;
     FMemory: PByte;
+    FMemorySize: NativeUInt;      // for FreePages
     FSlots: array of TIORingBlockSlot;
     FBufferSize: Cardinal;
     FMaxGap: Cardinal;
@@ -178,6 +179,7 @@ begin
   ADest.FListIndex := 0;
   ADest.FUseList := False;
   ADest.FMemory := nil;
+  ADest.FMemorySize := 0;
   ADest.FBufferSize := 0;
   ADest.FMaxGap := 0;
   ADest.FHead := 0;
@@ -250,7 +252,8 @@ begin
     if LTotalSize > UInt64(High(NativeInt) div 2) then
       raise EIORingError.CreateFmt('%d buffers of %d bytes do not fit in memory', [AReadAhead, ABufferSize]);
 
-    FMemory := TIORingPlatform.AllocPages(NativeUInt(LTotalSize));
+    FMemorySize := NativeUInt(LTotalSize);
+    FMemory := TIORingPlatform.AllocPages(FMemorySize);
     SetLength(FSlots, AReadAhead);
     for LIndex := 0 to High(FSlots) do
     begin
@@ -291,7 +294,7 @@ begin
         on EIORingError do
           ;    // not a valid request any more: nothing to wait for
       end;
-  TIORingPlatform.FreePages(FMemory);
+  TIORingPlatform.FreePages(FMemory, FMemorySize);
   FMemory := nil;
   FSlots := nil;
   FList := nil;

@@ -152,6 +152,7 @@ Learn also names `IORING_E_WAIT_TIMEOUT`, `IORING_E_UNKNOWN_VERSION` and
 | `PopIoRingCompletion` on an empty CQ | `S_FALSE`, and the `IORING_CQE` is **zeroed** (Learn says "unmodified") |
 | Cancelled operation | its own completion is `HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED)`; the cancel entry completes with `S_OK` |
 | `IsIoRingOpSupported` on a V4 ring | `TRUE` for all op codes, `IORING_OP_NOP` included |
+| A write with `FILE_WRITE_FLAGS_WRITE_THROUGH` on a cached file (no `FILE_FLAG_NO_BUFFERING`) | fails with **0x800701FD** ("not supported on a file opened for cached IO"); on an unbuffered file it works (found in Phase 20) |
 
 Important semantics:
 
@@ -460,10 +461,10 @@ type
 
   TIORingCompletion = record
     UserData: TIORingUserData;
-    NativeResult: Integer;        // HRESULT on Windows, res (bytes or -errno) on Linux
-    BytesTransferred: NativeUInt; // 0 when failed
+    NativeResult: Integer;        // 0, or the error: HRESULT on Windows, -errno on Linux (§5.7)
+    BytesTransferred: NativeUInt; // the bytes (0 when failed)
     function Succeeded: Boolean; inline;
-    function IsEndOfFile: Boolean; inline;   // HRESULT_FROM_WIN32(ERROR_HANDLE_EOF) / res = 0 on read
+    function IsEndOfFile: Boolean; inline;   // Windows: HRESULT_FROM_WIN32(ERROR_HANDLE_EOF); Linux: a read of 0 bytes
     function ErrorMessage: string;
     procedure RaiseIfFailed;
   end;
@@ -682,6 +683,141 @@ Usage styles, from fastest/most manual to most convenient:
   the `delayed` directive (§6).
 - When a future IoRing version appears, the library raises its minimum only
   if it starts using something the new version adds.
+
+### 5.7 The Linux ring – `TLinuxIORing` (Phase 20)
+
+**Facts found before Phase 20** (WSL2, Ubuntu 24.04, kernel 6.18, FPC
+3.2.2, 2026-10-24; more in §6.4):
+
+- **[VERIFIED]** FPC 3.2.2 has no `eventfd` function and no system call
+  number constants for `eventfd2` and `statx`: they need raw system calls
+  with our own numbers, which differ per CPU (x86-64: 290 and 332; AArch64:
+  19 and 291). `futex` has an RTL function (`Futex`, unit `Linux`), which
+  knows the number itself.
+- **[VERIFIED]** An `eventfd` registered with the ring
+  (`IORING_REGISTER_EVENTFD`) works.
+- **[VERIFIED]** `IORING_REGISTER_BUFFERS` accepts a sparse entry
+  (address nil, length 0). Registering buffers a second time without
+  unregistering fails with `-EBUSY`.
+- **[VERIFIED]** `O_DIRECT` (unbuffered) works on WSL2's ext4. `statx` with
+  `STATX_DIOALIGN` (Linux 6.1 and newer) reports the alignment: offsets 512,
+  memory 4 here. A misaligned buffer fails.
+- **[VERIFIED]** Reading a file opened write-only fails with `EBADF`
+  (Windows: `E_ACCESSDENIED`).
+
+**Phase 20 decisions (decided 2026-10-24):**
+
+- **Two phases instead of one.** Phase 20: `TLinuxIORing`, the
+  platform record, the atomics on Linux, and the shared suites that need no
+  engine (atomics, request pool, request queue, ring, sequential reader,
+  read stream) running on Linux. Phase 21: the engine on Linux (how its I/O
+  thread sleeps and is woken), then the block reader, overlap rule and write
+  stream suites, and the benchmarks on Linux. The Linux extras move to
+  Phase 22.
+- **`TLinuxIORing` (`Delphi.IOUring.Backend.Posix`)** has the same public
+  methods as `TWindowsIORing`, so `Delphi.IOUring` exports it as `TIORing`:
+  - `Open`: `io_uring_setup`, the completion queue at least twice the
+    submission queue (`IORING_SETUP_CQSIZE`), the memory mapped once
+    (`IORING_FEAT_SINGLE_MMAP`).
+  - `Prepare*` only write an SQE (no system call): `IORING_OP_READ` /
+    `WRITE` (`READ_FIXED` / `WRITE_FIXED` for registered buffers,
+    `IOSQE_FIXED_FILE` for registered files), `FSYNC`, `READV` / `WRITEV`
+    for scatter/gather, `ASYNC_CANCEL`. `sfDrainPreceding` =
+    `IOSQE_IO_DRAIN`; write-through = `RWF_DSYNC`.
+  - Flush modes: `rfmDefault` = fsync; `rfmData` and `rfmMinMetadata` =
+    fdatasync; `rfmNoSync` = `sync_file_range` (writes the data, no flush
+    command to the device).
+  - `Submit` and `WaitForCompletions`: one `io_uring_enter`, with the
+    timeout in `IORING_ENTER_EXT_ARG`; a timeout is not an error.
+  - `CompletionEventHandle`: an `eventfd` registered with the ring, as §5.2
+    planned.
+  - The ring memory is shared with the kernel: the tails are written with
+    `StoreRelease`, heads and tails are read with `LoadAcquire` (`TAtomic`).
+  - Scatter/gather: `TIORingSegment` is an `iovec` (address and length);
+    `IORingSegment(Address)` gives one page. Linux needs no unbuffered handle
+    for it.
+- **One meaning for `NativeResult` on both systems:** 0 = success,
+  negative = error code (HRESULT on Windows, -errno on Linux); the bytes are
+  always in `BytesTransferred`. (§5.1 planned "res" for Linux, with the
+  byte count in `NativeResult`; then `NativeResult <> 0` would mean
+  different things on the two systems.) End of file stays different:
+  Windows reports a read at or after the end as an error
+  (`IORING_RESULT_END_OF_FILE`), Linux as success with 0 bytes;
+  `IsEndOfFile` is True for both, so callers check it first (the library
+  does already). `IORING_RESULT_CANCELLED` is -ECANCELED on Linux.
+- **Registration on Linux is a system call, not a ring
+  operation.** `PrepareRegisterFiles` / `PrepareRegisterBuffers` register at
+  once (unregister first: a second registration fails with `EBUSY`) and put
+  a completion with the user data into a small list that `TryPopCompletion`
+  returns first. So it takes effect at once, not in submission order as on
+  Windows; a failure comes back in that completion (-errno), as on Windows.
+- **Minimum Linux 5.11** (February 2021): it has everything above
+  (`IORING_OP_READ` / `WRITE` 5.6, `IORING_FEAT_NODROP` 5.5, the timeout in
+  `IORING_ENTER_EXT_ARG` 5.11). Older kernels, or io_uring switched off
+  (`kernel.io_uring_disabled`, seccomp in containers): `Available` = False.
+  Ubuntu 22.04 (5.15) and RHEL 9 (5.14) are newer; Debian 11 (5.10) is not.
+- **`TLinuxIORingPlatform`**, the same names as on Windows: `open` with
+  `O_DIRECT` for unbuffered and `posix_fadvise(SEQUENTIAL)` for the
+  sequential hint; create with `O_CREAT or O_TRUNC`; `ftruncate`; `fstat`;
+  the sector size from `statx` (`STATX_DIOALIGN`; 4096 if the kernel does
+  not tell); `mmap` for page memory; `clock_gettime` for the clock.
+  `munmap` needs the size, so `FreePages` gets a size parameter on both
+  systems (its callers know the size).
+- **Atomics on Linux:** `WaitWhileEqual`, `WakeOne` and `WakeAll` with the
+  futex (private to the process). x86-64 needs nothing else. AArch64:
+  acquire/release with real barriers – written, but **[VERIFY]** until it
+  runs on an ARM machine.
+- **Tests on Linux:** `TestPlatformHelpers` gets its Linux side (files with
+  a neutral set of open flags, pipes, page memory). The expected codes come
+  from small helpers (for example "access denied": `E_ACCESSDENIED` on
+  Windows, `-EBADF` on Linux). Tests of Windows-only behaviour stay in
+  `{$IFDEF MSWINDOWS}`; Linux gets its own where it behaves differently.
+
+**Phase 20 implementation notes** (2026-10-24):
+
+- Built as decided: `TLinuxIORing`, `TLinuxIORingPlatform` and the Linux
+  `TIORingSegment` (`Delphi.IOUring.Backend.Posix`); `Delphi.IOUring`
+  exports them as `TIORing`, `TIORingPlatform` and `TIORingSegment`. The
+  atomics sleep and wake with the futex. On AArch64 every atomic operation
+  has DMB barriers around it, `CpuPause` does nothing; **[VERIFY]**, not
+  compiled for ARM yet (no cross compiler here). `FreePages` has a size
+  parameter on both systems.
+- One change of plan: the **read stream suite moves to Phase 21**. The
+  stream unit also holds the write stream, which needs the engine; rather
+  than `{$IFDEF}`s in the library for one phase, the read stream tests run
+  on Linux together with the engine.
+- On Linux run, through the one Free Pascal test program: the ring tests
+  (with 3 Linux-only ones, without the 2 Windows layout tests), the
+  sequential reader, the atomics, the request pool and queue, besides the
+  Linux API tests and the file helper tests: **137 tests**, with and without
+  `-O3`, five runs in a row without a failure. The atomics' multi-thread
+  tests pass with the futex.
+- **[VERIFIED] How the kernel submits** (6.18): `io_uring_enter` stops at
+  an entry that fails early – its error comes in its completion – and the
+  next call goes on with the rest; `Submit` repeats the call until all
+  prepared entries are in. When it submits entries, the call returns their
+  number also when the wait times out; so `WaitForCompletions` decides
+  "timed out" by counting the completions, not by the result code.
+- The ring maps SQ and CQ with one `mmap`, and fills the SQ index array
+  once at `Open` (slot I = SQE I). `Close` waits with `io_uring_enter`
+  itself; it needs no event.
+- `CompletionEventHandle` creates and registers the `eventfd` on its first
+  call, so a ring that never asks pays nothing for it. The kernel signals it
+  for every completion (Windows: when the queue goes from empty to
+  non-empty).
+- Scatter/gather: the ring copies the segments and cuts them to `ACount`
+  bytes (the kernel would fill all of them), and keeps the copy until
+  nothing is in flight; the caller's array stays as it is.
+- The page size comes from `AT_PAGESZ` in `/proc/self/auxv`: FPC 3.2.2 has
+  no function for it, and AArch64 systems have 4, 16 or 64 KiB pages.
+- **[VERIFIED] on Linux** (6.18, WSL2, ext4): a cancelled pipe read
+  completes with `-ECANCELED`; all four flush modes and write-through
+  (`RWF_DSYNC`) succeed; a reader that leaves its scope closes its file
+  (checked by counting `/proc/self/fd`, because Linux deletes open files
+  too); the 100 MiB unbuffered read of the tests takes about 64 ms.
+- **[VERIFIED] on Windows**, found by the new flush test:
+  write-through needs an unbuffered file (§2.1). The test now writes through
+  on an unbuffered file, on both systems.
 
 ---
 
@@ -2471,3 +2607,4 @@ decision 17.)
 | 16 | 2026-10-23 | **The write stream writes through an engine** (its own by default, or a shared one): Windows does buffered writes inside the submit call, so the submit must happen on another thread (§2.1, §8.2). A failed background write raises at the next call, and at `Free` if it was never raised. |
 | 17 | 2026-10-23 | **Linux: raw system calls, no liburing**; the API unit translates the **kernel 6.8** `linux/io_uring.h` (Ubuntu 24.04 LTS), checked by layout tests generated from the C header; Linux tests are built and run in WSL through `Build-FPC.ps1 -Platform Linux64` (§6.4). |
 | 18 | 2026-10-23 | **One set of tests** for Delphi, Free Pascal and Linux in `Source/UnitTests/Common`: a base class over DUnitX and FPCUnit with the FPCUnit check names; one Free Pascal test program for Windows and Linux; done on main (§12.4). |
+| 19 | 2026-10-24 | **The Linux ring** (§5.7): Phase 20 is the ring, the platform record and the atomics on Linux, Phase 21 the engine on Linux; `NativeResult` is 0 or a negative error code on both systems (bytes in `BytesTransferred`); registration on Linux is a system call at `Prepare` with a completion of its own; minimum Linux 5.11. |

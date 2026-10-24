@@ -472,7 +472,7 @@ var
 begin
   LPage := PageSize;
   FRing := NewRing;
-  LFile := FResources.CreateNewFile(FILE_FLAG_OVERLAPPED or FILE_FLAG_NO_BUFFERING);
+  LFile := FResources.CreateNewFile([tofUnbuffered]);
   LWriteMemory := FResources.AllocPages(SEGMENT_COUNT * LPage);
   LReadMemory := FResources.AllocPages(SEGMENT_COUNT * LPage);
 

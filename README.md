@@ -30,7 +30,8 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 | Overlap rule of the engine (`orKeepOrder`: per file handle, requests that touch the same bytes take effect in start order) | done, tested, measured |
 | Write stream `TSequentialWriteOnlyFileStream` and writer `TIORingSequentialWriter` (writing in the background) | done, tested, benchmarked |
 | Complete Linux io_uring API translation (`Delphi.IOUring.Backend.Posix.API`, Linux 6.8 header, Free Pascal) | done, tested on x86-64 (WSL2); AArch64 not tested yet |
-| Linux ring and the rest on Linux | planned |
+| Linux ring `TLinuxIORing` (`Delphi.IOUring.Backend.Posix`; `TIORing` on Linux), the read-ahead reader and the atomics on Linux | done, tested on x86-64 (WSL2) |
+| The engine, block reader and streams on Linux | planned (Phase 21) |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
 
@@ -41,6 +42,9 @@ See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
   and creating a ring raises `EIORingNotSupported`.
 - **Delphi 13**, or **Free Pascal 3.2.2** (Lazarus 5.0). Older Delphi versions
   may work but are not tested.
+- Linux (Free Pascal only, so far the ring and the read-ahead reader):
+  **Linux 5.11 or newer**, x86-64 (AArch64 is written for but not tested),
+  with io_uring not switched off. Otherwise `IORingAvailable` returns False.
 
 ## Usage
 
@@ -235,8 +239,9 @@ the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
   Lazarus project: `Source\UnitTests\FPC\Delphi.IOUring.UnitTests.FPC.lpi`.
 - Tests, Linux: `Source\Build-FPC.ps1 -Project Tests -Platform Linux64 -Run`
   builds and runs them in WSL, with the FPC installed there (Ubuntu:
-  `sudo apt install fpc`). So far they test the Linux API translation (the
-  rest of the tests follow with the Linux ring).
+  `sudo apt install fpc`). On Linux they test the API translation, the ring,
+  the read-ahead reader, the atomics and the request structures; the
+  engine's tests follow with Phase 21.
 - Benchmarks: `Source\Benchmarks\Delphi.IOUring.Benchmarks.dproj`, and for Free
   Pascal `Source\Build-FPC.ps1 -Project Benchmarks` – see
   [Docs/Benchmarks.md](Docs/Benchmarks.md). The engine's data structures

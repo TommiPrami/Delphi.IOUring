@@ -26,12 +26,18 @@ uses
 {$IFDEF MSWINDOWS}
   , Delphi.IOUring.Backend.Windows
 {$ENDIF}
+{$IFDEF LINUX}
+  , Delphi.IOUring.Backend.Posix
+{$ENDIF}
   ;
 
 const
   IORING_INFINITE = Delphi.IOUring.Backend.Custom.IORING_INFINITE;
 {$IFDEF MSWINDOWS}
   IORING_RESULT_END_OF_FILE = Delphi.IOUring.Backend.Custom.IORING_RESULT_END_OF_FILE;
+  IORING_RESULT_CANCELLED = Delphi.IOUring.Backend.Custom.IORING_RESULT_CANCELLED;
+{$ENDIF}
+{$IFDEF LINUX}
   IORING_RESULT_CANCELLED = Delphi.IOUring.Backend.Custom.IORING_RESULT_CANCELLED;
 {$ENDIF}
 
@@ -57,6 +63,12 @@ type
   TIORingPlatform = Delphi.IOUring.Backend.Windows.TWindowsIORingPlatform;
   TIORingSegment = Delphi.IOUring.Backend.Windows.TIORingSegment;
   PIORingSegment = Delphi.IOUring.Backend.Windows.PIORingSegment;
+{$ENDIF}
+{$IFDEF LINUX}
+  TIORing = Delphi.IOUring.Backend.Posix.TLinuxIORing;
+  TIORingPlatform = Delphi.IOUring.Backend.Posix.TLinuxIORingPlatform;
+  TIORingSegment = Delphi.IOUring.Backend.Posix.TIORingSegment;
+  PIORingSegment = Delphi.IOUring.Backend.Posix.PIORingSegment;
 {$ENDIF}
 
 // Enumeration values are not visible through a type alias; re-export them too
@@ -110,6 +122,9 @@ function IORingSegment(const AAddress: Pointer): TIORingSegment;
 begin
 {$IFDEF MSWINDOWS}
   Result := Delphi.IOUring.Backend.Windows.IORingSegment(AAddress);
+{$ENDIF}
+{$IFDEF LINUX}
+  Result := Delphi.IOUring.Backend.Posix.IORingSegment(AAddress);
 {$ENDIF}
 end;
 

@@ -3,9 +3,10 @@
 {
   Tests for the core ring (TIORing in Delphi.IOUring).
 
-  The ring API is used only through Delphi.IOUring, so the tests can later run
-  on Linux too. Files, pipes and memory come from TestPlatformHelpers (Windows
-  for now); a few layout checks are Windows-only and marked so.
+  The ring API is used only through Delphi.IOUring, so the same tests run on
+  Windows and Linux. Files, pipes and memory come from TestPlatformHelpers;
+  where the systems differ, the expected value comes from there or from
+  Delphi.IOUring. A few layout checks are Windows-only.
 }
 
 {$I Delphi.IOUring.inc}
@@ -41,7 +42,13 @@ type
     procedure RandomReads_EveryCompletionVerified;
     procedure RegisterFilesAndBuffers_ArraysAreCopied;
     procedure WriteFlushRead_WithDrain;
+    procedure Flush_AllModes;
+    procedure WriteThrough_UnbufferedFile;
     procedure ReadScatter_UsesOnlySegmentCountEntries;
+{$IFDEF LINUX}
+    procedure ReadScatter_Linux_CutToByteCount;
+    procedure RegisterFiles_Linux_TakesEffectAtOnce;
+{$ENDIF}
     procedure PrepareCancel_CancelsPendingPipeRead;
     procedure ReadOnWriteOnlyHandle_GivesFailedCompletion;
     // Waiting and closing
@@ -54,8 +61,10 @@ type
     procedure ReadAt_OnBusyRing_Raises;
     procedure WriteAt_ThenReadAt_RoundTrip;
     // Types and errors
+{$IFDEF MSWINDOWS}
     procedure Completion_HasLayoutOfIoRingCqe;
     procedure BufferInfo_HasLayoutOfIoRingBufferInfo;
+{$ENDIF}
     procedure ErrorMessage_DescribesCodes;
   end;
 
@@ -63,7 +72,12 @@ implementation
 
 uses
 {$IFDEF FPC}
+  {$IFDEF MSWINDOWS}
   Windows,
+  {$ENDIF}
+  {$IFDEF UNIX}
+  BaseUnix,
+  {$ENDIF}
   SysUtils,
   Classes,
 {$ELSE}
@@ -72,14 +86,18 @@ uses
   System.Classes,
 {$ENDIF}
   Delphi.IOUring,
+{$IFDEF MSWINDOWS}
   Delphi.IOUring.Backend.Windows.API,
+{$ENDIF}
   TestFileHelpers;
 
 const
   PATTERN_FILE_SIZE = 1024 * 1024;
-  RESULT_E_ACCESSDENIED = HRESULT($80070005);
-
-function CancelIoEx(hFile: THandle; lpOverlapped: POverlapped): BOOL; stdcall; external 'kernel32.dll';
+{$IFDEF MSWINDOWS}
+  BACKEND_NAME = 'Windows IoRing';
+{$ELSE}
+  BACKEND_NAME = 'Linux io_uring';
+{$ENDIF}
 
 function AddressByConst(const ARing: TIORing): Pointer;
 begin
@@ -130,7 +148,7 @@ begin
   Log(Format('Backend "%s", version %d, max SQ %d, max CQ %d',
     [LCapabilities.BackendName, LCapabilities.NativeVersion, LCapabilities.MaxSubmissionQueueSize,
      LCapabilities.MaxCompletionQueueSize]));
-  AssertEquals('Backend', 'Windows IoRing', LCapabilities.BackendName);
+  AssertEquals('Backend', BACKEND_NAME, LCapabilities.BackendName);
   AssertFalse('Emulated', LCapabilities.Emulated);
   AssertTrue('All operations', LCapabilities.SupportedOps = [ioRead, ioWrite, ioFlush, ioCancel, ioRegisterFiles,
     ioRegisterBuffers, ioReadScatter, ioWriteGather]);
@@ -403,7 +421,7 @@ begin
   AssertTrue('Register buffers', LRing.PrepareRegisterBuffers(LInfos, 101));
 
   // Spoil the caller's arrays before the kernel reads them
-  LHandles[0] := INVALID_HANDLE_VALUE;
+  LHandles[0] := THandle(-1);
   LInfos[0].Address := nil;
   LInfos[0].Length := 0;
   LHandles := nil;
@@ -449,6 +467,55 @@ begin
   CheckPattern(0, @LReadBuffer, DATA_SIZE);
 end;
 
+procedure TIORingTests.Flush_AllModes;
+const
+  DATA_SIZE = 4096;
+  MODES: array[0..3] of TIORingFlushMode = (rfmDefault, rfmData, rfmMinMetadata, rfmNoSync);
+var
+  LRing: TIORing;
+  LFile: TIORingFileRef;
+  LData: array[0..DATA_SIZE - 1] of Byte;
+  LCompletions: array[0..7] of TIORingCompletion;
+  LIndex: Integer;
+begin
+  LFile := TIORingFileRef.FromHandle(FResources.CreateNewFile);
+  TTestFileHelpers.FillPattern(0, LData, DATA_SIZE);
+  LRing.Open(8);
+
+  AssertTrue('Write', LRing.PrepareWrite(LFile, TIORingBufferRef.FromPointer(@LData), DATA_SIZE, 0, 10));
+  for LIndex := 0 to High(MODES) do
+    AssertTrue('Flush', LRing.PrepareFlush(LFile, MODES[LIndex], LIndex, [sfDrainPreceding]));
+  LRing.Submit(5);
+
+  AssertEquals('Completions', 5, LRing.PopCompletions(LCompletions));
+  for LIndex := 0 to 4 do
+    AssertTrue(Format('UserData %d: %s', [LCompletions[LIndex].UserData, LCompletions[LIndex].ErrorMessage]),
+      LCompletions[LIndex].Succeeded);
+end;
+
+procedure TIORingTests.WriteThrough_UnbufferedFile;
+var
+  LRing: TIORing;
+  LPage: NativeUInt;
+  LFile: TIORingFileRef;
+  LMemory: PByte;
+  LCompletion: TIORingCompletion;
+begin
+  // Windows: write-through only on an unbuffered file (on a cached one the
+  // write fails with 0x800701FD); Linux takes it on both
+  LPage := PageSize;
+  LFile := TIORingFileRef.FromHandle(FResources.CreateNewFile([tofUnbuffered]));
+  LMemory := FResources.AllocPages(LPage);
+  TTestFileHelpers.FillPattern(0, LMemory^, LPage);
+  LRing.Open(8);
+
+  AssertTrue('Write', LRing.PrepareWrite(LFile, TIORingBufferRef.FromPointer(LMemory), LPage, 0, 1, [], True));
+  LRing.Submit(1);
+  AssertTrue('Completion', LRing.TryPopCompletion(LCompletion));
+  AssertTrue(LCompletion.ErrorMessage, LCompletion.Succeeded);
+  AssertEquals('Bytes', Int64(LPage), Int64(LCompletion.BytesTransferred));
+end;
+
 procedure TIORingTests.ReadScatter_UsesOnlySegmentCountEntries;
 const
   SEGMENT_COUNT = 3;
@@ -463,7 +530,7 @@ var
   LIndex: Integer;
 begin
   LPage := PageSize;
-  LFile := TIORingFileRef.FromHandle(FResources.OpenFile(PatternFile, FILE_FLAG_OVERLAPPED or FILE_FLAG_NO_BUFFERING));
+  LFile := TIORingFileRef.FromHandle(FResources.OpenFile(PatternFile, [tofUnbuffered]));
   LMemory := FResources.AllocPages((SEGMENT_COUNT + 1) * LPage);
   LGuard := LMemory + SEGMENT_COUNT * LPage;
   FillChar(LGuard^, LPage, $AA);
@@ -482,6 +549,60 @@ begin
     if LGuard[LIndex] <> $AA then
       Fail(Format('Guard page changed at byte %d', [LIndex]));
 end;
+
+{$IFDEF LINUX}
+procedure TIORingTests.ReadScatter_Linux_CutToByteCount;
+var
+  LRing: TIORing;
+  LPage: NativeUInt;
+  LFile: TIORingFileRef;
+  LMemory: PByte;
+  LSegments: array[0..1] of TIORingSegment;
+  LCompletion: TIORingCompletion;
+  LIndex: Integer;
+begin
+  // The kernel would fill both pages; the ring cuts the segments to ACount
+  // bytes (Windows: ACount decides), and leaves the caller's array as it is
+  LPage := PageSize;
+  LFile := TIORingFileRef.FromHandle(FResources.OpenFile(PatternFile));
+  LMemory := FResources.AllocPages(2 * LPage);
+  FillChar(LMemory^, 2 * LPage, $AA);
+  LSegments[0] := IORingSegment(LMemory);
+  LSegments[1] := IORingSegment(LMemory + LPage);
+
+  LRing.Open(8);
+  AssertTrue('Prepare', LRing.PrepareReadScatter(LFile, @LSegments[0], 2, LPage + 100, 0, 1));
+  LRing.Submit(1);
+
+  AssertTrue('Completion', LRing.TryPopCompletion(LCompletion));
+  AssertTrue(LCompletion.ErrorMessage, LCompletion.Succeeded);
+  AssertEquals('Bytes', Int64(LPage + 100), Int64(LCompletion.BytesTransferred));
+  CheckPattern(0, LMemory, LPage + 100);
+  for LIndex := Integer(LPage) + 100 to 2 * Integer(LPage) - 1 do
+    if LMemory[LIndex] <> $AA then
+      Fail(Format('Byte %d after the count changed', [LIndex]));
+  AssertEquals('Caller''s segment untouched', Int64(LPage), Int64(LSegments[1].Length));
+end;
+
+procedure TIORingTests.RegisterFiles_Linux_TakesEffectAtOnce;
+const
+  BAD_FILE = 1000000;
+var
+  LRing: TIORing;
+  LCompletion: TIORingCompletion;
+begin
+  // A system call on Linux, not a ring operation: done in Prepare, its
+  // completion is there before any Submit, and a failure comes in it
+  LRing.Open(8);
+  AssertTrue('Prepare', LRing.PrepareRegisterFiles([BAD_FILE], 7));
+  AssertEquals('Prepared', Int64(0), Int64(LRing.PreparedCount));
+  AssertEquals('Pending', Int64(1), Int64(LRing.PendingCount));
+  AssertTrue('Completion without Submit', LRing.TryPopCompletion(LCompletion));
+  AssertEquals('UserData', 7, Int64(LCompletion.UserData));
+  AssertEquals('Bad file', -ESysEBADF, LCompletion.NativeResult);
+  AssertEquals('Pending', Int64(0), Int64(LRing.PendingCount));
+end;
+{$ENDIF}
 
 procedure TIORingTests.PrepareCancel_CancelsPendingPipeRead;
 var
@@ -509,15 +630,15 @@ begin
       if LCompletions[LIndex].UserData = 1 then
       begin
         LReadSeen := True;
-        AssertEquals('Cancelled read', Int64(HResultFromWin32(ERROR_OPERATION_ABORTED)),
-          Int64(LCompletions[LIndex].NativeResult));
+        AssertEquals('Cancelled read', Int64(IORING_RESULT_CANCELLED), Int64(LCompletions[LIndex].NativeResult));
       end
       else
         AssertTrue('Cancel request: ' + LCompletions[LIndex].ErrorMessage, LCompletions[LIndex].Succeeded);
     AssertTrue('Read completion seen', LReadSeen);
   finally
-    // Never leave the ring waiting for a pipe read in Close
-    CancelIoEx(LClient, nil);
+    // Never leave the ring waiting for a pipe read in Close: a byte ends it
+    if LRing.PendingCount > 0 then
+      WriteByteToPipe(LServer, 0);
   end;
 end;
 
@@ -529,7 +650,7 @@ var
   LCompletion: TIORingCompletion;
   LRaised: Boolean;
 begin
-  LFile := TIORingFileRef.FromHandle(FResources.OpenFile(PatternFile, FILE_FLAG_OVERLAPPED, GENERIC_WRITE));
+  LFile := TIORingFileRef.FromHandle(FResources.OpenFile(PatternFile, [tofWriteOnly]));
   LRing.Open(8);
   AssertTrue('Prepare', LRing.PrepareRead(LFile, TIORingBufferRef.FromPointer(@LBuffer), SizeOf(LBuffer), 0, 1));
   LRing.Submit(1);
@@ -537,7 +658,7 @@ begin
   AssertTrue('Completion', LRing.TryPopCompletion(LCompletion));
   Log('Read on write-only handle: ' + LCompletion.ErrorMessage);
   AssertFalse('Succeeded', LCompletion.Succeeded);
-  AssertEquals('Access denied', Int64(RESULT_E_ACCESSDENIED), Int64(LCompletion.NativeResult));
+  AssertEquals('Access denied', Int64(RESULT_ACCESS_DENIED), Int64(LCompletion.NativeResult));
 
   LRaised := False;
   try
@@ -546,7 +667,7 @@ begin
     on E: EIORingError do
     begin
       LRaised := True;
-      AssertEquals('NativeCode', Int64(RESULT_E_ACCESSDENIED), Int64(E.NativeCode));
+      AssertEquals('NativeCode', Int64(RESULT_ACCESS_DENIED), Int64(E.NativeCode));
     end;
   end;
   AssertTrue('RaiseIfFailed raises', LRaised);
@@ -568,7 +689,7 @@ begin
 
   AssertTrue('Prepare', LRing.PrepareRead(LFile, TIORingBufferRef.FromPointer(@LBuffer), SizeOf(LBuffer), 0, 1));
   LRing.Submit;
-  AssertEquals('Event', Int64(WAIT_OBJECT_0), Int64(WaitForSingleObject(LRing.CompletionEventHandle, 5000)));
+  AssertTrue('Event', WaitForEvent(LRing.CompletionEventHandle, 5000));
   AssertTrue('Completion', LRing.TryPopCompletion(LCompletion));
   AssertTrue(LCompletion.ErrorMessage, LCompletion.Succeeded);
 end;
@@ -713,6 +834,7 @@ end;
 
 { Types and errors }
 
+{$IFDEF MSWINDOWS}
 procedure TIORingTests.Completion_HasLayoutOfIoRingCqe;
 var
   LCompletion: TIORingCompletion;
@@ -737,11 +859,13 @@ begin
   AssertEquals('Length', Int64(NativeUInt(@LNative.Length) - NativeUInt(@LNative)),
     Int64(NativeUInt(@LInfo.Length) - NativeUInt(@LInfo)));
 end;
+{$ENDIF}
 
 procedure TIORingTests.ErrorMessage_DescribesCodes;
 var
   LMessage: string;
 begin
+{$IFDEF MSWINDOWS}
   LMessage := IORingErrorMessage(IORING_E_SUBMISSION_QUEUE_FULL);
   Log(LMessage);
   AssertTrue(LMessage, Pos('submission queue is full', LMessage) > 0);
@@ -751,6 +875,12 @@ begin
   Log(LMessage);
   AssertTrue(LMessage, Pos('0x80070026', LMessage) > 0);
   AssertTrue('No text for ERROR_HANDLE_EOF', Length(LMessage) > Length(' (0x80070026)'));
+{$ELSE}
+  LMessage := IORingErrorMessage(-ESysEBADF);
+  Log(LMessage);
+  AssertTrue(LMessage, Pos('(errno 9)', LMessage) > 0);
+  AssertTrue('No text for EBADF', Length(LMessage) > Length(' (errno 9)'));
+{$ENDIF}
 end;
 
 initialization

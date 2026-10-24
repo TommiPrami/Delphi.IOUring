@@ -256,7 +256,7 @@ begin
     end;
   finally
     CloseHandle(LFile);
-    TIORingPlatform.FreePages(LBuffer);
+    TIORingPlatform.FreePages(LBuffer, BLOCK_SIZE);
   end;
 end;
 
@@ -295,7 +295,7 @@ begin
       AConsumer.Consume(LBuffer, ABlocks[LIndex].Length);
     end;
   finally
-    TIORingPlatform.FreePages(LBuffer);
+    TIORingPlatform.FreePages(LBuffer, BLOCK_SIZE);
   end;
 end;
 

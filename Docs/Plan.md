@@ -295,17 +295,26 @@ Source/
   - [x] Found on the way: DUnitX runs all tests of a class on one object (FPCUnit: one object per test); three tests had no counted check; RTL differences (`GetTickCount64`, `constref`, `TStreamReader`, `string` size) – Design §12.4.
 
   **Done 2026-10-23** – Delphi 242 tests (Win32 and Win64, Debug and Release), FPC 241 on Windows (Win32 and Win64, with and without `-O3`), FPC 32 on Linux (WSL2, with and without `-O3`); `lazbuild` builds the Lazarus test project. Delphi has one test more (`ReadOverloads_Work`: overloads FPC 3.2.2's `TStream` lacks).
-- **Phase 20** – `TLinuxIORing` record in `Delphi.IOUring.Backend.Posix`; `Atomics` gets AArch64-correct acquire/release; same `Tests.Ring` / reader / stream / engine suites run on Linux (WSL2 is enough for x86-64 development).
-- **Phase 21** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only.
+- **Phase 20** – `TLinuxIORing` record in `Delphi.IOUring.Backend.Posix` and the platform record `TLinuxIORingPlatform`; `Atomics` on Linux (futex; AArch64 acquire/release); the Linux side of the test helpers; the shared suites that need no engine (atomics, request pool and queue, ring, sequential reader) run on Linux (WSL2 is enough for x86-64 development). Decided: Design §5.7, decision 19.
+  - [x] `TLinuxIORing`: the same methods as `TWindowsIORing`; one `mmap` for both rings; `Submit` repeats `io_uring_enter` until every prepared entry is in; timeouts with `IORING_ENTER_EXT_ARG`; registration as a system call with its own completion; scatter/gather segments copied and cut to the byte count; the `eventfd` only when `CompletionEventHandle` is asked for.
+  - [x] `TLinuxIORingPlatform` (`O_DIRECT`, `posix_fadvise`, `statx` for the alignment, `mmap`, `AT_PAGESZ`, `clock_gettime`); `FreePages` got a size parameter on both systems. `NativeResult` is 0 or a negative error code on both systems.
+  - [x] Atomics on Linux: the futex; AArch64 barriers written ([VERIFY], no ARM machine and no cross compiler here).
+  - [x] `TestPlatformHelpers` for Linux: neutral open flags, `pipe()`, `mmap`, waiting on an event, `RESULT_ACCESS_DENIED`. The ring and reader tests run on both systems; new: `Flush_AllModes`, `WriteThrough_UnbufferedFile`, and two Linux-only ring tests (registration at once, scatter cut to the byte count).
+  - [x] Changed plan: the read stream suite moves to Phase 21 – the stream unit also holds the write stream, which needs the engine.
+  - [x] Found on the way: on Windows, write-through needs an unbuffered file (`0x800701FD` on a cached one; Design §2.1).
+  - [ ] AArch64: not compiled or run yet ([VERIFY], Design §5.7).
+
+  **Done 2026-10-24** – Linux: 137 tests pass in WSL2 (kernel 6.18), with and without `-O3`. Windows: Delphi 244 tests (Win32 and Win64, Debug and Release), FPC 243 (Win32 and Win64, with and without `-O3`); `lazbuild` builds the test project; the benchmarks compile.
+- **Phase 21** – The engine on Linux (how its I/O thread sleeps and is woken); the block reader, overlap rule, read stream and write stream suites on Linux; the benchmarks on Linux.
+- **Phase 22** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only.
 
 ---
 
 ## Immediate next step
 
-Phase 19 is done: Delphi and Free Pascal run one set of tests
-(`Source/UnitTests/Common`), and one Free Pascal runner serves Windows and
-Linux. Next: **Phase 20 – `TLinuxIORing`** in `Delphi.IOUring.Backend.Posix`,
-built on the API unit: the ring memory with the right memory barriers,
-prepare / submit / complete like `TWindowsIORing`; the atomics' waiting on
-Linux (futex); the Linux side of `TestPlatformHelpers`; and the shared suites
-(ring, reader, stream, engine) running on Linux. Decisions first.
+Phase 20 is done: the Linux ring `TLinuxIORing`, its platform record and the
+atomics on Linux; the ring, reader, atomics and request structure tests run on
+Linux. Next: **Phase 21 – the engine on Linux**: how its I/O thread sleeps and
+is woken (on Windows it waits for two events at once), then the block reader,
+overlap rule, read stream and write stream suites and the benchmarks on Linux.
+Decisions first.

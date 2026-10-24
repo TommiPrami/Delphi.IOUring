@@ -58,7 +58,9 @@ implementation
 
 uses
 {$IFDEF FPC}
+  {$IFDEF MSWINDOWS}
   Windows,
+  {$ENDIF}
   SysUtils,
   Classes,
 {$ELSE}
@@ -72,9 +74,6 @@ uses
 const
   SMALL_BUFFER = 64 * 1024;
   LARGE_FILE_SIZE = 100 * 1024 * 1024;
-
-function IORingGetFileSizeEx(hFile: THandle; out lpFileSize: Int64): BOOL; stdcall;
-  external 'kernel32.dll' name 'GetFileSizeEx';
 
 procedure ReadALittleAndLeaveScope(const AFileName: string);
 var
@@ -425,13 +424,22 @@ end;
 procedure TSequentialReaderTests.EndOfScope_ClosesFile;
 var
   LFileName: string;
+{$IFNDEF MSWINDOWS}
+  LOpenFiles: Integer;
+{$ENDIF}
 begin
   LFileName := TTestFileHelpers.CreatePatternFile(1024 * 1024, 'Scope');
   FResources.AddFile(LFileName);
 
+{$IFDEF MSWINDOWS}
   ReadALittleAndLeaveScope(LFileName);
-
   AssertTrue('The file is still open: ' + SysErrorMessage(GetLastError), DeleteFile(LFileName));
+{$ELSE}
+  // Linux deletes open files too: count the open file descriptors instead
+  LOpenFiles := OpenFileDescriptorCount;
+  ReadALittleAndLeaveScope(LFileName);
+  AssertEquals('The file is still open', LOpenFiles, OpenFileDescriptorCount);
+{$ENDIF}
 end;
 
 procedure TSequentialReaderTests.OpenHandle_NotOwned_KeepsHandleOpen;
@@ -439,15 +447,14 @@ var
   LHandle: THandle;
   LReader: TIORingSequentialReader;
   LBuffer: array[0..999] of Byte;
-  LSize: Int64;
 begin
   LHandle := FResources.OpenFile(SharedPatternFile(3 * SMALL_BUFFER));
   LReader.Open(LHandle, False, [], SMALL_BUFFER, 2);
   AssertEquals('Read', Int64(SizeOf(LBuffer)), Int64(LReader.Read(LBuffer, SizeOf(LBuffer))));
   LReader.Close;
 
-  AssertTrue('The handle was closed by the reader', IORingGetFileSizeEx(LHandle, LSize));
-  AssertEquals('Size', Int64(3 * SMALL_BUFFER), LSize);
+  // GetFileSize raises if the reader closed the handle
+  AssertEquals('Size', Int64(3 * SMALL_BUFFER), TIORingPlatform.GetFileSize(LHandle));
 end;
 
 procedure TSequentialReaderTests.Open_BadArguments_Raise;

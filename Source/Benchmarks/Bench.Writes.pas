@@ -355,7 +355,7 @@ begin
       end;
     end;
   finally
-    TIORingPlatform.FreePages(GData);
+    TIORingPlatform.FreePages(GData, MiB);
   end;
 end;
 

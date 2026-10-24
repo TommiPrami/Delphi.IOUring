@@ -79,6 +79,7 @@ type
     FHasFile: Boolean;
     FOwnsFile: Boolean;
     FMemory: PByte;
+    FMemorySize: NativeUInt;      // for FreePages
     FSlots: array of TIORingReaderSlot;
     FBufferSize: Cardinal;
     FBufferCount: Cardinal;
@@ -167,6 +168,7 @@ begin
   ADest.FHasFile := False;
   ADest.FOwnsFile := False;
   ADest.FMemory := nil;
+  ADest.FMemorySize := 0;
   ADest.FBufferSize := 0;
   ADest.FBufferCount := 0;
   ADest.FRegistered := False;
@@ -247,7 +249,8 @@ begin
     FSize := TIORingPlatform.GetFileSize(AHandle);
     FBufferSize := ABufferSize;
     FBufferCount := ABufferCount;
-    FMemory := TIORingPlatform.AllocPages(NativeUInt(LTotalSize));
+    FMemorySize := NativeUInt(LTotalSize);
+    FMemory := TIORingPlatform.AllocPages(FMemorySize);
 
     SetLength(FSlots, ABufferCount);
     for LIndex := 0 to ABufferCount - 1 do
@@ -301,7 +304,7 @@ begin
   FRing.Close;
 
   FSlots := nil;
-  TIORingPlatform.FreePages(FMemory);
+  TIORingPlatform.FreePages(FMemory, FMemorySize);
   FMemory := nil;
 
   if FHasFile and FOwnsFile then

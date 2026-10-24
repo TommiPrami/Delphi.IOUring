@@ -1,9 +1,10 @@
 ﻿unit TestPlatformHelpers;
 
 {
-  Windows helpers for the tests: files, pipes and page-aligned memory that are
-  released automatically, a thread that writes to a pipe later, plus small
-  HRESULT helpers. The Linux side comes with TLinuxIORing (Phase 20).
+  Platform helpers for the tests, for Windows and Linux: files, pipes and
+  page-aligned memory that are released automatically, a thread that writes to
+  a pipe later, waiting on an event handle, and what the platform reports for
+  some failures. Plus small HRESULT helpers on Windows.
 
   No test framework dependency (failures raise exceptions): used by the
   Delphi and the Free Pascal tests.
@@ -15,7 +16,9 @@ interface
 
 uses
 {$IFDEF FPC}
+  {$IFDEF MSWINDOWS}
   Windows,
+  {$ENDIF}
   Classes;
 {$ELSE}
   Winapi.Windows,
@@ -23,6 +26,14 @@ uses
 {$ENDIF}
 
 type
+  // How OpenFile and CreateNewFile open a file; the same on every platform
+  TTestOpenFlag = (
+    tofWriteOnly,    // write access only (OpenFile; the default is read only)
+    tofUnbuffered,   // past the file cache: FILE_FLAG_NO_BUFFERING / O_DIRECT
+    tofSynchronous   // Windows: without FILE_FLAG_OVERLAPPED (Linux: no difference)
+  );
+  TTestOpenFlags = set of TTestOpenFlag;
+
   // Collects test resources and releases them all in Destroy (or ReleaseAll).
   // Release order: memory last, so no buffer goes away before its handle.
   TTestResources = class
@@ -30,6 +41,7 @@ type
     FHandles: array of THandle;
     FFiles: array of string;
     FMemory: array of Pointer;
+    FMemorySizes: array of NativeUInt;
   public
     destructor Destroy; override;
     procedure ReleaseAll;
@@ -38,14 +50,18 @@ type
     procedure AddFile(const AFileName: string);
 
     // Opens an existing file; raises on failure
-    function OpenFile(const AFileName: string; const AFlags: DWORD = FILE_FLAG_OVERLAPPED;
-      const AAccess: DWORD = GENERIC_READ): THandle;
+    function OpenFile(const AFileName: string; const AFlags: TTestOpenFlags = []): THandle; overload;
+{$IFDEF MSWINDOWS}
+    // With Windows flags and access (the Windows API tests)
+    function OpenFile(const AFileName: string; const AFlags: DWORD; const AAccess: DWORD = GENERIC_READ): THandle; overload;
+{$ENDIF}
     // Creates a new empty file (read/write) in the test folder; deleted on release
-    function CreateNewFile(const AFlags: DWORD = FILE_FLAG_OVERLAPPED): THandle;
-    // Page-aligned, zero-filled memory (VirtualAlloc)
+    function CreateNewFile(const AFlags: TTestOpenFlags = []): THandle;
+    // Page-aligned, zero-filled memory
     function AllocPages(const ASize: NativeUInt): Pointer;
-    // Connected named pipe pair, both ends overlapped. Reads from AClient stay
-    // pending until something is written to AServer.
+    // A connected pipe: reads from AClient stay pending until something is
+    // written to AServer. Windows: a named pipe, both ends overlapped. Linux:
+    // pipe() (AServer is the write end).
     procedure OpenPipePair(out AServer, AClient: THandle);
   end;
 
@@ -62,22 +78,59 @@ type
     constructor Create(const APipe: THandle; const ADelayMilliseconds: Cardinal; const AValue: Byte);
   end;
 
-// Writes one byte to an overlapped pipe handle and waits until it is written
+const
+  // NativeResult of a read on a file opened for writing only
+{$IFDEF MSWINDOWS}
+  RESULT_ACCESS_DENIED = Integer($80070005);   // E_ACCESSDENIED
+{$ELSE}
+  RESULT_ACCESS_DENIED = -9;                   // -EBADF
+{$ENDIF}
+
+// Writes one byte to a pipe and waits until it is written
 procedure WriteByteToPipe(const APipe: THandle; const AValue: Byte);
 
+// True when the event (Windows event / Linux eventfd) is signalled within
+// ATimeoutMs
+function WaitForEvent(const AHandle: THandle; const ATimeoutMs: Cardinal): Boolean;
+
 function PageSize: NativeUInt;
+
+{$IFDEF UNIX}
+// The number of open file descriptors of this process (/proc/self/fd)
+function OpenFileDescriptorCount: Integer;
+{$ENDIF}
+
+{$IFDEF MSWINDOWS}
 function HResultFromWin32(const ACode: DWORD): HRESULT;
 function HrToStr(const AResult: HRESULT): string;
+{$ENDIF}
 
 implementation
 
 uses
 {$IFDEF FPC}
+  {$IFDEF UNIX}
+  BaseUnix,
+  Delphi.IOUring,
+  {$ENDIF}
   SysUtils,
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
   TestFileHelpers;
+
+{$IFDEF UNIX}
+const
+  O_CLOEXEC_FLAG = &02000000;
+
+procedure RaiseLastErrno(const AOperation: string);
+var
+  LErrno: Integer;
+begin
+  LErrno := fpgeterrno;
+  raise EOSError.CreateFmt('%s: %s (errno %d)', [AOperation, SysErrorMessage(LErrno), LErrno]);
+end;
+{$ENDIF}
 
 { TTestResources }
 
@@ -92,7 +145,11 @@ var
   LIndex: Integer;
 begin
   for LIndex := High(FHandles) downto 0 do
+{$IFDEF MSWINDOWS}
     CloseHandle(FHandles[LIndex]);
+{$ELSE}
+    FpClose(FHandles[LIndex]);
+{$ENDIF}
   FHandles := nil;
 
   for LIndex := High(FFiles) downto 0 do
@@ -100,8 +157,13 @@ begin
   FFiles := nil;
 
   for LIndex := High(FMemory) downto 0 do
+{$IFDEF MSWINDOWS}
     VirtualFree(FMemory[LIndex], 0, MEM_RELEASE);
+{$ELSE}
+    Fpmunmap(FMemory[LIndex], FMemorySizes[LIndex]);
+{$ENDIF}
   FMemory := nil;
+  FMemorySizes := nil;
 end;
 
 procedure TTestResources.AddHandle(const AHandle: THandle);
@@ -116,6 +178,24 @@ begin
   FFiles[High(FFiles)] := AFileName;
 end;
 
+{$IFDEF MSWINDOWS}
+function WindowsFlags(const AFlags: TTestOpenFlags): DWORD;
+begin
+  Result := 0;
+  if not (tofSynchronous in AFlags) then
+    Result := Result or FILE_FLAG_OVERLAPPED;
+  if tofUnbuffered in AFlags then
+    Result := Result or FILE_FLAG_NO_BUFFERING;
+end;
+
+function TTestResources.OpenFile(const AFileName: string; const AFlags: TTestOpenFlags): THandle;
+begin
+  if tofWriteOnly in AFlags then
+    Result := OpenFile(AFileName, WindowsFlags(AFlags), GENERIC_WRITE)
+  else
+    Result := OpenFile(AFileName, WindowsFlags(AFlags), GENERIC_READ);
+end;
+
 function TTestResources.OpenFile(const AFileName: string; const AFlags, AAccess: DWORD): THandle;
 begin
   Result := CreateFile(PChar(AFileName), AAccess, FILE_SHARE_READ or FILE_SHARE_WRITE, nil,
@@ -125,13 +205,13 @@ begin
   AddHandle(Result);
 end;
 
-function TTestResources.CreateNewFile(const AFlags: DWORD): THandle;
+function TTestResources.CreateNewFile(const AFlags: TTestOpenFlags): THandle;
 var
   LFileName: string;
 begin
   LFileName := TTestFileHelpers.NewTestFileName('Write');
   Result := CreateFile(PChar(LFileName), GENERIC_READ or GENERIC_WRITE, 0, nil, CREATE_ALWAYS,
-    FILE_ATTRIBUTE_NORMAL or AFlags, 0);
+    FILE_ATTRIBUTE_NORMAL or WindowsFlags(AFlags), 0);
   if Result = INVALID_HANDLE_VALUE then
     RaiseLastOSError;
   // Handle first: handles are closed before files are deleted
@@ -146,6 +226,8 @@ begin
     RaiseLastOSError;
   SetLength(FMemory, Length(FMemory) + 1);
   FMemory[High(FMemory)] := Result;
+  SetLength(FMemorySizes, Length(FMemorySizes) + 1);
+  FMemorySizes[High(FMemorySizes)] := ASize;
 end;
 
 procedure TTestResources.OpenPipePair(out AServer, AClient: THandle);
@@ -189,20 +271,9 @@ begin
   end;
 end;
 
-{ TDelayedPipeWriter }
-
-constructor TDelayedPipeWriter.Create(const APipe: THandle; const ADelayMilliseconds: Cardinal; const AValue: Byte);
+function WaitForEvent(const AHandle: THandle; const ATimeoutMs: Cardinal): Boolean;
 begin
-  FPipe := APipe;
-  FDelayMilliseconds := ADelayMilliseconds;
-  FValue := AValue;
-  inherited Create(True);
-end;
-
-procedure TDelayedPipeWriter.Execute;
-begin
-  Sleep(FDelayMilliseconds);
-  WriteByteToPipe(FPipe, FValue);
+  Result := WaitForSingleObject(AHandle, ATimeoutMs) = WAIT_OBJECT_0;
 end;
 
 function PageSize: NativeUInt;
@@ -224,6 +295,123 @@ end;
 function HrToStr(const AResult: HRESULT): string;
 begin
   Result := Format('0x%.8x', [Cardinal(AResult)]);
+end;
+{$ENDIF}
+
+{$IFDEF UNIX}
+function UnixFlags(const AFlags: TTestOpenFlags): Integer;
+begin
+  Result := O_CLOEXEC_FLAG;
+  if tofUnbuffered in AFlags then
+    Result := Result or O_DIRECT;
+end;
+
+function TTestResources.OpenFile(const AFileName: string; const AFlags: TTestOpenFlags): THandle;
+var
+  LAccess: Integer;
+begin
+  if tofWriteOnly in AFlags then
+    LAccess := O_WRONLY
+  else
+    LAccess := O_RDONLY;
+  Result := FpOpen(AFileName, LAccess or UnixFlags(AFlags));
+  if Result < 0 then
+    RaiseLastErrno('Open "' + AFileName + '"');
+  AddHandle(Result);
+end;
+
+function TTestResources.CreateNewFile(const AFlags: TTestOpenFlags): THandle;
+var
+  LFileName: string;
+begin
+  LFileName := TTestFileHelpers.NewTestFileName('Write');
+  Result := FpOpen(LFileName, O_RDWR or O_CREAT or O_TRUNC or UnixFlags(AFlags), &644);
+  if Result < 0 then
+    RaiseLastErrno('Create "' + LFileName + '"');
+  // Handle first: handles are closed before files are deleted
+  AddHandle(Result);
+  AddFile(LFileName);
+end;
+
+function TTestResources.AllocPages(const ASize: NativeUInt): Pointer;
+begin
+  Result := Fpmmap(nil, ASize, PROT_READ or PROT_WRITE, MAP_PRIVATE or MAP_ANONYMOUS, -1, 0);
+  if Result = MAP_FAILED then
+    RaiseLastErrno('mmap');
+  SetLength(FMemory, Length(FMemory) + 1);
+  FMemory[High(FMemory)] := Result;
+  SetLength(FMemorySizes, Length(FMemorySizes) + 1);
+  FMemorySizes[High(FMemorySizes)] := ASize;
+end;
+
+procedure TTestResources.OpenPipePair(out AServer, AClient: THandle);
+var
+  LPipe: TFilDes;
+begin
+  if FpPipe(LPipe) < 0 then
+    RaiseLastErrno('pipe');
+  AClient := LPipe[0];   // read end
+  AServer := LPipe[1];   // write end
+  AddHandle(AServer);
+  AddHandle(AClient);
+end;
+
+procedure WriteByteToPipe(const APipe: THandle; const AValue: Byte);
+var
+  LValue: Byte;
+begin
+  LValue := AValue;
+  if FpWrite(APipe, LValue, 1) <> 1 then
+    RaiseLastErrno('Write to the pipe');
+end;
+
+function WaitForEvent(const AHandle: THandle; const ATimeoutMs: Cardinal): Boolean;
+var
+  LPoll: TPollFd;
+begin
+  LPoll.fd := AHandle;
+  LPoll.events := POLLIN;
+  LPoll.revents := 0;
+  Result := FpPoll(@LPoll, 1, Integer(ATimeoutMs)) = 1;
+end;
+
+function PageSize: NativeUInt;
+begin
+  // The library's own answer (AT_PAGESZ from the auxiliary vector)
+  Result := TIORingPlatform.PageSize;
+end;
+
+function OpenFileDescriptorCount: Integer;
+var
+  LSearch: TSearchRec;
+begin
+  Result := 0;
+  if FindFirst('/proc/self/fd/*', faAnyFile, LSearch) = 0 then
+  try
+    repeat
+      if (LSearch.Name <> '.') and (LSearch.Name <> '..') then
+        Inc(Result);
+    until FindNext(LSearch) <> 0;
+  finally
+    FindClose(LSearch);
+  end;
+end;
+{$ENDIF}
+
+{ TDelayedPipeWriter }
+
+constructor TDelayedPipeWriter.Create(const APipe: THandle; const ADelayMilliseconds: Cardinal; const AValue: Byte);
+begin
+  FPipe := APipe;
+  FDelayMilliseconds := ADelayMilliseconds;
+  FValue := AValue;
+  inherited Create(True);
+end;
+
+procedure TDelayedPipeWriter.Execute;
+begin
+  Sleep(FDelayMilliseconds);
+  WriteByteToPipe(FPipe, FValue);
 end;
 
 end.

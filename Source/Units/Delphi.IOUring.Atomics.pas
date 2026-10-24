@@ -29,8 +29,11 @@
 // split a 64-bit value into two 32-bit moves is the move a tiny assembler
 // routine. Neither compiler moves or caches reads and writes of shared
 // memory across them (the tests check this with optimization on, too).
-// Other CPUs (AArch64, Milestone 4) need real barriers here, so they are
-// refused until then.
+// AArch64 (Linux, Free Pascal) does not keep that order by itself: there
+// every operation gets real barriers (DMB). [VERIFY] Written for AArch64, not
+// yet run on it (Docs/Design.md §5.7).
+//
+// Sleeping and waking: WaitOnAddress on Windows, the futex on Linux.
 
 {$I Delphi.IOUring.inc}
 
@@ -38,7 +41,7 @@
 {$OVERFLOWCHECKS OFF}
 {$RANGECHECKS OFF}
 
-{$IFDEF FPC}
+{$IF defined(FPC) and (defined(CPUX86) or defined(CPUX64))}
   {$ASMMODE INTEL}
 {$ENDIF}
 
@@ -59,12 +62,15 @@
     // 64-bit store; checked.)
     {$DEFINE IORING_ATOMICS_ASM_STORE64}
   {$ENDIF}
+{$ELSEIF defined(CPUAARCH64) and defined(FPC)}
+  // The CPU may reorder reads and writes: barriers around the operations
+  {$DEFINE IORING_ATOMICS_AARCH64}
 {$ELSE}
-  {$MESSAGE ERROR 'Delphi.IOUring.Atomics supports only x86 and x64 for now (other CPUs need acquire/release barriers: Milestone 4)'}
+  {$MESSAGE ERROR 'Delphi.IOUring.Atomics supports x86, x64 and (Free Pascal) AArch64'}
 {$ENDIF}
 
-{$IFNDEF MSWINDOWS}
-  {$MESSAGE ERROR 'Delphi.IOUring.Atomics: wait/wake exists only for Windows for now (Linux futex: Milestone 4)'}
+{$IF not (defined(MSWINDOWS) or defined(LINUX))}
+  {$MESSAGE ERROR 'Delphi.IOUring.Atomics: wait/wake exists for Windows and Linux only'}
 {$ENDIF}
 
 interface
@@ -182,6 +188,12 @@ function IORingAllocCacheAligned(const ASize: NativeUInt; out AMemory: Pointer):
 
 implementation
 
+{$IFDEF LINUX}
+uses
+  BaseUnix,   // fpgeterrno, TTimeSpec
+  Linux;      // Futex
+{$ENDIF}
+
 {$IFDEF MSWINDOWS}
 const
   SYNCHRONIZATION_DLL = 'api-ms-win-core-synch-l1-2-0.dll';
@@ -202,7 +214,9 @@ procedure IORingWakeByAddressAll(AAddress: Pointer); stdcall; external SYNCHRONI
 class function TAtomic.CompareExchange(var ATarget: Integer; ANewValue, AComparand: Integer): Integer;
 begin
 {$IFDEF FPC}
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedCompareExchange(ATarget, ANewValue, AComparand);
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 {$ELSE}
   Result := AtomicCmpExchange(ATarget, ANewValue, AComparand);
 {$ENDIF}
@@ -233,7 +247,9 @@ end;
 class function TAtomic.CompareExchange(var ATarget: Int64; ANewValue, AComparand: Int64): Int64;
 begin
 {$IFDEF FPC}
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedCompareExchange64(ATarget, ANewValue, AComparand);
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 {$ELSE}
   Result := AtomicCmpExchange(ATarget, ANewValue, AComparand);
 {$ENDIF}
@@ -278,7 +294,9 @@ end;
 class function TAtomic.Exchange(var ATarget: Integer; AValue: Integer): Integer;
 begin
 {$IFDEF FPC}
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedExchange(ATarget, AValue);
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 {$ELSE}
   Result := AtomicExchange(ATarget, AValue);
 {$ENDIF}
@@ -308,7 +326,9 @@ end;
 {$ELSE}
 begin
 {$IFDEF FPC}
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedExchange64(ATarget, AValue);
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 {$ELSE}
   Result := AtomicExchange(ATarget, AValue);
 {$ENDIF}
@@ -328,7 +348,9 @@ end;
 class function TAtomic.FetchAdd(var ATarget: Integer; ADelta: Integer): Integer;
 begin
 {$IFDEF FPC}
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedExchangeAdd(ATarget, ADelta);
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 {$ELSE}
   Result := AtomicIncrement(ATarget, ADelta) - ADelta;
 {$ENDIF}
@@ -356,7 +378,9 @@ end;
 {$ELSE}
 begin
 {$IFDEF FPC}
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedExchangeAdd64(ATarget, ADelta);
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 {$ELSE}
   Result := AtomicIncrement(ATarget, ADelta) - ADelta;
 {$ENDIF}
@@ -408,14 +432,18 @@ begin
   Result := UInt64(Decrement(Int64(ATarget)));
 end;
 
+// AArch64: a barrier after the read keeps the later reads and writes after it
+// (on x86/x64 the CPU does that by itself)
 class function TAtomic.LoadAcquire(var ATarget: Integer): Integer;
 begin
   Result := ATarget;
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 end;
 
 class function TAtomic.LoadAcquire(var ATarget: Cardinal): Cardinal;
 begin
   Result := ATarget;
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 end;
 
 {$IFDEF IORING_ATOMICS_X86}
@@ -432,6 +460,7 @@ end;
 class function TAtomic.LoadAcquire(var ATarget: Int64): Int64;
 begin
   Result := ATarget;
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 end;
 {$ENDIF}
 
@@ -445,13 +474,17 @@ begin
   Result := Pointer(LoadAcquire(NativeInt(ATarget)));
 end;
 
+// AArch64: a barrier before the write keeps the earlier reads and writes
+// before it
 class procedure TAtomic.StoreRelease(var ATarget: Integer; AValue: Integer);
 begin
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   ATarget := AValue;
 end;
 
 class procedure TAtomic.StoreRelease(var ATarget: Cardinal; AValue: Cardinal);
 begin
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   ATarget := AValue;
 end;
 
@@ -471,6 +504,7 @@ end;
 {$ELSE}
 class procedure TAtomic.StoreRelease(var ATarget: Int64; AValue: Int64);
 begin
+  {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   ATarget := AValue;
 end;
 {$ENDIF}
@@ -485,7 +519,12 @@ begin
   StoreRelease(NativeInt(ATarget), NativeInt(AValue));
 end;
 
-{$IFDEF FPC}
+{$IF defined(IORING_ATOMICS_AARCH64)}
+class procedure TAtomic.FullBarrier;
+begin
+  ReadWriteBarrier;   // DMB ISH
+end;
+{$ELSEIF defined(FPC)}
 // Any LOCK-prefixed instruction is a full barrier on x86/x64 (and often
 // cheaper than MFENCE). FPC's ReadWriteBarrier does the same job, but on x64
 // it gives a "not inlined" note wherever it is used.
@@ -504,7 +543,13 @@ begin
 end;
 {$ENDIF}
 
-{$IFDEF FPC}
+{$IF defined(IORING_ATOMICS_AARCH64)}
+class procedure TAtomic.CpuPause;
+begin
+  // [VERIFY] A YIELD instruction would be the hint here; without it the spin
+  // loops only spin
+end;
+{$ELSEIF defined(FPC)}
 class procedure TAtomic.CpuPause;
 asm
   pause
@@ -530,6 +575,7 @@ begin
   end;
 end;
 
+{$IFDEF MSWINDOWS}
 class function TAtomic.WaitWhileEqual(var ATarget: Integer; AExpected: Integer;
   ATimeoutMilliseconds: Cardinal): Boolean;
 begin
@@ -552,6 +598,56 @@ class procedure TAtomic.WakeAll(var ATarget);
 begin
   IORingWakeByAddressAll(@ATarget);
 end;
+{$ENDIF}
+
+{$IFDEF LINUX}
+const
+  // linux/futex.h: the futex is used by this process only
+  FUTEX_PRIVATE_FLAG = 128;
+  FUTEX_WAIT_PRIVATE = FUTEX_WAIT or FUTEX_PRIVATE_FLAG;
+  FUTEX_WAKE_PRIVATE = FUTEX_WAKE or FUTEX_PRIVATE_FLAG;
+
+// FPC's Futex returns -1 and sets errno: ETIMEDOUT = timed out; EAGAIN = the
+// value differed already; EINTR = a signal (a spurious wake-up)
+function FutexWait(const AAddress: Pointer; const AExpected: Integer; const ATimeoutMilliseconds: Cardinal): Boolean;
+var
+  LTimeout: TTimeSpec;
+  LTimeoutPointer: PTimeSpec;
+begin
+  if ATimeoutMilliseconds = IORING_WAIT_INFINITE then
+    LTimeoutPointer := nil
+  else
+  begin
+    LTimeout.tv_sec := ATimeoutMilliseconds div 1000;
+    LTimeout.tv_nsec := (ATimeoutMilliseconds mod 1000) * 1000000;
+    LTimeoutPointer := @LTimeout;
+  end;
+  Result := (Futex(AAddress, FUTEX_WAIT_PRIVATE, AExpected, LTimeoutPointer) = 0) or
+    (fpgeterrno <> ESysETIMEDOUT);
+end;
+
+class function TAtomic.WaitWhileEqual(var ATarget: Integer; AExpected: Integer;
+  ATimeoutMilliseconds: Cardinal): Boolean;
+begin
+  Result := FutexWait(@ATarget, AExpected, ATimeoutMilliseconds);
+end;
+
+class function TAtomic.WaitWhileEqual(var ATarget: Cardinal; AExpected: Cardinal;
+  ATimeoutMilliseconds: Cardinal): Boolean;
+begin
+  Result := FutexWait(@ATarget, Integer(AExpected), ATimeoutMilliseconds);
+end;
+
+class procedure TAtomic.WakeOne(var ATarget);
+begin
+  Futex(@ATarget, FUTEX_WAKE_PRIVATE, 1, nil);
+end;
+
+class procedure TAtomic.WakeAll(var ATarget);
+begin
+  Futex(@ATarget, FUTEX_WAKE_PRIVATE, MaxInt, nil);
+end;
+{$ENDIF}
 
 function IORingAllocCacheAligned(const ASize: NativeUInt; out AMemory: Pointer): Pointer;
 var
