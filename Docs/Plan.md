@@ -315,13 +315,21 @@ Source/
   - [ ] Benchmarks on a real Linux machine (not WSL2), and AArch64.
 
   **Done 2026-10-24** – Linux: 230 tests pass in WSL2 (kernel 6.18; Ubuntu 24.04 and 26.04), with and without `-O3`. Windows: Delphi 245 tests (Win32 and Win64, Debug and Release), FPC 244 (Win32 and Win64, with and without `-O3`; also FPC trunk 3.3.1, Win64); `lazbuild` builds the test project; the benchmarks compile with Delphi and FPC, and the FPC ones also on Linux.
-- **Phase 22** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only. Proposal: Design §5.8 (facts measured in WSL2); waits for the decisions marked [DECIDE].
+- **Phase 22** – Linux extras: sockets, linked operations, SQPOLL – exposed through the API unit and capabilities only. Decided: Design §5.8, decision 21.
+  - [x] Measured first (WSL2): SQPOLL gives no gain for file I/O and costs much more CPU time; links and socket operations work through the ring.
+  - [x] `TLinuxIORing.PrepareSqe` (any io_uring operation, one completion per entry) and `LinkToNext` (linked operations), in the low-level ring.
+  - [x] SQPOLL and all other definitions stay in the API unit; an API test with a SQPOLL ring.
+  - [x] Shared capabilities for both systems: `SystemDescription`, `NotAvailableReason`, `NativeFeatures`, `NativeOps`, `Extras`, `ToString`; `IORingCapabilities` in `Delphi.IOUring`.
+  - [x] Tests: 11 Linux-only (`Tests.Linux.Extras`: sockets, links), the SQPOLL API test, a shared capabilities test.
+
+  **Done 2026-10-24** – Linux: 243 tests pass in WSL2 (Ubuntu 24.04 and 26.04), with and without `-O3`. Windows: Delphi 246 tests (Win32 and Win64, Debug and Release), FPC 245 (Win32 and Win64, with and without `-O3`; also FPC trunk 3.3.1, Win64); `lazbuild` builds the test project; the benchmarks compile with Delphi and FPC, and the FPC ones also on Linux.
 
 ---
 
 ## Immediate next step
 
-Phase 21 is done: the engine, the block reader and both streams run on Linux,
-and so do the four benchmarks (a first look in WSL2). Next: **Phase 22 – Linux
-extras** (sockets, linked operations, SQPOLL). The proposal is in Design §5.8,
-with the facts measured in WSL2; it waits for the decisions marked [DECIDE].
+Phase 22 is done, and with it Milestone 4: the whole library runs on Linux
+through Free Pascal, with the Linux extras in the low-level ring and
+capabilities that describe either system. Still open from Milestone 4:
+AArch64 (needs an ARM machine) and benchmarks on a real Linux machine (not
+WSL2). What comes next is not planned yet; the ideas are in Design §13.

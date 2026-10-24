@@ -77,8 +77,8 @@ type
   // ToString describes it all for logs and bug reports.
   TIORingCapabilities = record
     BackendName: string;              // e.g. 'Windows IoRing'; empty if not available
-    // Windows: the IoRing version (IORING_VERSION_*); Linux: the kernel
-    // version, major * 100 + minor (618 = 6.18)
+    // Windows: the IoRing version (IORING_VERSION_*: 1, 2, 300, 400); Linux:
+    // the kernel version, major * 100 + minor (618 = 6.18)
     NativeVersion: Cardinal;
     MaxSubmissionQueueSize: Cardinal;
     MaxCompletionQueueSize: Cardinal;
@@ -221,7 +221,11 @@ begin
   else
   begin
 {$IFDEF MSWINDOWS}
-    Result := Format('%s, version %d', [BackendName, NativeVersion]);
+    // ioringapi.h numbers the versions 1, 2, 300, 400
+    if NativeVersion >= 100 then
+      Result := Format('%s, version %d', [BackendName, NativeVersion div 100])
+    else
+      Result := Format('%s, version %d', [BackendName, NativeVersion]);
 {$ELSE}
     Result := Format('%s, kernel %d.%d', [BackendName, NativeVersion div 100, NativeVersion mod 100]);
 {$ENDIF}

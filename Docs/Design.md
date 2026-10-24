@@ -967,6 +967,10 @@ Windows, and the higher layers (reader, engine, streams) stay as they are.
   thread has gone to sleep (the wake-up flag).
 - Tests: 11 Linux-only tests (`Tests.Linux.Extras`), a SQPOLL test in the
   API tests, and a shared capabilities test (both systems).
+- Found on the way: `ioringapi.h` numbers the IoRing versions 1, 2, 300,
+  400, so `NativeVersion` is 400 for version 4; `ToString` says "version 4".
+  Windows reports 9 opcodes (0–8) and feature bits $2
+  (`IORING_FEATURE_SET_COMPLETION_EVENT`).
 
 ---
 

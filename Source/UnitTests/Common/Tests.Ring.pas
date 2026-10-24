@@ -176,6 +176,7 @@ begin
   AssertTrue('Text names the system', Pos(LCapabilities.SystemDescription, LText) > 0);
 {$IFDEF MSWINDOWS}
   AssertTrue('Windows', Pos('Windows ', LCapabilities.SystemDescription) = 1);
+  AssertTrue('Version 4 (IORING_VERSION_4 = 400)', Pos(BACKEND_NAME + ', version 4', LText) = 1);
   for LOpcode := IORING_OP_READ to IORING_OP_WRITE_GATHER do
     AssertTrue(Format('Native opcode %d', [LOpcode]), Byte(LOpcode) in LCapabilities.NativeOps);
   AssertTrue('No extras on Windows', LCapabilities.Extras = []);
