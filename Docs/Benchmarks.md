@@ -78,9 +78,12 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
 - **GitHub's runners (Phase 23; slow cloud disks):** the block reader reaches
   the disk's limit where plain reads do not – on Windows 3.6× `ReadFile`
   for random blocks, 7.5–12.6× for sorted ones. The write stream with work
-  finished 24–42 % sooner. **On ARM64 the lock-free structures sometimes
-  lose to a mutex** (0.87–0.90 for the queue under contention): planned
-  Phase 27.
+  finished 24–42 % sooner. On ARM64 the lock-free structures sometimes lost
+  to a mutex (0.87–0.90 for the queue under contention) – fixed in Phase 27.
+- **The atomics on ARM64 (Phase 27):** assembler routines and an `isb` spin
+  hint. With one thread the free list is 52 % faster, the queue 30 %; with
+  2–3 producers the queue is 7–9 times as fast as before, and lock-free now
+  beats the mutex everywhere on ARM64 (1.00–8.76×).
 - **Big `Read` calls (Phase 26):** the part of a call beyond what the
   stream's buffers have asked for is read straight into the caller's
   memory. With cached data, 64 MiB calls now get **96–101 % of
@@ -922,7 +925,32 @@ structure stays only where it beats the lock – holds on x86-64, not
 everywhere on ARM64. The likely cause: on AArch64 every atomic operation
 has full barriers (DMB) around it, and FPC 3.2.2 does not inline its
 `ReadWriteBarrier` there (the compiler says so 109 times), so every
-operation makes two calls. Planned: Phase 27.
+operation makes two calls. **Fixed in Phase 27** (next section).
+
+### The atomics on ARM64 (Phase 27)
+
+The Structures benchmark on the ARM64 runner (4 processors), 2026-10-25,
+built three ways and run in turns, two rounds (the hand-started "ARM64
+atomics" workflow; raw output:
+[2026-10-25-ci-arm64-atomics.txt](BenchmarkResults/2026-10-25-ci-arm64-atomics.txt)).
+Lock-free Mops/s, in brackets lock-free ÷ mutex:
+
+| | before | assembler, `yield` | assembler, `isb` (kept) |
+| --- | --- | --- | --- |
+| Free list, tight, 1 thread | 27.4 / 27.4 | 41.7 / 41.8 | 41.6 / 41.8 |
+| Free list, tight, 4 threads | 3.3 (0.47) / 6.2 (1.04) | 9.6 (1.66) / 8.3 (1.07) | 9.4 (1.75) / 21.6 (3.22) |
+| Free list, work 1 µs, 4 threads | 1.95 (1.00) / 1.32 (0.67) | 2.05 (1.06) / 2.22 (1.02) | 1.93 (1.02) / 2.25 (1.13) |
+| Queue, tight, 1 producer | 24.1 / 22.2 | 29.2 / 30.5 | 31.1 / 31.6 |
+| Queue, tight, 2 producers | 6.3 (1.24) / 4.4 (0.92) | 9.3 (1.59) / 8.9 (1.72) | 28.4 (6.67) / 32.8 (5.30) |
+| Queue, tight, 3 producers | 3.7 (1.09) / 3.2 (1.01) | 3.8 (1.08) / 3.9 (1.15) | 26.7 (8.53) / 32.5 (8.76) |
+| Queue, work 1 µs, 3 producers | 2.98 (1.74) / 2.91 (1.65) | 2.94 (1.82) / 2.98 (1.59) | 2.97 (1.68) / 2.98 (1.77) |
+
+- **One call and one barrier instead of three calls and two:** 52 % more
+  for the free list and 30 % for the queue with one thread.
+- **The spin hint matters most under contention:** `isb` makes the queue
+  with 2–3 producers 7–9 times as fast as before; `yield` hardly helps.
+- With work, all three are close – the structures are not the limit there –
+  but lock-free never loses any more.
 
 ## Big Read calls (Phase 26)
 

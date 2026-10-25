@@ -7,7 +7,7 @@
     Builds Delphi.IOUring.Benchmarks.Structures three times:
       rtl    the way before Phase 27 (FPC's Interlocked routines, a full barrier on each side, no CPU hint)
       yield  the assembler routines, CpuPause = YIELD
-      isb    the assembler routines, CpuPause = ISB
+      isb    the assembler routines, CpuPause = ISB (the default since Phase 27)
     and runs them in turns, -Rounds times. Each run's tables also become one annotation of the workflow run (readable
     without signing in), and all output goes to the job summary and to -OutputFolder.
 
@@ -35,8 +35,8 @@ $root = Split-Path (Split-Path $PSScriptRoot)
 $build = Join-Path $root 'Source/Build-FPC.ps1'
 $variants = [ordered]@{
     rtl   = @('IORING_ATOMICS_AARCH64_RTL')
-    yield = @()
-    isb   = @('IORING_ATOMICS_AARCH64_ISB')
+    yield = @('IORING_ATOMICS_AARCH64_YIELD')
+    isb   = @()
 }
 New-Item -ItemType Directory -Force $OutputFolder | Out-Null
 

@@ -3383,6 +3383,46 @@ turns (1), assembler routines for AArch64, each kept only if it wins (2),
 one code path for all CPUs unless lock-free still loses by more than 10 %
 with work (3).
 
+#### Implementation notes and results (Phase 27)
+
+- **The routines:** private assembler methods of `TAtomic`
+  (`A64CompareExchange32` …), called by the inline public methods, so each
+  operation is one call. Read-modify-write: `ldxr`, `stlxr`, `dmb ish` – the
+  compare-exchange always stores (the old value back when it does not
+  match, as FPC's own routine does), so a failed one orders like the others
+  and the rules for callers stay as they were. `LoadAcquire` = `ldar`,
+  `StoreRelease` = `stlr`, `FullBarrier` = `dmb ish`, `CpuPause` = `isb`.
+  FPC 3.2.2 accepted all of them (CI, 2026-10-25), and the tests pass on
+  ARM64, debug and `-O3`.
+- **For comparing:** `IORING_ATOMICS_AARCH64_RTL` builds the way before
+  Phase 27, `IORING_ATOMICS_AARCH64_YIELD` the `yield` spin hint;
+  `Build-FPC.ps1 -Define` passes them, and the ARM64 atomics workflow
+  measures all three in turns.
+- **Results** (ARM64 runner, 4 processors, run 40170491363; two rounds;
+  lock-free Mops/s, in brackets lock-free ÷ mutex; raw output:
+  [BenchmarkResults/2026-10-25-ci-arm64-atomics.txt](BenchmarkResults/2026-10-25-ci-arm64-atomics.txt)):
+
+| | before (`rtl`) | assembler, `yield` | assembler, `isb` |
+| --- | --- | --- | --- |
+| Free list, tight, 1 thread | 27.4 / 27.4 | 41.7 / 41.8 | 41.6 / 41.8 |
+| Free list, tight, 4 threads | 3.3 (0.47) / 6.2 (1.04) | 9.6 (1.66) / 8.3 (1.07) | 9.4 (1.75) / 21.6 (3.22) |
+| Free list, work, 4 threads | 1.95 (1.00) / 1.32 (0.67) | 2.05 (1.06) / 2.22 (1.02) | 1.93 (1.02) / 2.25 (1.13) |
+| Queue, tight, 1 producer | 24.1 / 22.2 | 29.2 / 30.5 | 31.1 / 31.6 |
+| Queue, tight, 2 producers | 6.3 (1.24) / 4.4 (0.92) | 9.3 (1.59) / 8.9 (1.72) | 28.4 (6.67) / 32.8 (5.30) |
+| Queue, tight, 3 producers | 3.7 (1.09) / 3.2 (1.01) | 3.8 (1.08) / 3.9 (1.15) | 26.7 (8.53) / 32.5 (8.76) |
+| Queue, work, 3 producers | 2.98 (1.74) / 2.91 (1.65) | 2.94 (1.82) / 2.98 (1.59) | 2.97 (1.68) / 2.98 (1.77) |
+
+- **[VERIFIED] The assembler routines** alone: +52 % for the free list and
+  +30 % for the queue with one thread (one call and one barrier instead of
+  three calls and two).
+- **[VERIFIED] `isb` is what helps under contention:** with 2–3 producers
+  the queue gets 7–9 times the speed of before; `yield` hardly helps (as
+  other runtimes found on ARM cores). So `CpuPause` is `isb`.
+- **[VERIFIED] Lock-free now beats the mutex everywhere on ARM64** (with
+  work, 1.00–1.77). Decision 3 is not needed: one code path for all CPUs.
+- Noise: the runner's numbers jump between rounds (free list, tight, 4
+  threads: 9.4 and 21.6), so only differences seen in both rounds count.
+
 ---
 
 ## 13. Ideas parked for later

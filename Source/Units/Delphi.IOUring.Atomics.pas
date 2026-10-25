@@ -68,7 +68,7 @@
   {
     Small assembler routines (Docs/Design.md §12.9). IORING_ATOMICS_AARCH64_RTL keeps the way before Phase 27 – FPC's
     Interlocked routines with a full barrier on each side – for comparing them in the benchmark.
-    IORING_ATOMICS_AARCH64_ISB: CpuPause is an ISB instead of a YIELD.
+    IORING_ATOMICS_AARCH64_YIELD: CpuPause is a YIELD instead of an ISB (measured slower under contention).
   }
   {$IFNDEF IORING_ATOMICS_AARCH64_RTL}
     {$DEFINE IORING_ATOMICS_AARCH64_ASM}
@@ -713,14 +713,14 @@ end;
 {$ENDIF}
 
 {$IF defined(IORING_ATOMICS_AARCH64_ASM)}
-{ YIELD is the hint for a spinning thread; on many ARM cores it does almost nothing, so some runtimes use ISB (a short
-  real wait) instead. Both are measured (Docs/Design.md §12.9). }
+{ ISB: a short real wait. YIELD is the architecture's hint for a spinning thread, but on GitHub's ARM64 runner it did
+  almost nothing: with 2-3 producers the queue was 3-4 times faster with ISB (Docs/Design.md §12.9). }
 class procedure TAtomic.CpuPause; assembler; nostackframe;
 asm
-{$IFDEF IORING_ATOMICS_AARCH64_ISB}
-  isb
-{$ELSE}
+{$IFDEF IORING_ATOMICS_AARCH64_YIELD}
   yield
+{$ELSE}
+  isb
 {$ENDIF}
 end;
 {$ELSEIF defined(IORING_ATOMICS_AARCH64)}

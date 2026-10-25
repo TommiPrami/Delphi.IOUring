@@ -375,8 +375,10 @@ Only what a benchmark has already shown:
 - **Phase 27** – The atomics on AArch64: on GitHub's ARM64 runner the lock-free structures sometimes lose to a mutex (queue with 2–3 producers in a tight loop 0.87–0.90; free list with 4 threads and work 0.88), while on x86-64 they always win. Every atomic operation there has full barriers around it, and FPC 3.2.2 does not inline its `ReadWriteBarrier` on AArch64. Measure inline barriers and lighter ordering (acquire/release instructions); keep the lock-free structures only where they win (Design §10.5). Decided: Design §12.9 – measure in a hand-started ARM64 workflow; assembler routines, each kept only if it wins; one code path for all CPUs.
   - [x] `Delphi.IOUring.Atomics` on AArch64: small assembler routines – compare-exchange, exchange and fetch-add as `ldxr`/`stlxr` loops with one `dmb ish` after them; `LoadAcquire` = `ldar`, `StoreRelease` = `stlr`; `CpuPause` = `yield` (`IORING_ATOMICS_AARCH64_ISB`: `isb`). `IORING_ATOMICS_AARCH64_RTL` keeps the way before, for comparing.
   - [x] `.github/workflows/arm64-atomics.yml` (started by hand) and `.github/scripts/Measure-Atomics.ps1`: tests, then the Structures benchmark as `rtl`, `yield` and `isb`, in turns; tables as annotations and in the job summary. `Build-FPC.ps1 -Define`.
-  - [ ] First run on the ARM64 runner: does FPC 3.2.2 accept the instructions; do the tests pass; the numbers.
-  - [ ] Keep what wins (decision 2); with the numbers, decision 3 if lock-free still loses.
+  - [x] First run on the ARM64 runner (2026-10-25): FPC 3.2.2 accepts the instructions; the tests pass (debug and `-O3`); Structures benchmark in Design §12.9.
+  - [x] Kept: the assembler routines (+52 % free list, +30 % queue with one thread) with `CpuPause` = `isb` (queue with 2–3 producers 7–9× faster than before; `yield` hardly helps). Lock-free now beats the mutex everywhere on ARM64: decision 3 not needed.
+
+  **Done 2026-10-25** – ARM64: lock-free 1.00–8.76× the mutex (before: down to 0.67). x86 unchanged: Delphi 252 tests (Win32, Win64), FPC 251 (Win64), Linux 249 (WSL2).
 
 Small things, any time: run the Windows benchmarks once more (the shared
 benchmark code changed in Phase 21); close the last open question (Design
@@ -387,8 +389,8 @@ of git (they are ignored now, but still tracked).
 
 ## Immediate next step
 
-Phase 26 is done: big `Read` calls read straight into the caller's memory
-(warm big calls 8–24 % faster; Design §12.8). Next is **Phase 27** (the
-atomics on AArch64): first a proposal with the decisions marked [DECIDE] –
-among them where to measure, since this machine is x86-64 and the
-benchmarks do not run in CI.
+Milestone 6 is done: big `Read` calls read straight into the caller's
+memory (Phase 26, Design §12.8), and the atomics on AArch64 are assembler
+routines with an `isb` spin hint – lock-free now beats the mutex everywhere
+on ARM64 (Phase 27, Design §12.9). Next: a proposal for what comes after
+Milestone 6 (and the small things listed above).
