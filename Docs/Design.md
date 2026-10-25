@@ -7,19 +7,14 @@
 `….Backend.Posix`) and so on – §12.10. The notes of earlier phases use the
 new names, except the review of §12.10.)
 
-Status: **Draft v1.3** (2026-10-23) – Milestones 1, 2 and 3 complete: Delphi 13 and
-Free Pascal 3.2.2 on Windows, Win32 and Win64 (§12.1). Milestone 1 (Phases 1–5):
-complete Windows API unit, core ring (implementation notes in §5.2),
-sequential reader (notes in §7), read-only stream (notes in §8.1),
-benchmarks ([Benchmarks.md](Benchmarks.md)). Milestone 3: the
-atomics unit (Phase 10, notes in §10.6), the request pool (Phase 11, notes
-in §10.7), the request queue (Phase 12, notes in §10.8), the engine with one
-I/O thread (Phase 13, notes in §10.9), the block reader (Phase 14, notes in
-§10.10), several I/O threads (Phase 15, measurements in §10.11, notes in
-§10.12), the overlap rule (Phase 16, decisions in §11, notes in §10.13) and
-the write stream (Phase 17, §8.2) – Milestone 3 is complete. Milestone 4
-(Linux through Free Pascal) has started: the Linux API unit (Phase 18, notes
-in §6.4). Things marked
+Status: **version 0.1.0** (tagged 2026-10-25) – Milestones 1–7 complete
+(Phases 1–28, [Plan.md](Plan.md)): Delphi 13 and Free Pascal 3.2.2 on
+Windows (Win32, Win64), Free Pascal on Linux (x86-64, AArch64). Where the
+notes are: the Windows API unit and the core ring (§5.2, §6), the sequential
+reader and the streams (§7, §8), the engine, its structures and the block
+reader (§10, §11), Linux (§5.7, §5.8, §6.4, §10.14), compilers, CI,
+packages, demos and the later phases (§12), measurements in
+[Benchmarks.md](Benchmarks.md). Things marked
 **[DECIDE]**
 need an answer from the project owner; things marked **[VERIFY]** must be
 proven by a spike or unit test before building on them, and become
@@ -3617,8 +3612,8 @@ the small things (6).
   - Folders: the Delphi test and benchmark projects in `Delphi/` (next to
     `FPC/` and `Linux/`), the package in `Packages/Lazarus` at the root.
   - The text of this design uses the new names everywhere except in the
-    review above. Left: the GitHub repository's new name and the tag 0.1.0
-    (both by the owner).
+    review above. The owner renamed the GitHub repository and the local
+    folder.
 - **No "local global variables"** (a new rule in CodingStyle.md): nested
   routines come before the routine's `var` section and get what they need
   as parameters. Six places did otherwise, five of them changing the
@@ -3626,6 +3621,9 @@ the small things (6).
   path). `CheckAvailability` on Linux needed no nested function at all: the
   probe loop fills the set of the kernel's opcodes, and the checks look
   there.
+- **Done (2026-10-25):** CI green on the renamed repository (Windows, Linux
+  x64, Linux ARM64), and the owner tagged **0.1.0** on commit `766b35c`.
+  Not run: the clock comparison on the ARM64 runner (optional).
 
 ---
 

@@ -367,7 +367,7 @@ Only what a benchmark has already shown:
 
   **Done 2026-10-25** – ARM64: lock-free 1.00–8.76× the mutex (before: down to 0.67). x86 unchanged: Delphi 252 tests (Win32, Win64), FPC 251 (Win64), Linux 249 (WSL2).
 
-## Milestone 7 – proposal (2026-10-25)
+## Milestone 7 – Tidy up and the first version, 0.1.0 (2026-10-25)
 
 Everything planned so far is built, tested on three systems and measured.
 What comes next depends most on how the library will be used, so this
@@ -437,13 +437,17 @@ choice.
   - [x] The library's new name (1), after asking (2026-10-25): Delphi.IOUring → **Pascal.IOUring** (projects, the Lazarus package `PascalIOUring`, the test and benchmark folders, the layout generator `Generate-LinuxApiLayout.sh`).
   - [x] The owner's naming scheme for units and files (CodingStyle.md, "Units and files"): prefix `PIR` + kind + what it holds – `PIRUnit.IORing`, `PIRUnit.Types`, `PIRUnit.Engine` …; `PIRUnit.<System>.API` / `.Ring` / `.Platform` instead of `Backend.…`; tests `PIRUnit.<Tested>.Tests`, helpers `PIRUnit.Test.…`, benchmarks `PIRUnit.Benchmark.…`; `PIRInclude.Compiler.inc`. The Delphi test and benchmark projects moved to `Delphi/` folders, the package to `Packages/Lazarus`. Files moved with `git mv`.
   - [x] No "local global variables" (new CodingStyle rule): the six nested routines that saw their caller's variables now get parameters.
-  - [ ] The GitHub repository renamed to Pascal.IOUring (by the owner), then the tag 0.1.0 (by the owner).
+  - [x] The GitHub repository renamed to Pascal.IOUring, and the local folder (by the owner); CI green on the renamed repository (Windows, Linux x64, Linux ARM64, two runs).
+  - [x] Tag **0.1.0** (by the owner, 2026-10-25), on commit `766b35c`.
+
+  **Done 2026-10-25** – Tagged 0.1.0. Tests: Delphi 252 (Win32 and Win64, Debug and Release), FPC 251 (Win32 and Win64, with and without `-O3`; trunk on Win64), Linux 249 (WSL2, debug and `-O3`); CI green on all three runners. Not run: the clock comparison on the ARM64 runner (optional, `benchmark: clock`).
 
 ---
 
 ## Immediate next step
 
-Phase 28 (Milestone 7) is built and tested, and the library is now called
-Pascal.IOUring. Left for the owner: rename the GitHub repository to
-Pascal.IOUring and tag 0.1.0. After that the library goes into a real
-program (decided d.).
+Phase 28 is done and the first version, **0.1.0**, is tagged. Next, as
+decided for Milestone 7 (d.): the library goes into a real program of the
+owner's, to see whether the API fits or needs more. What that program needs
+decides the next phase. Later, and only when needed: Linux sockets (the plan
+in Design §13).
