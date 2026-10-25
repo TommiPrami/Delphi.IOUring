@@ -3312,6 +3312,75 @@ directly.
 open point – why cold 64 MiB calls on Windows are about 2 % slower – is not
 explained (§13).
 
+### 12.9 The atomics on AArch64 (Phase 27)
+
+On GitHub's ARM64 runner the lock-free structures sometimes lose to a mutex
+(Benchmarks.md, "GitHub's runners"): the queue with 2–3 producers in a tight
+loop gets 0.87–0.90 of the mutex queue, the free list with 4 threads and
+work 0.88. On x86-64 they always win.
+
+**Facts found before Phase 27** (`Delphi.IOUring.Atomics` and the FPC
+3.2.2 sources, 2026-10-25):
+
+- FPC 3.2.2's `InterlockedCompareExchange`, `InterlockedExchange` and
+  `InterlockedExchangeAdd` on AArch64 are `ldxr`/`stxr` loops **without any
+  ordering**. So `TAtomic` puts `ReadWriteBarrier` (`dmb ish`, a full
+  barrier) before and after each of them – and FPC 3.2.2 does not inline
+  `ReadWriteBarrier` there. **One compare-exchange is three calls and two
+  full barriers.**
+- `LoadAcquire` is a load and a call to a full barrier; `StoreRelease` a
+  call to a full barrier and a store. AArch64 has single instructions for
+  both, weaker and cheaper: `ldar` (load-acquire) and `stlr`
+  (store-release).
+- **`CpuPause` is empty on AArch64** (marked [VERIFY] in the code): the
+  back-off after a lost race spins without any hint to the CPU. On x86 it is
+  `pause`. AArch64 has `yield`; some runtimes use `isb` instead, because
+  `yield` does almost nothing on many ARM cores.
+- FPC's trunk has single-instruction atomics (LSE, ARMv8.1: `casal`,
+  `swpal`, `ldaddal`, under `CPUAARCH64_HAS_LSE`) and a `yield` intrinsic;
+  FPC 3.2.2 – the version in CI – has neither. Whether its assembler accepts
+  the LSE instructions is not known [VERIFY].
+- The only AArch64 machine at hand is GitHub's ARM64 runner. The CI no
+  longer runs benchmarks (§12.6, Phase 24).
+
+**Phase 27 proposal:**
+
+- **[DECIDE] 1. Where and how to measure.** Proposed: a second workflow,
+  started only by hand (`.github/workflows/arm64-atomics.yml`,
+  `workflow_dispatch`), on the ARM64 runner: the tests (debug and `-O3`),
+  then the Structures benchmark built twice – the atomics as they are now and
+  the new ones (a define picks them) – run in turns, as in Phase 26. The
+  summary also goes out as annotations of the run, so it can be read without
+  signing in; the full output as an artifact. The CI on every push stays
+  without benchmarks. Other choice: an input of the existing CI workflow
+  (removed in Phase 24).
+- **[DECIDE] 2. What to build.** Proposed: small assembler routines for
+  AArch64 (Free Pascal only) in `Delphi.IOUring.Atomics`, with the same
+  rules for callers as now (§10.6):
+  - compare-exchange, exchange and fetch-add: one routine each – an
+    `ldxr`/`stlxr` loop and one `dmb ish` after it (the fully ordered
+    pattern of the Linux kernel): one call and one barrier instead of three
+    calls and two;
+  - `LoadAcquire` an `ldar`, `StoreRelease` an `stlr`;
+  - `CpuPause` a `yield` – and `isb` measured as a second choice.
+
+  Kept only where the benchmark shows a gain and the tests pass on ARM64.
+  Other choice: LSE instructions (`casal` …) as well, picked at run time
+  when the CPU has them (Linux `getauxval(AT_HWCAP)`) – more code; proposed
+  only as a later step if the ARM64 numbers still lose.
+- **[DECIDE] 3. If lock-free still loses on ARM64 after that.** The rule of
+  §10.5 is "a lock-free structure stays only where it beats the lock".
+  Proposed: one code path for all CPUs – no mutex just for AArch64 – unless
+  it still loses by more than 10 % in the scenarios with work (the ones like
+  real use); then a separate decision with the numbers. Other choice: switch
+  to a mutex on AArch64 wherever it wins.
+
+**Phase 27 decisions (decided 2026-10-25):** all three as proposed – a
+hand-started ARM64 workflow that measures the old and the new atomics in
+turns (1), assembler routines for AArch64, each kept only if it wins (2),
+one code path for all CPUs unless lock-free still loses by more than 10 %
+with work (3).
+
 ---
 
 ## 13. Ideas parked for later

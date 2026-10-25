@@ -372,7 +372,7 @@ Only what a benchmark has already shown:
   - [x] README (the stream section) and Benchmarks.md ("Big Read calls") describe it.
 
   **Done 2026-10-24** – Tests: Delphi 252 (Win32 and Win64, Debug and Release), FPC 251 (Win32 and Win64, with and without `-O3`), Linux 249 (WSL2, with and without `-O3`); the demos run on Win64 and Linux; the benchmarks and the Lazarus package compile. The Linux clock stays as it is (measured: less than 0.1 %).
-- **Phase 27** – The atomics on AArch64: on GitHub's ARM64 runner the lock-free structures sometimes lose to a mutex (queue with 2–3 producers in a tight loop 0.87–0.90; free list with 4 threads and work 0.88), while on x86-64 they always win. Every atomic operation there has full barriers around it, and FPC 3.2.2 does not inline its `ReadWriteBarrier` on AArch64. Measure inline barriers and lighter ordering (acquire/release instructions); keep the lock-free structures only where they win (Design §10.5).
+- **Phase 27** – The atomics on AArch64: on GitHub's ARM64 runner the lock-free structures sometimes lose to a mutex (queue with 2–3 producers in a tight loop 0.87–0.90; free list with 4 threads and work 0.88), while on x86-64 they always win. Every atomic operation there has full barriers around it, and FPC 3.2.2 does not inline its `ReadWriteBarrier` on AArch64. Measure inline barriers and lighter ordering (acquire/release instructions); keep the lock-free structures only where they win (Design §10.5). Proposal: Design §12.9 (facts from the code and the FPC 3.2.2 sources); waits for the decisions marked [DECIDE].
 
 Small things, any time: run the Windows benchmarks once more (the shared
 benchmark code changed in Phase 21); close the last open question (Design
