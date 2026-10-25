@@ -26,7 +26,7 @@ uses
 {$ELSE}
   System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Engine, Delphi.IOUring.BlockReader, Demo.Common in '..\Common\Demo.Common.pas';
+  Pascal.IOUring, Pascal.IOUring.Engine, Pascal.IOUring.BlockReader, Demo.Common in '..\Common\Demo.Common.pas';
 
 const
   BLOCK_SIZE = 4096;

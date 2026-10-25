@@ -78,18 +78,18 @@ __recovery/
 # Castalia statistics file (since XE7 Castalia is distributed with Delphi)
 *.stat
 
-# Delphi.IOUring: test project build output and generated resource file
+# Pascal.IOUring: test project build output and generated resource file
 Source/UnitTests/Win32/
 Source/UnitTests/Win64/
 Source/UnitTests/*.res
 
-# Delphi.IOUring: benchmark build output, generated resource file and results
+# Pascal.IOUring: benchmark build output, generated resource file and results
 Source/Benchmarks/Win32/
 Source/Benchmarks/Win64/
 Source/Benchmarks/*.res
 Source/Benchmarks/*.csv
 
-# Delphi.IOUring: Free Pascal / Lazarus build output and session files
+# Pascal.IOUring: Free Pascal / Lazarus build output and session files
 Source/UnitTests/FPC/Win32/
 Source/UnitTests/FPC/Win64/
 Source/UnitTests/FPC/Linux64/

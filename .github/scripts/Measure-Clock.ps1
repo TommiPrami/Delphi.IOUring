@@ -4,7 +4,7 @@
     each clock, run in turns, warm cache only.
 
 .DESCRIPTION
-    Builds Delphi.IOUring.Benchmarks.Blocks twice:
+    Builds Pascal.IOUring.Benchmarks.Blocks twice:
       syscall  FPC's clock_gettime, a system call (the default)
       libc     the C library's clock_gettime, through the vDSO (IORING_CLOCK_LIBC)
     and runs them in turns, -Rounds times, on a 1 GiB file whose blocks are in the cache. Each run's tables also become
@@ -48,7 +48,7 @@ foreach ($name in $variants.Keys) {
         Write-Host "::error title=Clock benchmark::The $name variant did not build"
         exit 1
     }
-    $program = Get-ChildItem (Join-Path $root 'Source/Benchmarks/FPC') -Recurse -File -Filter 'Delphi.IOUring.Benchmarks.Blocks.FPC' |
+    $program = Get-ChildItem (Join-Path $root 'Source/Benchmarks/FPC') -Recurse -File -Filter 'Pascal.IOUring.Benchmarks.Blocks.FPC' |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
     Copy-Item $program.FullName (Join-Path $OutputFolder "blocks-$name")
     & chmod +x (Join-Path $OutputFolder "blocks-$name")

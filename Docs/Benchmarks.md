@@ -1,6 +1,6 @@
-﻿# Delphi.IOUring – Benchmarks
+﻿# Pascal.IOUring – Benchmarks
 
-Measured 2026-10-22 (Plan, Phase 5) with `Source/Benchmarks/Delphi.IOUring.Benchmarks`,
+Measured 2026-10-22 (Plan, Phase 5) with `Source/Benchmarks/Pascal.IOUring.Benchmarks`,
 Release builds, Delphi 13. Raw data (every single run): [BenchmarkResults/](BenchmarkResults/).
 The engine's data structures (Phase 11 and later) have a benchmark of their
 own: [Engine structures](#engine-structures-phase-11), and so has the engine
@@ -295,7 +295,7 @@ Two things learned on the way:
 
 ## Engine structures (Phase 11)
 
-The free list (Phase 11) and the request queue (Phase 12). Measured 2026-10-22 with `Source/Benchmarks/Delphi.IOUring.Benchmarks.Structures`
+The free list (Phase 11) and the request queue (Phase 12). Measured 2026-10-22 with `Source/Benchmarks/Pascal.IOUring.Benchmarks.Structures`
 (Delphi, Release) and its Free Pascal build (`Build-FPC.ps1 -Project Structures`,
 `-O3`), on an Intel Core i7-14700: 8 performance cores with 2 threads each and
 12 efficiency cores, 28 logical processors. Raw data:
@@ -442,8 +442,8 @@ Why the difference is so big:
 Many small reads at offsets that are known before reading starts – as a
 program does that reads records found through an index. This is the first
 benchmark of the engine (`TIORingEngine`), through the block reader
-(`TIORingBlockReader`). Program: `Delphi.IOUring.Benchmarks.Blocks` (Delphi)
-and `Delphi.IOUring.Benchmarks.Blocks.FPC` (Free Pascal). Measured
+(`TIORingBlockReader`). Program: `Pascal.IOUring.Benchmarks.Blocks` (Delphi)
+and `Pascal.IOUring.Benchmarks.Blocks.FPC` (Free Pascal). Measured
 2026-10-23, same machine. Raw data:
 [2026-10-23-blocks.csv](BenchmarkResults/2026-10-23-blocks.csv).
 
@@ -1085,8 +1085,8 @@ Before = the Win64 numbers in the sections above.
 ## How to run
 
 ```
-Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.exe --sizes 1,10 --runs 3 --csv results.csv
-Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.exe --tune --sizes 10 --runs 3
+Source\Benchmarks\Win64\Release\Pascal.IOUring.Benchmarks.exe --sizes 1,10 --runs 3 --csv results.csv
+Source\Benchmarks\Win64\Release\Pascal.IOUring.Benchmarks.exe --tune --sizes 10 --runs 3
 ```
 
 Free Pascal (`-Platform Win32` or `Win64`):
@@ -1095,7 +1095,7 @@ Free Pascal (`-Platform Win32` or `Win64`):
 Source\Build-FPC.ps1 -Project Benchmarks -Platform Win64 -Run -RunArguments '--sizes','1,10','--runs','3'
 ```
 
-Options: `--dir` (where the test files go; default `%TEMP%\Delphi.IOUring.Bench`),
+Options: `--dir` (where the test files go; default `%TEMP%\Pascal.IOUring.Bench`),
 `--sizes` (GiB, comma separated), `--runs`, `--work-us` (CPU work per MiB in the
 work scenario, default 200), `--threads` (default 4), `--csv`, `--tune`,
 `--keep` (keep the test files). The 10 GiB set takes about 10 minutes per
@@ -1106,7 +1106,7 @@ Engine structures (free list about 30 s, queue about 5 min per build; options
 `--only freelist|queue`, `--runs`, `--threads`, `--csv`):
 
 ```
-Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Structures.exe --runs 3 --csv structures.csv
+Source\Benchmarks\Win64\Release\Pascal.IOUring.Benchmarks.Structures.exe --runs 3 --csv structures.csv
 Source\Build-FPC.ps1 -Project Structures -Platform Win64 -Run
 ```
 
@@ -1116,7 +1116,7 @@ Blocks known in advance (about 1.5 minutes per build; options `--dir`,
 than once), `--keep`):
 
 ```
-Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Blocks.exe --runs 3 --csv blocks.csv
+Source\Benchmarks\Win64\Release\Pascal.IOUring.Benchmarks.Blocks.exe --runs 3 --csv blocks.csv
 Source\Build-FPC.ps1 -Project Blocks -Platform Win64 -Run
 ```
 
@@ -1125,14 +1125,14 @@ Writing a file (options `--dir`, `--sizes` (GiB, default 1,10), `--runs`,
 largest size):
 
 ```
-Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Writes.exe --sizes 1,10 --runs 3 --csv writes.csv
+Source\Benchmarks\Win64\Release\Pascal.IOUring.Benchmarks.Writes.exe --sizes 1,10 --runs 3 --csv writes.csv
 Source\Build-FPC.ps1 -Project Writes -Platform Win64 -Run
 ```
 
 Linux: the same four Free Pascal programs with `-Platform Linux64`; they are
 built and run in WSL (`-Distribution Ubuntu-26.04` picks a distribution, the
 default is WSL's default one). The test files go to
-`/tmp/Delphi.IOUring.Bench`. The whole set (reader 1 and 10 GiB, blocks,
+`/tmp/Pascal.IOUring.Bench`. The whole set (reader 1 and 10 GiB, blocks,
 writes 1 and 10 GiB, structures) took about 10 minutes in WSL2.
 
 ```

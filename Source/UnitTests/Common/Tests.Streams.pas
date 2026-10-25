@@ -1,12 +1,12 @@
 ﻿unit Tests.Streams;
 
 {
-  Tests for TSequentialReadOnlyFileStream (Delphi.IOUring.Streams): same
+  Tests for TSequentialReadOnlyFileStream (Pascal.IOUring.Streams): same
   content as TFileStream, the seek and write rules, and use through the
   usual RTL helpers (CopyFrom, LoadFromStream, TStreamReader).
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -76,7 +76,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.SequentialReader, Delphi.IOUring.Streams, TestFileHelpers;
+  Pascal.IOUring, Pascal.IOUring.SequentialReader, Pascal.IOUring.Streams, TestFileHelpers;
 
 const
   SMALL_BUFFER = 64 * 1024;

@@ -26,7 +26,7 @@ uses
 {$ELSE}
   System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring.SequentialReader, Demo.Common in '..\Common\Demo.Common.pas';
+  Pascal.IOUring.SequentialReader, Demo.Common in '..\Common\Demo.Common.pas';
 
 type
   TAdler32 = record

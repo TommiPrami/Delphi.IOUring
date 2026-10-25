@@ -4,7 +4,7 @@
     run in turns.
 
 .DESCRIPTION
-    Builds Delphi.IOUring.Benchmarks.Structures three times:
+    Builds Pascal.IOUring.Benchmarks.Structures three times:
       rtl    the way before Phase 27 (FPC's Interlocked routines, a full barrier on each side, no CPU hint)
       yield  the assembler routines, CpuPause = YIELD
       isb    the assembler routines, CpuPause = ISB (the default since Phase 27)
@@ -47,7 +47,7 @@ foreach ($name in $variants.Keys) {
         Write-Host "::error title=Atomics benchmark::The $name variant did not build"
         exit 1
     }
-    $program = Get-ChildItem (Join-Path $root 'Source/Benchmarks/FPC') -Recurse -File -Filter 'Delphi.IOUring.Benchmarks.Structures.FPC' |
+    $program = Get-ChildItem (Join-Path $root 'Source/Benchmarks/FPC') -Recurse -File -Filter 'Pascal.IOUring.Benchmarks.Structures.FPC' |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
     Copy-Item $program.FullName (Join-Path $OutputFolder "structures-$name")
     & chmod +x (Join-Path $OutputFolder "structures-$name")

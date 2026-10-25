@@ -28,7 +28,7 @@ uses
 {$ELSE}
   System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring.Streams, Demo.Common in '..\Common\Demo.Common.pas';
+  Pascal.IOUring.Streams, Demo.Common in '..\Common\Demo.Common.pas';
 
 procedure CopyWithStreams(const ASource, ATarget: string);
 var

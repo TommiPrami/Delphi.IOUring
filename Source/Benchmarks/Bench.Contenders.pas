@@ -33,7 +33,7 @@ type
 implementation
 
 uses
-  Winapi.Windows, System.SysUtils, System.Classes, Delphi.IOUring.SequentialReader, Bench.Readers;
+  Winapi.Windows, System.SysUtils, System.Classes, Pascal.IOUring.SequentialReader, Bench.Readers;
 
 { Classic RTL streams }
 

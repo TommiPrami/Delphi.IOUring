@@ -10,7 +10,7 @@
   Delphi and the Free Pascal tests.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -127,19 +127,19 @@ uses
   BaseUnix,
   Unix,       // fpReadLink
   Sockets,    // fpsocketpair
-  Delphi.IOUring,
+  Pascal.IOUring,
   {$ENDIF}
   SysUtils,
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring.Backend.Custom, TestFileHelpers;
+  Pascal.IOUring.Types, TestFileHelpers;
 
 {$IFDEF UNIX}
 const
   O_CLOEXEC_FLAG = &02000000;
   { ARM64's own fcntl.h value; FPC 3.2.2's BaseUnix.O_DIRECT is the x86 one (O_DIRECTORY on ARM64). As in
-    Delphi.IOUring.Backend.Posix. }
+    Pascal.IOUring.Backend.Linux. }
 {$IF defined(CPUAARCH64)}
   O_DIRECT_FLAG = &0200000;
 {$ELSE}
@@ -276,7 +276,7 @@ var
   LName: string;
 begin
   CreateGUID(LGuid);
-  LName := '\\.\pipe\Delphi.IOUring.Tests.' + GUIDToString(LGuid);
+  LName := '\\.\pipe\Pascal.IOUring.Tests.' + GUIDToString(LGuid);
 
   AServer := CreateNamedPipe(PChar(LName), PIPE_ACCESS_DUPLEX or FILE_FLAG_OVERLAPPED,
     PIPE_TYPE_BYTE or PIPE_READMODE_BYTE or PIPE_WAIT, 1, 4096, 4096, 0, nil);

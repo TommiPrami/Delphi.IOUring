@@ -1,7 +1,7 @@
 ﻿unit Tests.Backend.Windows.API;
 
 {
-  Calls the real Windows IoRing API through Delphi.IOUring.Backend.Windows.API.
+  Calls the real Windows IoRing API through Pascal.IOUring.Backend.Windows.API.
 
   Besides checking the translation, several tests answer the [VERIFY]
   questions of Docs/Design.md. Their findings are written to the test log
@@ -11,7 +11,7 @@
   Requires Windows with IoRing version 4 (Windows 11 24H2 or newer).
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -21,7 +21,7 @@ uses
 {$ELSE}
   Winapi.Windows,
 {$ENDIF}
-  Delphi.IOUring.Backend.Windows.API, TestPlatformHelpers, Tests.Support;
+  Pascal.IOUring.Backend.Windows.API, TestPlatformHelpers, Tests.Support;
 
 type
   TCompletionArray = array of IORING_CQE;

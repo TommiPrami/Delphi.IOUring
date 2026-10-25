@@ -1,7 +1,7 @@
 ﻿unit Tests.RequestQueue;
 
 {
-  Tests for TIORingRequestQueue (Delphi.IOUring.RequestQueue): order, full
+  Tests for TIORingRequestQueue (Pascal.IOUring.RequestQueue): order, full
   and empty, the capacity, many laps around the array, and the wrap-around of
   the position counters (started just before the end of the NativeUInt
   range).
@@ -12,7 +12,7 @@
   test (WorkQueue), run by RunThreads.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -22,7 +22,7 @@ uses
 {$ELSE}
   System.Classes,
 {$ENDIF}
-  Delphi.IOUring.RequestQueue, Tests.Support;
+  Pascal.IOUring.RequestQueue, Tests.Support;
 
 type
   TRequestQueueTests = class(TIORingTestCase)
@@ -76,7 +76,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Atomics;
+  Pascal.IOUring, Pascal.IOUring.Atomics;
 
 { A value that says who put it in and when: producer in the bits 24..30, its sequence number below
   (fits NativeUInt on Win32 too) }

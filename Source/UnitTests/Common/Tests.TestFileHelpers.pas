@@ -5,7 +5,7 @@
   that checks file contents would give wrong answers.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 

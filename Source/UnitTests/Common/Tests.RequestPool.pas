@@ -1,7 +1,7 @@
 ﻿unit Tests.RequestPool;
 
 {
-  Tests for Delphi.IOUring.RequestPool: the lock-free free list and the
+  Tests for Pascal.IOUring.RequestPool: the lock-free free list and the
   request pool (slots, states, handles, waiting).
 
   Stale handles: after Release every method must see the old handle as
@@ -12,7 +12,7 @@
   RunThreads.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -22,7 +22,7 @@ uses
 {$ELSE}
   System.Classes,
 {$ENDIF}
-  Delphi.IOUring.RequestPool, Tests.Support;
+  Pascal.IOUring.RequestPool, Tests.Support;
 
 const
   STRESS_CAPACITY = 8;
@@ -97,7 +97,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Atomics;
+  Pascal.IOUring, Pascal.IOUring.Atomics;
 
 const
   STRESS_THREADS = 4;

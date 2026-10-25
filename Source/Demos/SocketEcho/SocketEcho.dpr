@@ -4,7 +4,7 @@
   Linux only (Free Pascal): an echo server on TCP loopback whose socket I/O
   goes through the ring. Accept, receive and send are io_uring operations,
   put into the ring with TIORing.PrepareSqe and the names of
-  Delphi.IOUring.Backend.Posix.API (Docs/Design.md 5.8). A client thread
+  Pascal.IOUring.Backend.Linux.API (Docs/Design.md 5.8). A client thread
   connects with plain socket calls, sends a few messages and checks that each
   one comes back.
 
@@ -22,7 +22,7 @@
 
 uses
   cthreads,          // threads (the client thread)
-  SysUtils, Classes, BaseUnix, Sockets, Delphi.IOUring, Delphi.IOUring.Backend.Custom, Delphi.IOUring.Backend.Posix.API;
+  SysUtils, Classes, BaseUnix, Sockets, Pascal.IOUring, Pascal.IOUring.Types, Pascal.IOUring.Backend.Linux.API;
 
 const
   MESSAGES: array[0..2] of string = ('hello', 'io_uring', 'goodbye');

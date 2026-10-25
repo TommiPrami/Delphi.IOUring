@@ -1,15 +1,15 @@
 ﻿unit Tests.Ring;
 
 {
-  Tests for the core ring (TIORing in Delphi.IOUring).
+  Tests for the core ring (TIORing in Pascal.IOUring).
 
-  The ring API is used only through Delphi.IOUring, so the same tests run on
+  The ring API is used only through Pascal.IOUring, so the same tests run on
   Windows and Linux. Files, pipes and memory come from TestPlatformHelpers;
   where the systems differ, the expected value comes from there or from
-  Delphi.IOUring. A few layout checks are Windows-only.
+  Pascal.IOUring. A few layout checks are Windows-only.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -82,12 +82,12 @@ uses
 {$ELSE}
   Winapi.Windows, System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring,
+  Pascal.IOUring,
 {$IFDEF MSWINDOWS}
-  Delphi.IOUring.Backend.Windows.API,
+  Pascal.IOUring.Backend.Windows.API,
 {$ENDIF}
 {$IFDEF LINUX}
-  Delphi.IOUring.Backend.Posix.API,
+  Pascal.IOUring.Backend.Linux.API,
 {$ENDIF}
   TestFileHelpers;
 
@@ -170,7 +170,7 @@ begin
   AssertEquals('Not-available reason', '', LCapabilities.NotAvailableReason);
   AssertTrue('Text names the backend', Pos(BACKEND_NAME, LText) > 0);
   AssertTrue('Text names the system', Pos(LCapabilities.SystemDescription, LText) > 0);
-  AssertTrue('Text names the library version', Pos('Library: Delphi.IOUring ' + IORING_LIBRARY_VERSION, LText) > 0);
+  AssertTrue('Text names the library version', Pos('Library: Pascal.IOUring ' + IORING_LIBRARY_VERSION, LText) > 0);
 {$IFDEF MSWINDOWS}
   AssertTrue('Windows', Pos('Windows ', LCapabilities.SystemDescription) = 1);
   AssertTrue('Version 4 (IORING_VERSION_4 = 400)', Pos(BACKEND_NAME + ', version 4', LText) = 1);

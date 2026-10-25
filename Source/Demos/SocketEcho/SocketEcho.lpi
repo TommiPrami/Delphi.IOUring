@@ -24,8 +24,8 @@
     </RunParams>
     <RequiredPackages>
       <Item>
-        <PackageName Value="DelphiIOUring"/>
-        <DefaultFilename Value="../../Packages/Lazarus/DelphiIOUring.lpk"/>
+        <PackageName Value="PascalIOUring"/>
+        <DefaultFilename Value="../../Packages/Lazarus/PascalIOUring.lpk"/>
       </Item>
     </RequiredPackages>
     <Units>

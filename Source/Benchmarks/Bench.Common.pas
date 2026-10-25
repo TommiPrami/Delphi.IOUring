@@ -7,7 +7,7 @@
   for Windows and (Free Pascal) Linux.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -111,7 +111,7 @@ type
   function BenchProcessorCount: Integer;
   // 'Win32', 'Win64' or 'Linux64'
   function BenchPlatformName: string;
-  // <temp>/Delphi.IOUring.Bench
+  // <temp>/Pascal.IOUring.Bench
   function DefaultBenchFolder: string;
 
 implementation
@@ -125,7 +125,7 @@ uses
 {$IFDEF UNIX}
   BaseUnix, Unix, Syscall,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Backend.Custom;
+  Pascal.IOUring, Pascal.IOUring.Types;
 
 {$Q-}
 {$R-}
@@ -617,9 +617,9 @@ end;
 function DefaultBenchFolder: string;
 begin
 {$IFDEF MSWINDOWS}
-  Result := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'Delphi.IOUring.Bench';
+  Result := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'Pascal.IOUring.Bench';
 {$ELSE}
-  Result := IncludeTrailingPathDelimiter(GetTempDir(False)) + 'Delphi.IOUring.Bench';
+  Result := IncludeTrailingPathDelimiter(GetTempDir(False)) + 'Pascal.IOUring.Bench';
 {$ENDIF}
 end;
 

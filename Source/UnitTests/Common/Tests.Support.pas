@@ -27,7 +27,7 @@
   method of the test (RunThreads).
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -242,7 +242,7 @@ procedure TWorkerThread.Execute;
 begin
   if FReady <> nil then
   begin
-    { The RTL's interlocked calls (Delphi.IOUring.Atomics is not for Linux yet); a compare-exchange that changes
+    { The RTL's interlocked calls (Pascal.IOUring.Atomics is not for Linux yet); a compare-exchange that changes
       nothing is a full-barrier read }
 {$IFDEF FPC}
     InterLockedIncrement(FReady^);

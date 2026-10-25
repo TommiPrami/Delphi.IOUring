@@ -12,7 +12,7 @@
   (Delphi, Free Pascal on Windows and Linux).
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -30,7 +30,7 @@ type
     class function CheckPattern(const AOffset: UInt64; const ABuffer; const ACount: NativeInt;
       out AFirstBadOffset: UInt64): Boolean; static;
 
-    // Folder for test files: <temp>\Delphi.IOUring.Tests\ (created if missing)
+    // Folder for test files: <temp>\Pascal.IOUring.Tests\ (created if missing)
     class function TestFolder: string; static;
 
     // Unique file name in TestFolder (the file is not created)
@@ -164,9 +164,9 @@ end;
 class function TTestFileHelpers.TestFolder: string;
 begin
 {$IFDEF FPC}
-  Result := IncludeTrailingPathDelimiter(GetTempDir(False)) + 'Delphi.IOUring.Tests' + PathDelim;
+  Result := IncludeTrailingPathDelimiter(GetTempDir(False)) + 'Pascal.IOUring.Tests' + PathDelim;
 {$ELSE}
-  Result := IncludeTrailingPathDelimiter(TPath.GetTempPath) + 'Delphi.IOUring.Tests' + PathDelim;
+  Result := IncludeTrailingPathDelimiter(TPath.GetTempPath) + 'Pascal.IOUring.Tests' + PathDelim;
 {$ENDIF}
   ForceDirectories(Result);
 end;

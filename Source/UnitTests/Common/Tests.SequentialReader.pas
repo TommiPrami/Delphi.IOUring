@@ -1,19 +1,19 @@
 ﻿unit Tests.SequentialReader;
 
 {
-  Tests for TIORingSequentialReader (Delphi.IOUring.SequentialReader).
+  Tests for TIORingSequentialReader (Pascal.IOUring.SequentialReader).
 
   The main tests read pattern files of awkward sizes (around buffer and queue
   boundaries) with awkward read sizes, in every reader mode, and check every
   byte.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
 uses
-  Delphi.IOUring.SequentialReader, TestPlatformHelpers, Tests.Support;
+  Pascal.IOUring.SequentialReader, TestPlatformHelpers, Tests.Support;
 
 type
   TSequentialReaderTests = class(TIORingTestCase)
@@ -70,7 +70,7 @@ uses
 {$ELSE}
   Winapi.Windows, System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring, TestFileHelpers;
+  Pascal.IOUring, TestFileHelpers;
 
 const
   SMALL_BUFFER = 64 * 1024;

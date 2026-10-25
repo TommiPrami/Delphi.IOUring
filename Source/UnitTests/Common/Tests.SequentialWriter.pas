@@ -1,8 +1,8 @@
 ﻿unit Tests.SequentialWriter;
 
 {
-  Tests for TIORingSequentialWriter (Delphi.IOUring.SequentialWriter) and
-  TSequentialWriteOnlyFileStream (Delphi.IOUring.Streams): written data read
+  Tests for TIORingSequentialWriter (Pascal.IOUring.SequentialWriter) and
+  TSequentialWriteOnlyFileStream (Pascal.IOUring.Streams): written data read
   back (pattern bytes: every file offset has its own expected byte), sizes
   around the buffer size, pieces of every size, the zero-copy API, Flush,
   unbuffered writing with a cut last buffer, failed writes, a shared engine,
@@ -12,7 +12,7 @@
   on Windows, a read-only descriptor in place of the writer's on Linux.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -22,7 +22,7 @@ uses
 {$ELSE}
   System.Classes, System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Engine, Delphi.IOUring.SequentialWriter, Delphi.IOUring.Streams, TestPlatformHelpers,
+  Pascal.IOUring, Pascal.IOUring.Engine, Pascal.IOUring.SequentialWriter, Pascal.IOUring.Streams, TestPlatformHelpers,
   Tests.Support;
 
 type
@@ -82,7 +82,7 @@ type
 implementation
 
 uses
-  Delphi.IOUring.Atomics, TestFileHelpers;
+  Pascal.IOUring.Atomics, TestFileHelpers;
 
 const
   SMALL_BUFFER = 4096;

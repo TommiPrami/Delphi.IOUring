@@ -7,12 +7,12 @@
     for Win64), so it works without fpc.exe, fpc.cfg or lazbuild. Output goes
     to <project folder>\<Platform>\.
 
-      Tests       Source\UnitTests\FPC\Delphi.IOUring.UnitTests.FPC.lpr  (debug info)
-      Benchmarks  Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.FPC.lpr (optimized)
-      Structures  Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.Structures.FPC.lpr (optimized)
-      Blocks      Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.Blocks.FPC.lpr (optimized)
-      Writes      Source\Benchmarks\FPC\Delphi.IOUring.Benchmarks.Writes.FPC.lpr (optimized)
-      Package     Source\Packages\Lazarus\DelphiIOUring.pas: the main unit of the
+      Tests       Source\UnitTests\FPC\Pascal.IOUring.UnitTests.FPC.lpr  (debug info)
+      Benchmarks  Source\Benchmarks\FPC\Pascal.IOUring.Benchmarks.FPC.lpr (optimized)
+      Structures  Source\Benchmarks\FPC\Pascal.IOUring.Benchmarks.Structures.FPC.lpr (optimized)
+      Blocks      Source\Benchmarks\FPC\Pascal.IOUring.Benchmarks.Blocks.FPC.lpr (optimized)
+      Writes      Source\Benchmarks\FPC\Pascal.IOUring.Benchmarks.Writes.FPC.lpr (optimized)
+      Package     Source\Packages\Lazarus\PascalIOUring.pas: the main unit of the
                   Lazarus package, compiled without Lazarus (optimized; no -Run)
       Demos       Source\Demos\<Name>\<Name>.dpr, every demo of the platform
                   (optimized); -Run runs each one once without arguments
@@ -248,9 +248,9 @@ if ($Project -eq 'Tests') {
     if ($Optimize) {
         $codeOptions += '-O3'
     } else {
-        $codeOptions += '-dIORING_NO_INLINE'                 # debug build: no inlining (Delphi.IOUring.inc)
+        $codeOptions += '-dIORING_NO_INLINE'                 # debug build: no inlining (Pascal.IOUring.inc)
     }
-    $builds += @{ Dir = (Join-Source 'UnitTests\FPC'); File = 'Delphi.IOUring.UnitTests.FPC.lpr';
+    $builds += @{ Dir = (Join-Source 'UnitTests\FPC'); File = 'Pascal.IOUring.UnitTests.FPC.lpr';
         Units = $extraUnits; Options = $codeOptions }
 } elseif ($Project -eq 'Package') {
     # A unit, not a program: it pulls in every unit of the package and the
@@ -258,7 +258,7 @@ if ($Project -eq 'Tests') {
     if ($Run) {
         throw '-Run: the package is a unit, there is nothing to run.'
     }
-    $builds += @{ Dir = (Join-Source 'Packages\Lazarus'); File = 'DelphiIOUring.pas'; Units = @(); Options = @('-O3') }
+    $builds += @{ Dir = (Join-Source 'Packages\Lazarus'); File = 'PascalIOUring.pas'; Units = @(); Options = @('-O3') }
 } elseif ($Project -eq 'Demos') {
     # -Run runs each demo once, without arguments (each one checks its own result)
     $demoNames = @('Capabilities', 'CopyFile', 'Checksum', 'ReadBlocks', 'EngineCallbacks')
@@ -271,10 +271,10 @@ if ($Project -eq 'Tests') {
     }
 } else {
     switch ($Project) {
-        'Benchmarks' { $programFile = 'Delphi.IOUring.Benchmarks.FPC.lpr' }
-        'Structures' { $programFile = 'Delphi.IOUring.Benchmarks.Structures.FPC.lpr' }
-        'Blocks'     { $programFile = 'Delphi.IOUring.Benchmarks.Blocks.FPC.lpr' }
-        'Writes'     { $programFile = 'Delphi.IOUring.Benchmarks.Writes.FPC.lpr' }
+        'Benchmarks' { $programFile = 'Pascal.IOUring.Benchmarks.FPC.lpr' }
+        'Structures' { $programFile = 'Pascal.IOUring.Benchmarks.Structures.FPC.lpr' }
+        'Blocks'     { $programFile = 'Pascal.IOUring.Benchmarks.Blocks.FPC.lpr' }
+        'Writes'     { $programFile = 'Pascal.IOUring.Benchmarks.Writes.FPC.lpr' }
     }
     # Bench.Common, Bench.Readers, Bench.Structures, Bench.Blocks, Bench.Writes;
     # optimized, smart linking, stripped

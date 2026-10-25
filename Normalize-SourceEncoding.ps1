@@ -29,7 +29,7 @@
 
 .PARAMETER ExcludePattern
     Regex matched against each file's full path; matches are skipped.
-    Defaults to third-party folders and DelphiIOUring.pas of the Lazarus
+    Defaults to third-party folders and PascalIOUring.pas of the Lazarus
     package (Lazarus generates it, in its own format, when the package is
     compiled).
 
@@ -46,7 +46,7 @@
 param(
     [string]   $Root           = '.',
     [string[]] $Extensions     = @('.pas', '.inc', '.dpr', '.dpk', '.dproj', '.iss', '.md', '.csv'),
-    [string]   $ExcludePattern = '(?i)(thirdparty|3rdparty|[\\/]Packages[\\/]Lazarus[\\/]DelphiIOUring\.pas$)'
+    [string]   $ExcludePattern = '(?i)(thirdparty|3rdparty|[\\/]Packages[\\/]Lazarus[\\/]PascalIOUring\.pas$)'
 )
 
 Set-StrictMode -Version Latest

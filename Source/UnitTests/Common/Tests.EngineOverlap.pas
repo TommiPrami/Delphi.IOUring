@@ -14,7 +14,7 @@
   order: every read must return what the copy held when the read was started.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -24,7 +24,7 @@ uses
 {$ELSE}
   System.Classes, System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Engine, TestPlatformHelpers, Tests.Support;
+  Pascal.IOUring, Pascal.IOUring.Engine, TestPlatformHelpers, Tests.Support;
 
 type
   TEngineOverlapTests = class(TIORingTestCase)
@@ -80,7 +80,7 @@ type
 implementation
 
 uses
-  Delphi.IOUring.Atomics;
+  Pascal.IOUring.Atomics;
 
 const
   MODEL_SIZE = 64 * 1024;

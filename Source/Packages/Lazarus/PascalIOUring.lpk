@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <Name Value="PascalIOUring"/>
+    <Type Value="RunTimeOnly"/>
+    <Author Value="Tommi Prami"/>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <IncludeFiles Value="../../Units"/>
+        <OtherUnitFiles Value="../../Units"/>
+        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
+      </SearchPaths>
+    </CompilerOptions>
+    <Description Value="File I/O with the operating system's I/O rings: Windows IoRing (Win32, Win64) and Linux io_uring (x86-64, AArch64). The backend units (Windows, Posix) are not in the package's main unit: each system compiles only its own."/>
+    <License Value="MIT"/>
+    <Version Minor="1"/>
+    <Files Count="17">
+      <Item1>
+        <Filename Value="../../Units/Pascal.IOUring.pas"/>
+        <UnitName Value="Pascal.IOUring"/>
+      </Item1>
+      <Item2>
+        <Filename Value="../../Units/Pascal.IOUring.Atomics.pas"/>
+        <UnitName Value="Pascal.IOUring.Atomics"/>
+      </Item2>
+      <Item3>
+        <Filename Value="../../Units/Pascal.IOUring.Types.pas"/>
+        <UnitName Value="Pascal.IOUring.Types"/>
+      </Item3>
+      <Item4>
+        <Filename Value="../../Units/Pascal.IOUring.RequestPool.pas"/>
+        <UnitName Value="Pascal.IOUring.RequestPool"/>
+      </Item4>
+      <Item5>
+        <Filename Value="../../Units/Pascal.IOUring.RequestQueue.pas"/>
+        <UnitName Value="Pascal.IOUring.RequestQueue"/>
+      </Item5>
+      <Item6>
+        <Filename Value="../../Units/Pascal.IOUring.Engine.pas"/>
+        <UnitName Value="Pascal.IOUring.Engine"/>
+      </Item6>
+      <Item7>
+        <Filename Value="../../Units/Pascal.IOUring.SequentialReader.pas"/>
+        <UnitName Value="Pascal.IOUring.SequentialReader"/>
+      </Item7>
+      <Item8>
+        <Filename Value="../../Units/Pascal.IOUring.SequentialWriter.pas"/>
+        <UnitName Value="Pascal.IOUring.SequentialWriter"/>
+      </Item8>
+      <Item9>
+        <Filename Value="../../Units/Pascal.IOUring.BlockReader.pas"/>
+        <UnitName Value="Pascal.IOUring.BlockReader"/>
+      </Item9>
+      <Item10>
+        <Filename Value="../../Units/Pascal.IOUring.Streams.pas"/>
+        <UnitName Value="Pascal.IOUring.Streams"/>
+      </Item10>
+      <Item11>
+        <Filename Value="../../Units/Pascal.IOUring.Backend.Windows.API.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="Pascal.IOUring.Backend.Windows.API"/>
+      </Item11>
+      <Item12>
+        <Filename Value="../../Units/Pascal.IOUring.Backend.Windows.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="Pascal.IOUring.Backend.Windows"/>
+      </Item12>
+      <Item13>
+        <Filename Value="../../Units/Pascal.IOUring.Backend.Windows.Platform.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="Pascal.IOUring.Backend.Windows.Platform"/>
+      </Item13>
+      <Item14>
+        <Filename Value="../../Units/Pascal.IOUring.Backend.Linux.API.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="Pascal.IOUring.Backend.Linux.API"/>
+      </Item14>
+      <Item15>
+        <Filename Value="../../Units/Pascal.IOUring.Backend.Linux.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="Pascal.IOUring.Backend.Linux"/>
+      </Item15>
+      <Item16>
+        <Filename Value="../../Units/Pascal.IOUring.Backend.Linux.Platform.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="Pascal.IOUring.Backend.Linux.Platform"/>
+      </Item16>
+      <Item17>
+        <Filename Value="../../Units/Pascal.IOUring.inc"/>
+        <Type Value="Include"/>
+      </Item17>
+    </Files>
+    <RequiredPkgs Count="1">
+      <Item1>
+        <PackageName Value="FCL"/>
+      </Item1>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+  </Package>
+</CONFIG>

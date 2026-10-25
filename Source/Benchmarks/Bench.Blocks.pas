@@ -29,11 +29,11 @@
   Reported: thousand blocks per second, MiB/s of block data, CPU time of all
   threads; median of the runs. All contenders must get the same checksum.
 
-  Shared by Delphi (Delphi.IOUring.Benchmarks.Blocks.dpr) and Free Pascal
-  (FPC\Delphi.IOUring.Benchmarks.Blocks.FPC.lpr).
+  Shared by Delphi (Pascal.IOUring.Benchmarks.Blocks.dpr) and Free Pascal
+  (FPC\Pascal.IOUring.Benchmarks.Blocks.FPC.lpr).
 
   Options:
-    --dir <folder>     where the test file is created (default <temp>/Delphi.IOUring.Bench)
+    --dir <folder>     where the test file is created (default <temp>/Pascal.IOUring.Bench)
     --size-gib <n>     size of the test file (default 4)
     --blocks <n>       blocks per list (default 20000)
     --runs <n>         runs per contender and case; the median is reported (default 3)
@@ -42,7 +42,7 @@
     --keep             keep the test file
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -56,8 +56,8 @@ uses
 {$ELSE}
   System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Atomics, Delphi.IOUring.Backend.Custom, Delphi.IOUring.Engine,
-  Delphi.IOUring.BlockReader, Bench.Common;
+  Pascal.IOUring, Pascal.IOUring.Atomics, Pascal.IOUring.Types, Pascal.IOUring.Engine,
+  Pascal.IOUring.BlockReader, Bench.Common;
 
 {$IFDEF FPC}
 const

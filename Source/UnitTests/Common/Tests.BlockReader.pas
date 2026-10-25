@@ -1,7 +1,7 @@
 ﻿unit Tests.BlockReader;
 
 {
-  Tests for TIORingBlockReader (Delphi.IOUring.BlockReader): blocks come out
+  Tests for TIORingBlockReader (Pascal.IOUring.BlockReader): blocks come out
   in the provider's order with the right data; the provider is asked lazily;
   neighbouring blocks are merged (touching, and with MaxGap); blocks that go
   backwards or overlap; the end of the file; TryGetBlock without waiting;
@@ -9,7 +9,7 @@
   flight; and several readers on their own threads sharing one engine.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -19,7 +19,7 @@ uses
 {$ELSE}
   System.Classes,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Engine, Delphi.IOUring.BlockReader, TestPlatformHelpers, Tests.Support;
+  Pascal.IOUring, Pascal.IOUring.Engine, Pascal.IOUring.BlockReader, TestPlatformHelpers, Tests.Support;
 
 type
   TBlockArray = array of TIORingBlock;
@@ -65,7 +65,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring.Atomics, TestFileHelpers;
+  Pascal.IOUring.Atomics, TestFileHelpers;
 
 const
   PATTERN_FILE_SIZE = 4 * 1024 * 1024;

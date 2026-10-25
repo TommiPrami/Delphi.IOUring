@@ -1,12 +1,12 @@
 ﻿unit Tests.Backend.Windows.API.Layout;
 
 {
-  Record sizes and field offsets of Delphi.IOUring.Backend.Windows.API must be
+  Record sizes and field offsets of Pascal.IOUring.Backend.Windows.API must be
   identical to the C structures (MSVC layout), on Win32 and on Win64.
   Expected values come from the C declarations in ioringapi.h / ntioring_x.h.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -42,7 +42,7 @@ uses
 {$ELSE}
   Winapi.Windows,
 {$ENDIF}
-  Delphi.IOUring.Backend.Windows.API;
+  Pascal.IOUring.Backend.Windows.API;
 
 {$IFDEF CPUX64}
 const

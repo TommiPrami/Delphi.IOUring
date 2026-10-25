@@ -1,4 +1,4 @@
-﻿# Delphi.IOUring – Implementation Plan
+﻿# Pascal.IOUring – Implementation Plan
 
 Companion to [Design.md](Design.md). Each phase ends in something that
 compiles, has passing tests, and is committed.
@@ -23,24 +23,24 @@ against both compilers from day one.
 Docs/                      Design.md, Plan.md, Benchmarks.md, BenchmarkResults/ (raw CSV)
 Source/
   Units/
-    Delphi.IOUring.inc                       shared compiler switches (FPC mode etc.)
-    Delphi.IOUring.pas                       TIORing alias, availability, blocking helpers (new)
-    Delphi.IOUring.Backend.Custom.pas        neutral types, errors, shared helpers
-    Delphi.IOUring.Backend.Windows.API.pas   100 % IoRing API translation, standalone (new)
-    Delphi.IOUring.Backend.Windows.pas       TWindowsIORing (record)
-    Delphi.IOUring.Backend.Posix.API.pas     100 % io_uring API translation (Linux 6.8), standalone (new)
-    Delphi.IOUring.Backend.Posix.pas         TLinuxIORing (Milestone 4)
-    Delphi.IOUring.SequentialReader.pas      read-ahead engine (record)        (new)
-    Delphi.IOUring.SequentialWriter.pas      write-behind through an engine (record) (new)
-    Delphi.IOUring.Streams.pas               TStream descendants: read stream, write stream
-    Delphi.IOUring.Atomics.pas               TAtomic: CAS / fences / wait-wake (new)
-    Delphi.IOUring.RequestPool.pas           request slots, handles, lock-free free list (new)
-    Delphi.IOUring.RequestQueue.pas          lock-free queue: producers -> I/O thread (new)
-    Delphi.IOUring.Engine.pas                TIORingEngine: the I/O thread, Wait, callbacks (new)
-    Delphi.IOUring.BlockReader.pas           TIORingBlockReader: known blocks, read-ahead, merging (new)
+    Pascal.IOUring.inc                       shared compiler switches (FPC mode etc.)
+    Pascal.IOUring.pas                       TIORing alias, availability, blocking helpers (new)
+    Pascal.IOUring.Types.pas        neutral types, errors, shared helpers
+    Pascal.IOUring.Backend.Windows.API.pas   100 % IoRing API translation, standalone (new)
+    Pascal.IOUring.Backend.Windows.pas       TWindowsIORing (record)
+    Pascal.IOUring.Backend.Linux.API.pas     100 % io_uring API translation (Linux 6.8), standalone (new)
+    Pascal.IOUring.Backend.Linux.pas         TLinuxIORing (Milestone 4)
+    Pascal.IOUring.SequentialReader.pas      read-ahead engine (record)        (new)
+    Pascal.IOUring.SequentialWriter.pas      write-behind through an engine (record) (new)
+    Pascal.IOUring.Streams.pas               TStream descendants: read stream, write stream
+    Pascal.IOUring.Atomics.pas               TAtomic: CAS / fences / wait-wake (new)
+    Pascal.IOUring.RequestPool.pas           request slots, handles, lock-free free list (new)
+    Pascal.IOUring.RequestQueue.pas          lock-free queue: producers -> I/O thread (new)
+    Pascal.IOUring.Engine.pas                TIORingEngine: the I/O thread, Wait, callbacks (new)
+    Pascal.IOUring.BlockReader.pas           TIORingBlockReader: known blocks, read-ahead, merging (new)
   Build-FPC.ps1                              builds/runs the FPC tests or benchmark (no fpc.exe/lazbuild needed; -Optimize; -Platform Linux64 in WSL)
   UnitTests/
-    Delphi.IOUring.UnitTests.dpr/.dproj      Delphi runner (DUnitX console, TestInsight)
+    Pascal.IOUring.UnitTests.dpr/.dproj      Delphi runner (DUnitX console, TestInsight)
     Common/                                  the tests, the same for Delphi and Free Pascal (Design §12.4)
       Tests.Support.pas                      base class over DUnitX / FPCUnit, threads, shared pattern files
       Tests.Backend.Windows.API.Layout.pas   record layouts + helpers (Windows)
@@ -59,27 +59,27 @@ Source/
       TestFileHelpers.pas                    generates deterministic test files
       TestPlatformHelpers.pas                files, pipes, page memory for tests (Windows; Linux in Phase 20)
     FPC/                                     the Free Pascal runner, for Windows and Linux
-      Delphi.IOUring.UnitTests.FPC.lpr/.lpi  own small console runner on FPCUnit; Lazarus project (Windows)
+      Pascal.IOUring.UnitTests.FPC.lpr/.lpi  own small console runner on FPCUnit; Lazarus project (Windows)
     Linux/                                   the Linux-only tests (built and run in WSL by Build-FPC.ps1 -Platform Linux64)
-      Tests.Linux.Backend.Posix.API.Layout.pas  sizes, offsets and constants against the C header
-      Tests.Linux.Backend.Posix.API.Layout.inc  those checks, generated from the C header (do not edit)
-      Tests.Linux.Backend.Posix.API.pas      live calls to the kernel
-      PosixApiLayout.c, Generate-PosixApiLayout.sh  the generator of the .inc (gcc, on Linux)
+      Tests.Backend.Linux.API.Layout.pas  sizes, offsets and constants against the C header
+      Tests.Backend.Linux.API.Layout.inc  those checks, generated from the C header (do not edit)
+      Tests.Backend.Linux.API.pas      live calls to the kernel
+      LinuxApiLayout.c, Generate-LinuxApiLayout.sh  the generator of the .inc (gcc, on Linux)
   Benchmarks/
-    Delphi.IOUring.Benchmarks.dpr/.dproj     console app, CSV output
+    Pascal.IOUring.Benchmarks.dpr/.dproj     console app, CSV output
     Bench.Common.pas                         consumer, timing, cache purge, test files (Delphi + FPC)
     Bench.Readers.pas                        reading routines shared with the FPC benchmark
     Bench.Contenders.pas                     the Delphi contender list (anonymous methods, threads)
     Bench.Structures.pas                     engine structures (free list, queue): lock-free vs lock (Delphi + FPC)
-    Delphi.IOUring.Benchmarks.Structures.dpr/.dproj   runs Bench.Structures (Delphi)
-    FPC/Delphi.IOUring.Benchmarks.FPC.lpr    Free Pascal benchmark: the main contenders
-    FPC/Delphi.IOUring.Benchmarks.Structures.FPC.lpr  runs Bench.Structures (FPC)
+    Pascal.IOUring.Benchmarks.Structures.dpr/.dproj   runs Bench.Structures (Delphi)
+    FPC/Pascal.IOUring.Benchmarks.FPC.lpr    Free Pascal benchmark: the main contenders
+    FPC/Pascal.IOUring.Benchmarks.Structures.FPC.lpr  runs Bench.Structures (FPC)
     Bench.Blocks.pas                         blocks known in advance: block reader vs TFileStream/ReadFile (Delphi + FPC)
-    Delphi.IOUring.Benchmarks.Blocks.dpr/.dproj       runs Bench.Blocks (Delphi)
-    FPC/Delphi.IOUring.Benchmarks.Blocks.FPC.lpr      runs Bench.Blocks (FPC)
+    Pascal.IOUring.Benchmarks.Blocks.dpr/.dproj       runs Bench.Blocks (Delphi)
+    FPC/Pascal.IOUring.Benchmarks.Blocks.FPC.lpr      runs Bench.Blocks (FPC)
     Bench.Writes.pas                         writing a file: write stream vs TFileStream/TBufferedFileStream (Delphi + FPC)
-    Delphi.IOUring.Benchmarks.Writes.dpr/.dproj       runs Bench.Writes (Delphi)
-    FPC/Delphi.IOUring.Benchmarks.Writes.FPC.lpr      runs Bench.Writes (FPC)
+    Pascal.IOUring.Benchmarks.Writes.dpr/.dproj       runs Bench.Writes (Delphi)
+    FPC/Pascal.IOUring.Benchmarks.Writes.FPC.lpr      runs Bench.Writes (FPC)
   3rdParty/DUnitX
 ```
 
@@ -89,7 +89,7 @@ Source/
 
 ### Phase 0 – Groundwork
 
-- [x] `Delphi.IOUring.inc` (`{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}`, shared switches) and include it in all units.
+- [x] `Pascal.IOUring.inc` (`{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}`, shared switches) and include it in all units.
 - [x] DUnitX console test project (Win32 + Win64 platforms), referencing `Source/3rdParty/DUnitX` by relative path.
 - [x] `TestFileHelpers`: create temp files of given size where every 8-byte word is a hash of its word index (SplitMix64), so any read at any offset can be verified without keeping a copy.
 - [x] Tests for the helpers themselves prove the runner works on both platforms (14 tests, Win32 + Win64).
@@ -98,7 +98,7 @@ Source/
 
 ### Phase 1 – Complete Windows API unit (Layer 0)
 
-`Delphi.IOUring.Backend.Windows.API` – everything in Design §6.2, standalone (Design §6.1):
+`Pascal.IOUring.Backend.Windows.API` – everything in Design §6.2, standalone (Design §6.1):
 
 - [x] All types, constants (incl. the 8 `IORING_E_*` codes), records, `P…` pointer types.
 - [x] All 16 functions as `stdcall; external kernel32 … delayed` (`delayed` only for Delphi: FPC 3.2.2 does not support it).
@@ -125,9 +125,9 @@ Source/
 
 ### Phase 2 – Core abstraction (Layer 1)
 
-- [x] `Delphi.IOUring.Backend.Custom`: neutral plain records, `EIORingError` (readable texts for `IORING_E_*`), `EIORingNotSupported`, `TIORingCompletion` helpers.
+- [x] `Pascal.IOUring.Types`: neutral plain records, `EIORingError` (readable texts for `IORING_E_*`), `EIORingNotSupported`, `TIORingCompletion` helpers.
 - [x] `TWindowsIORing` **custom managed record** per Design §5.2: `Open`/`Close`, not copyable, ref conversion, all `Prepare*`, `Submit` with CQ-space guard, `TryPopCompletion`, `PopCompletions`, `WaitForCompletions`, completion event (pop-until-empty rule), pending-count tracking. `Close` **waits** for in-flight I/O (`CloseIoRing` does not cancel it – found in this phase).
-- [x] `Delphi.IOUring`: `TIORing` alias, `Available`, `QueryCapabilities`, blocking `IORingReadAt` / `IORingWriteAt`.
+- [x] `Pascal.IOUring`: `TIORing` alias, `Available`, `QueryCapabilities`, blocking `IORingReadAt` / `IORingWriteAt`.
 - [x] Check generated code (Design §4.1 [VERIFY]): cost of a managed-record local (+2.3 ns Win32, +1.2 ns Win64), `const` passing by reference (yes), inlining of the public methods (dropped, Design §4).
 - [x] Tests (`Tests.Ring`, 26 tests, written against `TIORing`, so they can later run on Linux; files/pipes come from the new shared `TestPlatformHelpers`):
   - [x] Assigning one ring to another raises; ring is closed automatically at end of scope.
@@ -187,7 +187,7 @@ Source/
 
 - **Phase 6 – Tool set-up**: working FPC/Lazarus with Win64 and Win32 compilers; build scripts for the library and tests.
   - [x] `Source\Build-FPC.ps1 -Project Tests|Benchmarks -Platform Win32|Win64 [-Run]`: calls the compiler binary directly, so it needs no `fpc.exe`, `fpc.cfg` or `lazbuild`.
-  - [x] Lazarus project file for the tests (`Delphi.IOUring.UnitTests.FPC.lpi`): builds with `lazbuild` for `i386-win32` and `x86_64-win64` (output in `bin\` and `lib\`), all tests pass.
+  - [x] Lazarus project file for the tests (`Pascal.IOUring.UnitTests.FPC.lpi`): builds with `lazbuild` for `i386-win32` and `x86_64-win64` (output in `bin\` and `lib\`), all tests pass.
   - [x] **Win64:** the repaired Lazarus 5.0 RC1 install (FPC 3.2.2) has `ppcx64.exe`, `fpc.exe` and `lazbuild.exe`.
 - **Phase 7 – Test runner for FPC**: **decided 2026-10-22: separate FPCUnit tests** (`Source/UnitTests/FPC/Tests.FPC.*`), the same checks as the Delphi test units. The shared helpers (`TestFileHelpers`, `TestPlatformHelpers`) are used by both. A small own console runner on FPCUnit sets the exit code.
   - [x] 101 FPC tests (Delphi has 115 because DUnitX counts each `[TestCase]` separately; the FPC tests loop over the same cases).
@@ -205,7 +205,7 @@ Source/
 
 ## Milestone 3 – I/O engine (Design §10, §11) – Delphi and FPC
 
-- **Phase 10 – Atomics unit**: `Delphi.IOUring.Atomics` (CAS 32/64 incl. Win32 64-bit CAS, exchange, add, load-acquire/store-release, pause, wait/wake on address), tests incl. multi-thread stress.
+- **Phase 10 – Atomics unit**: `Pascal.IOUring.Atomics` (CAS 32/64 incl. Win32 64-bit CAS, exchange, add, load-acquire/store-release, pause, wait/wake on address), tests incl. multi-thread stress.
   - [x] `TAtomic` (record, static methods): `CompareExchange`, `TryCompareExchange`, `Exchange`, `FetchAdd`, `Increment`, `Decrement`, `LoadAcquire`, `StoreRelease` for `Integer`, `Cardinal`, `Int64`, `UInt64` (and `Pointer`); `FullBarrier`, `CpuPause`; `WaitWhileEqual` / `WakeOne` / `WakeAll` on 32-bit values (Design §10.6).
   - [x] Win32: 64-bit CAS is `LOCK CMPXCHG8B` (own assembler for FPC; Delphi's intrinsic does it itself); 64-bit load/store is one SSE move.
   - [x] Tests `Tests.Atomics` / `Tests.FPC.Atomics` (20 each): every method and type; exact counters from 4 threads; no half-written 64-bit values; release/acquire hand-over; a spin loop sees another thread's write; wait timeout, wake one / all, ping-pong without lost wake-ups.
@@ -213,34 +213,34 @@ Source/
 
   **Done 2026-10-22** – Delphi 135 tests and FPC 121 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 11 – Request pool**: fixed array of plain records, states, `NativeUInt` handle packing (index + generation, Win32 layout), lock-free free list with ABA tag. Stale-handle tests, multi-thread stress.
-  - [x] `Delphi.IOUring.RequestPool`: `TIORingFreeList` (Treiber stack, 64-bit tag + index, exponential backoff) and `TIORingRequestPool` (cache-line slots with a 32-bit state word and the engine's payload; handles = index + generation, index bits follow the capacity; `TryAcquire`, `TryChangeState`, `WaitFor` with a waiting flag, `Release`) (Design §10.7).
+  - [x] `Pascal.IOUring.RequestPool`: `TIORingFreeList` (Treiber stack, 64-bit tag + index, exponential backoff) and `TIORingRequestPool` (cache-line slots with a 32-bit state word and the engine's payload; handles = index + generation, index bits follow the capacity; `TryAcquire`, `TryChangeState`, `WaitFor` with a waiting flag, `Release`) (Design §10.7).
   - [x] Tests `Tests.RequestPool` / `Tests.FPC.RequestPool` (23 each): stale and out-of-range handles, state rules, payloads, generation wrap-around (Win32), waiting and waking, no slot held twice by 4 threads, an engine simulation (4 producers + 1 I/O thread, 80 000 requests, with and without spinning).
   - [x] The thread helpers of the tests moved to shared units (`TestThreadHelpers` for Delphi, `Tests.FPC.Support` for FPC).
-  - [x] Benchmark against an SRW lock (decision #10): new program `Delphi.IOUring.Benchmarks.Structures` (Delphi and FPC, `Build-FPC.ps1 -Project Structures`). Without backoff the lock won by up to 4.8×; with backoff (limit 1024 pauses) **the lock-free stack wins or ties in every case** – it stays ([Benchmarks.md](Benchmarks.md#engine-structures-phase-11)).
+  - [x] Benchmark against an SRW lock (decision #10): new program `Pascal.IOUring.Benchmarks.Structures` (Delphi and FPC, `Build-FPC.ps1 -Project Structures`). Without backoff the lock won by up to 4.8×; with backoff (limit 1024 pauses) **the lock-free stack wins or ties in every case** – it stays ([Benchmarks.md](Benchmarks.md#engine-structures-phase-11)).
 
   **Done 2026-10-22** – Delphi 158 tests and FPC 144 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 12 – Lock-free request queue**: bounded array queue with per-cell sequence numbers, cache-line padding. Benchmark against an SRW-lock queue; keep whichever wins (Design §10.5).
-  - [x] `Delphi.IOUring.RequestQueue`: `TIORingRequestQueue` – Vyukov's bounded MPMC queue of pointer-sized values; positions on their own cache lines, `NativeUInt` positions that may wrap around (signed differences), backoff (Design §10.8).
-  - [x] `TAtomic.BackOff` and `IORingAllocCacheAligned` moved to `Delphi.IOUring.Atomics` (shared by the free list, the pool and the queue).
+  - [x] `Pascal.IOUring.RequestQueue`: `TIORingRequestQueue` – Vyukov's bounded MPMC queue of pointer-sized values; positions on their own cache lines, `NativeUInt` positions that may wrap around (signed differences), backoff (Design §10.8).
+  - [x] `TAtomic.BackOff` and `IORingAllocCacheAligned` moved to `Pascal.IOUring.Atomics` (shared by the free list, the pool and the queue).
   - [x] Tests `Tests.RequestQueue` / `Tests.FPC.RequestQueue` (12 each): order, full/empty, capacity, laps, wrap-around of the positions (also under load), many producers with one or many consumers (every value once, in order per producer with one consumer). The tests themselves were checked by breaking the queue on purpose (Design §10.8).
   - [x] `RunThreads` (Delphi and FPC test helpers) fails a test whose threads still run after 60 s, so a broken lock-free structure fails the run instead of hanging it.
   - [x] Benchmark against an SRW-lock queue (`Bench.Structures`, `--only queue`): **the lock-free queue wins everywhere** – 4–23 % with few producers and real work, up to 290× under contention ([Benchmarks.md](Benchmarks.md#request-queue-phase-12)). It stays.
 
   **Done 2026-10-22** – Delphi 171 tests and FPC 157 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 13 – Engine with one I/O thread**: I/O thread loop (drain → prepare → one submit → reap → notify), sleep/wake protocol without syscalls when busy, `WaitOnAddress` waiting, `BeginBatch`/`EndBatch`, clean shutdown with requests in flight (every request completes: ok / error / cancelled). Stress test: many producer threads, random reads, all data verified. Stats counters.
-  - [x] API decided first (Design §10.4) and built as decided: `Delphi.IOUring.Engine` – `TIORingEngine` with `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`/`TryGetResult`/`WaitAll`, callbacks on the I/O thread, `BeginBatch`/`EndBatch`, `Stats` (Design §10.9).
+  - [x] API decided first (Design §10.4) and built as decided: `Pascal.IOUring.Engine` – `TIORingEngine` with `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`/`TryGetResult`/`WaitAll`, callbacks on the I/O thread, `BeginBatch`/`EndBatch`, `Stats` (Design §10.9).
   - [x] I/O thread: drain → prepare (one request may wait for room) → one submit → pop all → sleep only after an idle round; producers wake it only when it sleeps.
   - [x] A full pool makes starting a request sleep until one is freed; `Destroy` cancels queued and in-flight requests, waits for all, and lets threads blocked in `Wait` leave first.
-  - [x] New in the core: `IORING_RESULT_CANCELLED`, `TIORingCompletion.IsCancelled`; `Delphi.IOUring` re-exports both result codes.
+  - [x] New in the core: `IORING_RESULT_CANCELLED`, `TIORingCompletion.IsCancelled`; `Pascal.IOUring` re-exports both result codes.
   - [x] Tests `Tests.Engine` / `Tests.FPC.Engine` (19 each), incl. the shutdown cases and stress (8 threads × 1500 random reads, data checked; callbacks and waits mixed). Repeated 100× (Delphi) and 10× (FPC) to find flaky tests: one found and fixed (a busy engine never sleeps – Design §10.9).
   - [x] Found on the way: a request pool that is too small for what the threads keep can deadlock them – rule written into the unit and Design §10.9.
 
   **Done 2026-10-22** – Delphi 190 tests and FPC 176 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets. Not measured yet: the engine's speed (Phase 14's benchmark).
 - **Phase 14 – Read stream with block provider**: look-ahead distance, merging adjacent requests (contiguous buffer or scatter), in-order delivery. Benchmark: many small "known in advance" random reads vs `TFileStream` + seek.
-  - [x] API decided first (Design §10.4): both a provider (a method that gives the next block) and a plain list. `Delphi.IOUring.BlockReader` – `TIORingBlockReader`, a managed record: `TryGetBlock`/`ReleaseBlock`, zero-copy, blocks in the provider's order (Design §10.10).
+  - [x] API decided first (Design §10.4): both a provider (a method that gives the next block) and a plain list. `Pascal.IOUring.BlockReader` – `TIORingBlockReader`, a managed record: `TryGetBlock`/`ReleaseBlock`, zero-copy, blocks in the provider's order (Design §10.10).
   - [x] Look-ahead: `ReadAhead` buffers (default 32 × 256 KiB), one read in flight per buffer, all new reads of a round in one engine batch. Neighbouring blocks become one read; `MaxGap` lets small gaps be read too. Scatter reads left out: they need unbuffered handles and page-aligned blocks (Design §2.1).
   - [x] Tests `Tests.BlockReader` / `Tests.FPC.BlockReader` (15 each): order and data, the provider asked only when needed, merging, `MaxGap`, backward and overlapping blocks, end of file, empty list, not waiting, bad arguments, wrong call order, failed reads, `Close` with reads in flight, stats, stress (20 000 random blocks; 4 readers sharing one engine).
-  - [x] Benchmark: new program `Delphi.IOUring.Benchmarks.Blocks` (Delphi and FPC, `Build-FPC.ps1 -Project Blocks`) – 20 000 blocks of 4 KiB from a 4 GiB file, random and sorted, cold and warm, against `TFileStream` + `Seek` and positioned `ReadFile` (1 and 8 threads). Not in the cache: **7–10× faster than `TFileStream`** with read-ahead 128 and faster than 8 `ReadFile` threads; 17–22× for sorted blocks with `MaxGap`. In the cache, `ReadFile` stays faster ([Benchmarks.md](Benchmarks.md#blocks-known-in-advance-phase-14)).
+  - [x] Benchmark: new program `Pascal.IOUring.Benchmarks.Blocks` (Delphi and FPC, `Build-FPC.ps1 -Project Blocks`) – 20 000 blocks of 4 KiB from a 4 GiB file, random and sorted, cold and warm, against `TFileStream` + `Seek` and positioned `ReadFile` (1 and 8 threads). Not in the cache: **7–10× faster than `TFileStream`** with read-ahead 128 and faster than 8 `ReadFile` threads; 17–22× for sorted blocks with `MaxGap`. In the cache, `ReadFile` stays faster ([Benchmarks.md](Benchmarks.md#blocks-known-in-advance-phase-14)).
   - [x] Probes of the engine (Design §10.10): it adds about 10 % to a bare ring; one I/O thread is the limit only with unbuffered reads (about 70 thousand reads/s, two engines 114–126); results with cached data depend on whether Windows runs the threads on P- or E-cores; spinning longer before a wait sleeps helps cached reads but costs CPU time with reads from the disk.
   - [x] Found: on a handle without `FILE_FLAG_OVERLAPPED`, Windows runs the reads one at a time, also through IoRing; and on an overlapped handle every read takes the slower asynchronous way, even for cached data (Design §2.1).
   - [x] Tried and dropped: starting new reads in groups instead of one per freed buffer – no measurable gain (Design §10.10).
@@ -253,7 +253,7 @@ Source/
   - [x] Waking: a producer wakes an I/O thread only when all sleep; an I/O thread takes at most 16 requests per round and wakes a sleeping sibling when more are waiting (Design §10.12).
   - [x] Found and fixed: `Destroy` could hang when a ring was full of requests that only a cancel ends (also with one I/O thread). One place in each ring now stays free for a cancel.
   - [x] Tests (6 new in `Tests.Engine` / `Tests.FPC.Engine`): bad thread counts, a backlog is shared, a light load stays on one thread, `Destroy` cancels over 4 rings, both stress tests with 4 I/O threads; 30 repeated runs without a failure.
-  - [x] Benchmark (`Delphi.IOUring.Benchmarks.Blocks`, now also unbuffered and with 2 and 4 I/O threads): with 4 I/O threads the block reader read **3.2× as many unbuffered 4 KiB blocks** as with one, and with cached data it is now **1.3–1.6× faster than `ReadFile`**; data from the disk through the file cache gains nothing ([Benchmarks.md](Benchmarks.md#several-io-threads-phase-15)). The default stays 1 I/O thread.
+  - [x] Benchmark (`Pascal.IOUring.Benchmarks.Blocks`, now also unbuffered and with 2 and 4 I/O threads): with 4 I/O threads the block reader read **3.2× as many unbuffered 4 KiB blocks** as with one, and with cached data it is now **1.3–1.6× faster than `ReadFile`**; data from the disk through the file cache gains nothing ([Benchmarks.md](Benchmarks.md#several-io-threads-phase-15)). The default stays 1 I/O thread.
 
   **Done 2026-10-23** – Delphi 211 tests and FPC 197 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 16 – Overlap handling (decision first, Design §11)**: decide A only vs B opt-in. If B: in-flight range table per file on the I/O thread; write-after-read/write ordering, read-after-write ordering or serve-from-buffer, attach duplicate reads. Tests for each case in the Design §11 table.
@@ -266,10 +266,10 @@ Source/
   **Done 2026-10-23** – Delphi 224 tests and FPC 210 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets.
 - **Phase 17 – `TSequentialWriteOnlyFileStream`** (write-behind; can use the engine or its own ring).
   - [x] Measured first (Design §2.1): Windows does buffered writes, and unbuffered writes that extend a file, inside the submit call. So the writes go through an engine – its I/O thread does the submit – and not through a ring of the caller's thread.
-  - [x] Decided and built (Design §8.2): `Delphi.IOUring.SequentialWriter` – `TIORingSequentialWriter`, a managed record with its own engine by default or a shared one; copying `Write` and zero-copy `AcquireBuffer`/`CommitBuffer`; `Flush(AToDisk)`; unbuffered option with a cut last buffer. `TSequentialWriteOnlyFileStream` in `Delphi.IOUring.Streams`. A failed background write raises at the next call (`EWriteError` in the stream), and at `Free` if it was never raised.
+  - [x] Decided and built (Design §8.2): `Pascal.IOUring.SequentialWriter` – `TIORingSequentialWriter`, a managed record with its own engine by default or a shared one; copying `Write` and zero-copy `AcquireBuffer`/`CommitBuffer`; `Flush(AToDisk)`; unbuffered option with a cut last buffer. `TSequentialWriteOnlyFileStream` in `Pascal.IOUring.Streams`. A failed background write raises at the next call (`EWriteError` in the stream), and at `Free` if it was never raised.
   - [x] New platform calls: `CreateFileForWrite`, `SetFileSize`.
   - [x] Tests `Tests.SequentialWriter` / `Tests.FPC.SequentialWriter` (25 each): round trips around the buffer size and with pieces of every size, zero-copy, `Flush`, unbuffered, failed writes (made with a byte-range lock), bad arguments, wrong call order, end of scope, stats, a shared engine with 4 writers, and the stream with `CopyFrom`, `SaveToStream`, `Seek` rules and errors.
-  - [x] Benchmark: new program `Delphi.IOUring.Benchmarks.Writes` (Delphi and FPC, `Build-FPC.ps1 -Project Writes`) – 1 and 10 GiB against `TFileStream` and `TBufferedFileStream`, writing only and with CPU work. With work, 1 GiB was written **25–45 % sooner** (10 GiB: 3–21 %, the disk is the limit); writing alone gains nothing; unbuffered gets the data onto the disk soonest with a third of the CPU time ([Benchmarks.md](Benchmarks.md#writing-phase-17)).
+  - [x] Benchmark: new program `Pascal.IOUring.Benchmarks.Writes` (Delphi and FPC, `Build-FPC.ps1 -Project Writes`) – 1 and 10 GiB against `TFileStream` and `TBufferedFileStream`, writing only and with CPU work. With work, 1 GiB was written **25–45 % sooner** (10 GiB: 3–21 %, the disk is the limit); writing alone gains nothing; unbuffered gets the data onto the disk soonest with a third of the CPU time ([Benchmarks.md](Benchmarks.md#writing-phase-17)).
 
   **Done 2026-10-23** – Delphi 249 tests and FPC 235 tests pass on Win32 and Win64 (Delphi Debug and Release, FPC with and without `-O3`); `lazbuild` builds the FPC test project for both targets. **Milestone 3 is complete.**
 
@@ -277,12 +277,12 @@ Source/
 
 ## Milestone 4 – Linux through Free Pascal
 
-- **Phase 18** – `Delphi.IOUring.Backend.Posix.API`: complete `linux/io_uring.h` translation (Design §6.4) + syscall wrappers, layout tests on x86-64 and AArch64.
+- **Phase 18** – `Pascal.IOUring.Backend.Linux.API`: complete `linux/io_uring.h` translation (Design §6.4) + syscall wrappers, layout tests on x86-64 and AArch64.
   - [x] Decided first (Design §6.4, decision 17): raw system calls, no liburing; the header of Linux 6.8 (Ubuntu 24.04 LTS); layout tests generated from the C header; the Linux tests run in WSL.
-  - [x] `Delphi.IOUring.Backend.Posix.API`: every constant, enum, flag and record of the header with its C name, the mmap offsets, `__kernel_timespec`, the system call numbers, and `io_uring_setup`, `io_uring_enter`, `io_uring_enter2`, `io_uring_register` (they return `-errno` and raise nothing). Standalone: RTL only.
-  - [x] Layout tests generated: `Generate-PosixApiLayout.sh` first checks that `PosixApiLayout.c` names everything in the header (200 constants, 20 records, 147 fields), then builds it with gcc; it writes 373 checks into `Tests.Linux.Backend.Posix.API.Layout.inc`. A name the Pascal unit does not have does not compile.
+  - [x] `Pascal.IOUring.Backend.Linux.API`: every constant, enum, flag and record of the header with its C name, the mmap offsets, `__kernel_timespec`, the system call numbers, and `io_uring_setup`, `io_uring_enter`, `io_uring_enter2`, `io_uring_register` (they return `-errno` and raise nothing). Standalone: RTL only.
+  - [x] Layout tests generated: `Generate-LinuxApiLayout.sh` first checks that `LinuxApiLayout.c` names everything in the header (200 constants, 20 records, 147 fields), then builds it with gcc; it writes 373 checks into `Tests.Backend.Linux.API.Layout.inc`. A name the Pascal unit does not have does not compile.
   - [x] Live tests (22): setup and its errors, the ring memory, no-ops, reads and writes through the ring, end of file, errors in the completion, registered files and buffers, the probe, `io_uring_enter` errors, timeouts.
-  - [x] New test program `Delphi.IOUring.UnitTests.Linux.lpr`; `Build-FPC.ps1 -Platform Linux64` builds and runs it inside WSL.
+  - [x] New test program `Pascal.IOUring.UnitTests.Linux.lpr`; `Build-FPC.ps1 -Platform Linux64` builds and runs it inside WSL.
   - [x] Found on the way: FPC aligns a variant part (a C union) to the largest field in it – also the fields after the union. In the SQE the flags union moved from offset 28 to 32. Fixed with `packed` for the two records concerned (Design §6.4); the generated layout tests caught it on their first run.
   - [x] AArch64: tested in CI on GitHub's ARM64 runner (Phase 23): the layout tests pass, and the generator gives the same checks there (Design §6.4).
 
@@ -291,11 +291,11 @@ Source/
   - [x] Decided first (Design §12.4, decision 18): FPCUnit names for the checks, one Free Pascal runner for Windows and Linux, on main.
   - [x] `Tests.Support`: the base class `TIORingTestCase` (FPCUnit's `TTestCase`, or a DUnitX fixture that resets itself before each test), `RegisterTests`, `RunThreads`, `Log`, `CheckPattern`, shared pattern files. Compiles on Linux too.
   - [x] The 13 test topics moved to `Source/UnitTests/Common`, one unit each, made from the FPC twins; the tests and log lines that only Delphi had were ported. Old twins and `TestThreadHelpers` removed.
-  - [x] One Free Pascal runner (`FPC/Delphi.IOUring.UnitTests.FPC.lpr`) for Windows and Linux; the Linux tests use the same base class; `Build-FPC.ps1 -Platform Linux64` builds it in WSL.
+  - [x] One Free Pascal runner (`FPC/Pascal.IOUring.UnitTests.FPC.lpr`) for Windows and Linux; the Linux tests use the same base class; `Build-FPC.ps1 -Platform Linux64` builds it in WSL.
   - [x] Found on the way: DUnitX runs all tests of a class on one object (FPCUnit: one object per test); three tests had no counted check; RTL differences (`GetTickCount64`, `constref`, `TStreamReader`, `string` size) – Design §12.4.
 
   **Done 2026-10-23** – Delphi 242 tests (Win32 and Win64, Debug and Release), FPC 241 on Windows (Win32 and Win64, with and without `-O3`), FPC 32 on Linux (WSL2, with and without `-O3`); `lazbuild` builds the Lazarus test project. Delphi has one test more (`ReadOverloads_Work`: overloads FPC 3.2.2's `TStream` lacks).
-- **Phase 20** – `TLinuxIORing` record in `Delphi.IOUring.Backend.Posix` and the platform record `TLinuxIORingPlatform`; `Atomics` on Linux (futex; AArch64 acquire/release); the Linux side of the test helpers; the shared suites that need no engine (atomics, request pool and queue, ring, sequential reader) run on Linux (WSL2 is enough for x86-64 development). Decided: Design §5.7, decision 19.
+- **Phase 20** – `TLinuxIORing` record in `Pascal.IOUring.Backend.Linux` and the platform record `TLinuxIORingPlatform`; `Atomics` on Linux (futex; AArch64 acquire/release); the Linux side of the test helpers; the shared suites that need no engine (atomics, request pool and queue, ring, sequential reader) run on Linux (WSL2 is enough for x86-64 development). Decided: Design §5.7, decision 19.
   - [x] `TLinuxIORing`: the same methods as `TWindowsIORing`; one `mmap` for both rings; `Submit` repeats `io_uring_enter` until every prepared entry is in; timeouts with `IORING_ENTER_EXT_ARG`; registration as a system call with its own completion; scatter/gather segments copied and cut to the byte count; the `eventfd` only when `CompletionEventHandle` is asked for.
   - [x] `TLinuxIORingPlatform` (`O_DIRECT`, `posix_fadvise`, `statx` for the alignment, `mmap`, `AT_PAGESZ`, `clock_gettime`); `FreePages` got a size parameter on both systems. `NativeResult` is 0 or a negative error code on both systems.
   - [x] Atomics on Linux: the futex; AArch64 barriers (tested on ARM64 in CI, Phase 23).
@@ -319,7 +319,7 @@ Source/
   - [x] Measured first (WSL2): SQPOLL gives no gain for file I/O and costs much more CPU time; links and socket operations work through the ring.
   - [x] `TLinuxIORing.PrepareSqe` (any io_uring operation, one completion per entry) and `LinkToNext` (linked operations), in the low-level ring.
   - [x] SQPOLL and all other definitions stay in the API unit; an API test with a SQPOLL ring.
-  - [x] Shared capabilities for both systems: `SystemDescription`, `NotAvailableReason`, `NativeFeatures`, `NativeOps`, `Extras`, `ToString`; `IORingCapabilities` in `Delphi.IOUring`.
+  - [x] Shared capabilities for both systems: `SystemDescription`, `NotAvailableReason`, `NativeFeatures`, `NativeOps`, `Extras`, `ToString`; `IORingCapabilities` in `Pascal.IOUring`.
   - [x] Tests: 11 Linux-only (`Tests.Linux.Extras`: sockets, links), the SQPOLL API test, a shared capabilities test.
 
   **Done 2026-10-24** – Linux: 243 tests pass in WSL2 (Ubuntu 24.04 and 26.04), with and without `-O3`. Windows: Delphi 246 tests (Win32 and Win64, Debug and Release), FPC 245 (Win32 and Win64, with and without `-O3`; also FPC trunk 3.3.1, Win64); `lazbuild` builds the test project; the benchmarks compile with Delphi and FPC, and the FPC ones also on Linux.
@@ -344,7 +344,7 @@ free, ARM64 included.)
 
   **Done 2026-10-24** – CI green on Linux x64, Linux ARM64 and Windows Server 2025 (Free Pascal 3.2.2: tests debug and `-O3`, layout check, benchmarks built); AArch64 verified, one AArch64 bug found and fixed (`O_DIRECT`); failed tests become annotations. Locally unchanged: Delphi 246 tests, FPC 245 on Windows, 243 on Linux (WSL2).
 - **Phase 24** – A Lazarus package (`.lpk`), so a Lazarus project adds the library in one step. No Delphi package: Delphi compiles the library into the program from `Source/Units`. Decided: Design §12.6.
-  - [x] `Source/Packages/Lazarus/DelphiIOUring.lpk`, version 0.1, runtime only; the four backend units are not in its main unit, so each system compiles only its own. Lazarus's generated `DelphiIOUring.pas` committed with it (the normalize script leaves it alone).
+  - [x] `Source/Packages/Lazarus/PascalIOUring.lpk`, version 0.1, runtime only; the four backend units are not in its main unit, so each system compiles only its own. Lazarus's generated `PascalIOUring.pas` committed with it (the normalize script leaves it alone).
   - [x] `Build-FPC.ps1 -Project Package` compiles the package's main unit with FPC (Win32, Win64, Linux64; on Linux machines also LinuxArm64); CI does it on all three runners.
   - [x] CI no longer runs the benchmarks (the workflow's inputs and artifacts are gone); the tests stay on every push.
   - [x] README: how to use the library from Delphi (search path) and Lazarus (the package).
@@ -354,7 +354,7 @@ free, ARM64 included.)
   - [x] `Source/Demos`: `Capabilities`, `CopyFile`, `Checksum`, `ReadBlocks`, `EngineCallbacks`, `SocketEcho` (Linux only), and `Common/Demo.Common.pas` (a temporary file, a clock). Each runs without arguments and checks its own result, or takes a file name.
   - [x] Each demo: one `.dpr`, a `.dproj` (Delphi, Win32 and Win64; not `SocketEcho`) and an `.lpi` (Lazarus, through the package).
   - [x] `Build-FPC.ps1 -Project Demos [-Run]`; CI builds and runs the demos on all three runners.
-  - [x] `IORING_LIBRARY_VERSION = '0.1.0'`; `IORingCapabilities.ToString` ends with "Library: Delphi.IOUring 0.1.0".
+  - [x] `IORING_LIBRARY_VERSION = '0.1.0'`; `IORingCapabilities.ToString` ends with "Library: Pascal.IOUring 0.1.0".
 
   **Done 2026-10-24** – The demos build and run with FPC (Win32, Win64, Ubuntu 24.04 and 26.04), Delphi (Win32 and Win64, Debug and Release) and Lazarus (Win32, Win64). Tests: Delphi 246, FPC 245 on Windows, 243 on Linux.
 
@@ -373,7 +373,7 @@ Only what a benchmark has already shown:
 
   **Done 2026-10-24** – Tests: Delphi 252 (Win32 and Win64, Debug and Release), FPC 251 (Win32 and Win64, with and without `-O3`), Linux 249 (WSL2, with and without `-O3`); the demos run on Win64 and Linux; the benchmarks and the Lazarus package compile. The Linux clock stays as it is (measured: less than 0.1 %).
 - **Phase 27** – The atomics on AArch64: on GitHub's ARM64 runner the lock-free structures sometimes lose to a mutex (queue with 2–3 producers in a tight loop 0.87–0.90; free list with 4 threads and work 0.88), while on x86-64 they always win. Every atomic operation there has full barriers around it, and FPC 3.2.2 does not inline its `ReadWriteBarrier` on AArch64. Measure inline barriers and lighter ordering (acquire/release instructions); keep the lock-free structures only where they win (Design §10.5). Decided: Design §12.9 – measure in a hand-started ARM64 workflow; assembler routines, each kept only if it wins; one code path for all CPUs.
-  - [x] `Delphi.IOUring.Atomics` on AArch64: small assembler routines – compare-exchange, exchange and fetch-add as `ldxr`/`stlxr` loops with one `dmb ish` after them; `LoadAcquire` = `ldar`, `StoreRelease` = `stlr`; `CpuPause` = `yield` (`IORING_ATOMICS_AARCH64_ISB`: `isb`). `IORING_ATOMICS_AARCH64_RTL` keeps the way before, for comparing.
+  - [x] `Pascal.IOUring.Atomics` on AArch64: small assembler routines – compare-exchange, exchange and fetch-add as `ldxr`/`stlxr` loops with one `dmb ish` after them; `LoadAcquire` = `ldar`, `StoreRelease` = `stlr`; `CpuPause` = `yield` (`IORING_ATOMICS_AARCH64_ISB`: `isb`). `IORING_ATOMICS_AARCH64_RTL` keeps the way before, for comparing.
   - [x] `.github/workflows/arm64-atomics.yml` (started by hand) and `.github/scripts/Measure-Atomics.ps1`: tests, then the Structures benchmark as `rtl`, `yield` and `isb`, in turns; tables as annotations and in the job summary. `Build-FPC.ps1 -Define`.
   - [x] First run on the ARM64 runner (2026-10-25): FPC 3.2.2 accepts the instructions; the tests pass (debug and `-O3`); Structures benchmark in Design §12.9.
   - [x] Kept: the assembler routines (+52 % free list, +30 % queue with one thread) with `CpuPause` = `isb` (queue with 2–3 producers 7–9× faster than before; `yield` hardly helps). Lock-free now beats the mutex everywhere on ARM64: decision 3 not needed.
@@ -441,19 +441,20 @@ choice.
 - **Phase 28** – Tidy up before 0.1.0: review of code, API, names and structure. Decided: Design §12.10 – all six points as proposed.
   - [x] API names (2): `ATimeoutMilliseconds`, only `IORING_INFINITE`, `TIORingSequentialReaderStats` / `TIORingSequentialWriterStats`, `TIORingEngine.Stats` a property, `IORingReadAt` / `IORingWriteAt`, `TIORingUserData` in the engine.
   - [x] Internal types nested in the records that use them (3): slots of the readers and the writer, the queue's cells, the free list's links.
-  - [x] Platform units of their own (4): `Delphi.IOUring.Backend.Windows.Platform`, `Delphi.IOUring.Backend.Posix.Platform` (in the Lazarus package); one buffer check for the reader and the writer (`IORingCheckBufferArguments`, `IORingCheckSectorMultiple`).
+  - [x] Platform units of their own (4): `Pascal.IOUring.Backend.Windows.Platform`, `Pascal.IOUring.Backend.Linux.Platform` (in the Lazarus package); one buffer check for the reader and the writer (`IORingCheckBufferArguments`, `IORingCheckSectorMultiple`).
   - [x] The Linux clock (5): measured in WSL2 with the Blocks benchmark (new option `--cache`), six rounds – no gain, FPC's clock stays; `IORING_CLOCK_LIBC` for comparing. The ARM64 workflow ("ARM64 benchmarks") can measure it on the runner (`benchmark: clock`).
   - [x] Found on the way: a rare hang of the engine on Linux (a completion before the ring's eventfd was registered) – fixed; the Linux tests then passed 10 runs in a row.
   - [x] Small things (6): §14 closed (neutral ref records stay); answered [VERIFY] and [DECIDE later] markers removed; the two findings of GitHub's runners parked (§13); a plan for Linux sockets (§13).
   - [x] The Windows benchmarks again, locally (Delphi Win64; Benchmarks.md, "The Windows numbers again"): the same as before or better; nothing the library does got slower.
   - [x] Tests (2026-10-25): Delphi 252 (Win32 and Win64, Debug and Release), FPC 251 (Win32 and Win64, with and without `-O3`; trunk on Win64), Linux 249 (WSL2, debug and `-O3`, 10 runs in a row after the fix); the demos run on Win64 and Linux; the benchmarks and the Lazarus package compile.
-  - [ ] Unit names and the library's new name (1) – asked first; then the tag 0.1.0 (by the owner).
+  - [x] The library's new name and the unit names (1), after asking (2026-10-25): Delphi.IOUring → **Pascal.IOUring** (every unit, project, the Lazarus package `PascalIOUring`, the test and benchmark folders); `Backend.Custom` → `Pascal.IOUring.Types`; `Backend.Posix…` → `Backend.Linux…`; the Linux API tests `Tests.Backend.Linux.API…`, the layout generator `Generate-LinuxApiLayout.sh`. Files moved with `git mv`.
+  - [ ] The GitHub repository renamed to Pascal.IOUring (by the owner), then the tag 0.1.0 (by the owner).
 
 ---
 
 ## Immediate next step
 
-Phase 28 (Milestone 7) is built and tested, except its last step: the new
-names (the library Pascal.IOUring and the unit names of Design §12.10,
-decision 1) are to be asked before they are done, then the owner tags
-0.1.0. After that the library goes into a real program (decided d.).
+Phase 28 (Milestone 7) is built and tested, and the library is now called
+Pascal.IOUring. Left for the owner: rename the GitHub repository to
+Pascal.IOUring and tag 0.1.0. After that the library goes into a real
+program (decided d.).

@@ -2,7 +2,7 @@
 
 {
   Small helpers of the demos: a temporary test file and a clock. Nothing here
-  uses Delphi.IOUring - the demos show the library, this only sets the stage.
+  uses Pascal.IOUring - the demos show the library, this only sets the stage.
 }
 
 {$IFDEF FPC}
@@ -11,7 +11,7 @@
 
 interface
 
-  // <temp folder>/Delphi.IOUring.Demo.<AName>
+  // <temp folder>/Pascal.IOUring.Demo.<AName>
   function DemoFileName(const AName: string): string;
 
   // Writes ASize bytes of changing data into AFileName (an existing file is replaced), with a plain TFileStream
@@ -40,9 +40,9 @@ uses
 function DemoFileName(const AName: string): string;
 begin
 {$IFDEF FPC}
-  Result := IncludeTrailingPathDelimiter(GetTempDir(False)) + 'Delphi.IOUring.Demo.' + AName;
+  Result := IncludeTrailingPathDelimiter(GetTempDir(False)) + 'Pascal.IOUring.Demo.' + AName;
 {$ELSE}
-  Result := TPath.Combine(TPath.GetTempPath, 'Delphi.IOUring.Demo.' + AName);
+  Result := TPath.Combine(TPath.GetTempPath, 'Pascal.IOUring.Demo.' + AName);
 {$ENDIF}
 end;
 

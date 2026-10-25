@@ -24,8 +24,8 @@
   the runs), and the CPU time of all threads. Free list: one operation = take
   + give; queue: one value through the queue.
 
-  Shared by Delphi (Delphi.IOUring.Benchmarks.Structures.dpr) and Free Pascal
-  (FPC\Delphi.IOUring.Benchmarks.Structures.FPC.lpr).
+  Shared by Delphi (Pascal.IOUring.Benchmarks.Structures.dpr) and Free Pascal
+  (FPC\Pascal.IOUring.Benchmarks.Structures.FPC.lpr).
 
   Options:
     --only <name>      freelist or queue (default: both)
@@ -36,7 +36,7 @@
     --csv <file>       append every single run to this CSV file
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -50,8 +50,8 @@ uses
 {$ELSE}
   System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Atomics, Delphi.IOUring.Backend.Custom, Delphi.IOUring.RequestPool,
-  Delphi.IOUring.RequestQueue, Bench.Common;
+  Pascal.IOUring, Pascal.IOUring.Atomics, Pascal.IOUring.Types, Pascal.IOUring.RequestPool,
+  Pascal.IOUring.RequestQueue, Bench.Common;
 
 {$IFDEF FPC}
 const

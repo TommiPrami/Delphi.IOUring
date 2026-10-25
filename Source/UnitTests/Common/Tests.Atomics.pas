@@ -1,7 +1,7 @@
 ﻿unit Tests.Atomics;
 
 {
-  Tests for TAtomic (Delphi.IOUring.Atomics).
+  Tests for TAtomic (Pascal.IOUring.Atomics).
 
   One thread: the result of every operation for every type. 64-bit values
   have different upper and lower halves, so a Win32 version that handles
@@ -19,7 +19,7 @@
   The thread bodies are methods of the test (Work*), run by RunThreads.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -87,7 +87,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring.Atomics;
+  Pascal.IOUring.Atomics;
 
 const
   THREAD_COUNT = 4;

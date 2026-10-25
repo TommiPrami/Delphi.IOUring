@@ -1,7 +1,7 @@
 ﻿unit Tests.Engine;
 
 {
-  Tests for TIORingEngine (Delphi.IOUring.Engine): reads, writes and flushes
+  Tests for TIORingEngine (Pascal.IOUring.Engine): reads, writes and flushes
   with their results; end of file and errors; Wait with a timeout,
   TryGetResult, WaitAll; callbacks on the I/O thread; batches; a full request
   pool; Destroy with requests in flight (they complete as cancelled, and a
@@ -11,7 +11,7 @@
   Pipes give requests that stay pending until the test writes to the pipe.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -21,7 +21,7 @@ uses
 {$ELSE}
   System.Classes,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Engine, TestPlatformHelpers, Tests.Support;
+  Pascal.IOUring, Pascal.IOUring.Engine, TestPlatformHelpers, Tests.Support;
 
 type
   TIORingEngineTests = class(TIORingTestCase)
@@ -105,7 +105,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring.Atomics, Delphi.IOUring.Backend.Custom, TestFileHelpers;
+  Pascal.IOUring.Atomics, Pascal.IOUring.Types, TestFileHelpers;
 
 const
   PATTERN_FILE_SIZE = 4 * 1024 * 1024;

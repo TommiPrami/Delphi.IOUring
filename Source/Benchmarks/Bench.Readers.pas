@@ -7,7 +7,7 @@
   same code.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -19,7 +19,7 @@ uses
   Winapi.Windows,
   {$ENDIF}
 {$ENDIF}
-  Delphi.IOUring.SequentialReader, Bench.Common;
+  Pascal.IOUring.SequentialReader, Bench.Common;
 
 const
   STREAM_READ_SIZE = 64 * 1024;
@@ -62,7 +62,7 @@ uses
 {$ELSE}
   System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Streams;
+  Pascal.IOUring, Pascal.IOUring.Streams;
 
 procedure ReadWithFileStream(const AFileName: string; const AReadSize: Integer; var AConsumer: TBenchConsumer);
 var

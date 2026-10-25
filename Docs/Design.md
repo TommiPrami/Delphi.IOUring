@@ -1,4 +1,9 @@
-﻿# Delphi.IOUring – Design Specification
+﻿# Pascal.IOUring – Design Specification
+
+(Until Phase 28 the library was called Delphi.IOUring; its units
+`Delphi.IOUring.Backend.Custom` and `….Backend.Posix` are now
+`Pascal.IOUring.Types` and `….Backend.Linux` – §12.10. The notes of earlier
+phases use the new names, except the review of §12.10.)
 
 Status: **Draft v1.3** (2026-10-23) – Milestones 1, 2 and 3 complete: Delphi 13 and
 Free Pascal 3.2.2 on Windows, Win32 and Win64 (§12.1). Milestone 1 (Phases 1–5):
@@ -265,26 +270,26 @@ barrier. That is the shape of the core API. Everything outside the subset
 ```
  ┌────────────────────────────────────────────────────────────────────────┐
  │ Layer 3 – Convenience (classes, because TStream is a class)            │
- │   Delphi.IOUring.Streams   TSequentialReadOnlyFileStream               │
+ │   Pascal.IOUring.Streams   TSequentialReadOnlyFileStream               │
  ├────────────────────────────────────────────────────────────────────────┤
  │ Layer 2 – Helpers / engine (records where possible)                    │
- │   Delphi.IOUring.SequentialReader  TIORingSequentialReader (record)   │
- │   Delphi.IOUring.Engine            the I/O thread, Wait, callbacks     │
+ │   Pascal.IOUring.SequentialReader  TIORingSequentialReader (record)   │
+ │   Pascal.IOUring.Engine            the I/O thread, Wait, callbacks     │
  │                                    later: more threads, overlaps       │
- │   Delphi.IOUring.BlockReader       known blocks through the engine     │
- │   Delphi.IOUring.Atomics           CAS / fences / wait-on-address      │
- │   Delphi.IOUring.RequestPool       request slots, lock-free free list  │
- │   Delphi.IOUring.RequestQueue      lock-free queue to the I/O thread   │
+ │   Pascal.IOUring.BlockReader       known blocks through the engine     │
+ │   Pascal.IOUring.Atomics           CAS / fences / wait-on-address      │
+ │   Pascal.IOUring.RequestPool       request slots, lock-free free list  │
+ │   Pascal.IOUring.RequestQueue      lock-free queue to the I/O thread   │
  ├────────────────────────────────────────────────────────────────────────┤
  │ Layer 1 – Core abstraction (OS independent, records)                   │
- │   Delphi.IOUring.Backend.Custom    shared types, constants, errors     │
- │   Delphi.IOUring.Backend.Windows   TWindowsIORing (record)             │
- │   Delphi.IOUring.Backend.Posix     TLinuxIORing (record)               │
- │   Delphi.IOUring                   TIORing = platform ring, helpers    │
+ │   Pascal.IOUring.Types    shared types, constants, errors     │
+ │   Pascal.IOUring.Backend.Windows   TWindowsIORing (record)             │
+ │   Pascal.IOUring.Backend.Linux     TLinuxIORing (record)               │
+ │   Pascal.IOUring                   TIORing = platform ring, helpers    │
  ├────────────────────────────────────────────────────────────────────────┤
  │ Layer 0 – Complete OS API translations (standalone, reusable)          │
- │   Delphi.IOUring.Backend.Windows.API   100 % of ioringapi.h            │
- │   Delphi.IOUring.Backend.Posix.API     100 % of linux/io_uring.h       │
+ │   Pascal.IOUring.Backend.Windows.API   100 % of ioringapi.h            │
+ │   Pascal.IOUring.Backend.Linux.API     100 % of linux/io_uring.h       │
  └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -292,25 +297,27 @@ Unit responsibilities:
 
 | Unit | Contents | Depends on |
 | --- | --- | --- |
-| `Delphi.IOUring.Backend.Windows.API` | Complete translation of the Windows IoRing API (§6). Nothing else. | `Winapi.Windows` only |
-| `Delphi.IOUring.Backend.Posix.API` | Complete translation of the Linux io_uring user API (§6.4). | RTL only |
-| `Delphi.IOUring.Backend.Custom` | OS-neutral types (`TIORingCompletion`, `TIORingFileRef`, `TIORingBufferRef`, flags, capabilities), `EIORingError`, shared inline helper routines | RTL only |
-| `Delphi.IOUring.Backend.Windows` | `TWindowsIORing` record, built on the Windows API unit | Custom, Windows.API |
-| `Delphi.IOUring.Backend.Posix` | `TLinuxIORing` record, built on the Posix API unit | Custom, Posix.API |
-| `Delphi.IOUring` *(new)* | `TIORing` = the platform ring type (compile-time alias), `IORingAvailable`, blocking helpers | Custom + platform unit via `{$IFDEF}` |
-| `Delphi.IOUring.SequentialReader` *(new)* | Read-ahead engine, usable without streams | `Delphi.IOUring` |
-| `Delphi.IOUring.SequentialWriter` *(new)* | `TIORingSequentialWriter`: write-behind through an engine, usable without streams (§8.2) | `Delphi.IOUring`, Engine |
-| `Delphi.IOUring.Streams` | `TStream` descendants: the read stream and the write stream | SequentialReader, SequentialWriter, Engine |
-| `Delphi.IOUring.Atomics` *(new)* | `TAtomic`: one place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5, §10.6) | RTL only |
-| `Delphi.IOUring.RequestPool` *(new)* | `TIORingRequestPool` (request slots, states, handles, waiting) and `TIORingFreeList` (lock-free stack) (§10.3, §10.7) | `Delphi.IOUring`, Atomics |
-| `Delphi.IOUring.RequestQueue` *(new)* | `TIORingRequestQueue`: bounded lock-free queue from the producers to an I/O thread (§10.5, §10.8) | `Delphi.IOUring`, Atomics |
-| `Delphi.IOUring.Engine` *(new)* | `TIORingEngine`: one or more I/O threads, each with its own ring; `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`, callbacks, batches (§10.4, §10.9, §10.12); the overlap rule `orKeepOrder` as an option (§11, §10.13) | `Delphi.IOUring`, Atomics, RequestPool, RequestQueue |
-| `Delphi.IOUring.BlockReader` *(new)* | `TIORingBlockReader`: blocks known in advance (a provider or a list), read through the engine with read-ahead and merging, delivered in order (§10.4, §10.10) | `Delphi.IOUring`, Engine |
+| `Pascal.IOUring.Backend.Windows.API` | Complete translation of the Windows IoRing API (§6). Nothing else. | `Winapi.Windows` only |
+| `Pascal.IOUring.Backend.Linux.API` | Complete translation of the Linux io_uring user API (§6.4). | RTL only |
+| `Pascal.IOUring.Types` | OS-neutral types (`TIORingCompletion`, `TIORingFileRef`, `TIORingBufferRef`, flags, capabilities), `EIORingError`, shared inline helper routines | RTL only |
+| `Pascal.IOUring.Backend.Windows` | `TWindowsIORing` record, built on the Windows API unit | Types, Windows.API |
+| `Pascal.IOUring.Backend.Windows.Platform` | `TWindowsIORingPlatform`: files, memory, clock, wake event (Phase 28) | Types |
+| `Pascal.IOUring.Backend.Linux` | `TLinuxIORing` record, built on the Linux API unit | Types, Linux.API, Linux.Platform |
+| `Pascal.IOUring.Backend.Linux.Platform` | `TLinuxIORingPlatform`: the same for Linux (Phase 28) | Types |
+| `Pascal.IOUring` *(new)* | `TIORing` = the platform ring type (compile-time alias), `TIORingPlatform`, `IORingAvailable`, blocking helpers | Types + the platform's units via `{$IFDEF}` |
+| `Pascal.IOUring.SequentialReader` *(new)* | Read-ahead engine, usable without streams | `Pascal.IOUring` |
+| `Pascal.IOUring.SequentialWriter` *(new)* | `TIORingSequentialWriter`: write-behind through an engine, usable without streams (§8.2) | `Pascal.IOUring`, Engine |
+| `Pascal.IOUring.Streams` | `TStream` descendants: the read stream and the write stream | SequentialReader, SequentialWriter, Engine |
+| `Pascal.IOUring.Atomics` *(new)* | `TAtomic`: one place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5, §10.6) | RTL only |
+| `Pascal.IOUring.RequestPool` *(new)* | `TIORingRequestPool` (request slots, states, handles, waiting) and `TIORingFreeList` (lock-free stack) (§10.3, §10.7) | `Pascal.IOUring`, Atomics |
+| `Pascal.IOUring.RequestQueue` *(new)* | `TIORingRequestQueue`: bounded lock-free queue from the producers to an I/O thread (§10.5, §10.8) | `Pascal.IOUring`, Atomics |
+| `Pascal.IOUring.Engine` *(new)* | `TIORingEngine`: one or more I/O threads, each with its own ring; `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`, callbacks, batches (§10.4, §10.9, §10.12); the overlap rule `orKeepOrder` as an option (§11, §10.13) | `Pascal.IOUring`, Atomics, RequestPool, RequestQueue |
+| `Pascal.IOUring.BlockReader` *(new)* | `TIORingBlockReader`: blocks known in advance (a provider or a list), read through the engine with read-ahead and merging, delivered in order (§10.4, §10.10) | `Pascal.IOUring`, Engine |
 
 The "all OS-specific code lives in the `Backend.<OS>` units" rule still holds:
 the `.API` units are the raw translation, the `Backend.<OS>` unit next to it
-is the library's implementation on top of it. The new `Delphi.IOUring` unit
-is needed because `Backend.Custom` must not use the platform units (that
+is the library's implementation on top of it. The new `Pascal.IOUring` unit
+is needed because `Pascal.IOUring.Types` must not use the platform units (that
 would make them circular); it sits above both and is the unit user code
 normally `uses`.
 
@@ -333,7 +340,7 @@ microseconds. So:
    against `TIORing`, which keeps the two implementations honest.
 
    **`inline` – decided in Phase 2:** the public methods are **not** `inline`.
-   User code reaches them through the aliases in `Delphi.IOUring`, and Delphi
+   User code reaches them through the aliases in `Pascal.IOUring`, and Delphi
    expands an inline routine only if the caller also lists the unit that
    implements it; otherwise every call site gets hint H2443. A normal call
    costs about 1 ns next to the 50–100 ns of the Windows `Build*` call it
@@ -417,7 +424,7 @@ unit. **Not planned until a benchmark asks for it.**
 
 ## 5. Core API (Layer 1) – draft
 
-### 5.1 Types (`Delphi.IOUring.Backend.Custom`)
+### 5.1 Types (`Pascal.IOUring.Types`)
 
 All plain records.
 
@@ -585,7 +592,7 @@ Design rules:
 
 #### Implementation notes (Phase 2)
 
-The code (`Delphi.IOUring.Backend.Windows.pas`, `Delphi.IOUring.pas`) is the
+The code (`Pascal.IOUring.Backend.Windows.pas`, `Pascal.IOUring.pas`) is the
 reference; this is what it does where the draft above was open or differs:
 
 - **Close waits.** `CloseIoRing` does **not** cancel operations that are still
@@ -628,7 +635,7 @@ reference; this is what it does where the draft above was open or differs:
 ### 5.3 Sync vs async
 
 There is only **one** mechanism – the async ring. "Sync" is a helper in
-`Delphi.IOUring`:
+`Pascal.IOUring`:
 
 ```pascal
 // Blocking helpers: Prepare + Submit(wait 1) + Pop, raise on error.
@@ -715,8 +722,8 @@ Usage styles, from fastest/most manual to most convenient:
   thread sleeps and is woken), then the block reader, overlap rule and write
   stream suites, and the benchmarks on Linux. The Linux extras move to
   Phase 22.
-- **`TLinuxIORing` (`Delphi.IOUring.Backend.Posix`)** has the same public
-  methods as `TWindowsIORing`, so `Delphi.IOUring` exports it as `TIORing`:
+- **`TLinuxIORing` (`Pascal.IOUring.Backend.Linux`)** has the same public
+  methods as `TWindowsIORing`, so `Pascal.IOUring` exports it as `TIORing`:
   - `Open`: `io_uring_setup`, the completion queue at least twice the
     submission queue (`IORING_SETUP_CQSIZE`), the memory mapped once
     (`IORING_FEAT_SINGLE_MMAP`).
@@ -777,7 +784,7 @@ Usage styles, from fastest/most manual to most convenient:
 **Phase 20 implementation notes** (2026-10-24):
 
 - Built as decided: `TLinuxIORing`, `TLinuxIORingPlatform` and the Linux
-  `TIORingSegment` (`Delphi.IOUring.Backend.Posix`); `Delphi.IOUring`
+  `TIORingSegment` (`Pascal.IOUring.Backend.Linux`); `Pascal.IOUring`
   exports them as `TIORing`, `TIORingPlatform` and `TIORingSegment`. The
   atomics sleep and wake with the futex. On AArch64 every atomic operation
   has DMB barriers around it, `CpuPause` does nothing (first run on ARM in
@@ -939,7 +946,7 @@ Windows, and the higher layers (reader, engine, streams) stay as they are.
     `ieRawEntries` (Windows: none);
   - `ToString` – all of it in a few lines.
 
-  `Delphi.IOUring` gets `IORingCapabilities`, next to `IORingAvailable`.
+  `Pascal.IOUring` gets `IORingCapabilities`, next to `IORingAvailable`.
 
 **Phase 22 implementation notes** (2026-10-24):
 
@@ -1143,7 +1150,7 @@ plus the three syscall wrappers. x86-64 and AArch64 only.
   newer kernels added (4 more feature bits, a few opcodes and register
   codes) can follow with a newer pin; the generated layout tests (below)
   make that cheap. The core subset (§2.3) needs nothing newer than 5.11.
-- **`Delphi.IOUring.Backend.Posix.API`, standalone** like the Windows unit:
+- **`Pascal.IOUring.Backend.Linux.API`, standalone** like the Windows unit:
   original C names; `{$PACKRECORDS C}`; C unions as variant parts of records;
   all constants, enums, flags and records of the header; the mmap offsets
   (`IORING_OFF_SQ_RING`, …); the wrappers `io_uring_setup`, `io_uring_enter`
@@ -1159,7 +1166,7 @@ plus the three syscall wrappers. x86-64 and AArch64 only.
   no-op through it, register files and buffers, ask the kernel which
   opcodes it has (`IORING_REGISTER_PROBE`), and the error cases (for
   example 0 entries: `-EINVAL`).
-- **A Linux test program:** `Delphi.IOUring.UnitTests.Linux.lpr` (FPCUnit;
+- **A Linux test program:** `Pascal.IOUring.UnitTests.Linux.lpr` (FPCUnit;
   the Windows test project uses Windows calls throughout). `Build-FPC.ps1`
   gets `-Platform Linux64`, which compiles and runs it inside WSL, so the
   same script builds everything.
@@ -1169,9 +1176,9 @@ plus the three syscall wrappers. x86-64 and AArch64 only.
 
 **Phase 18 implementation notes** (2026-10-23):
 
-- Built as decided: `Delphi.IOUring.Backend.Posix.API` (Free Pascal, Linux,
+- Built as decided: `Pascal.IOUring.Backend.Linux.API` (Free Pascal, Linux,
   x86-64 and AArch64; only the RTL units `BaseUnix` and `Syscall`). The test
-  program is `Source/UnitTests/Linux/Delphi.IOUring.UnitTests.Linux.lpr`:
+  program is `Source/UnitTests/Linux/Pascal.IOUring.UnitTests.Linux.lpr`:
   `Build-FPC.ps1 -Project Tests -Platform Linux64 -Run`.
 - How C maps to Pascal: a union is the variant part of a record; the fields
   after a union are inside its last variant, so every member keeps its C
@@ -1191,11 +1198,11 @@ plus the three syscall wrappers. x86-64 and AArch64 only.
   fine in a simple test.
 - **[VERIFIED]** FPC's `do_SysCall` returns -1 and sets `errno` on failure.
   The wrappers give back `-errno`, the kernel's own form (as liburing does).
-- The layout checks: `Generate-PosixApiLayout.sh` (bash and gcc, on Linux)
-  reads the header and stops if `PosixApiLayout.c` misses a constant, record
+- The layout checks: `Generate-LinuxApiLayout.sh` (bash and gcc, on Linux)
+  reads the header and stops if `LinuxApiLayout.c` misses a constant, record
   or field of it (6.8: 200 constants, 20 records, 147 fields). Then the C
   program writes 373 checks (sizes, offsets, values) into
-  `Tests.Linux.Backend.Posix.API.Layout.inc`; the output is the same on
+  `Tests.Backend.Linux.API.Layout.inc`; the output is the same on
   every run. A name the Pascal unit does not have does not compile. A new
   header pin: run the script and add what it reports.
 - **[VERIFIED] what the kernel does** (6.18 in WSL2; the live tests):
@@ -1314,7 +1321,7 @@ than the disk delivers it, `DataReady` is always `True` and `Read` is just a
 
 ### Implementation notes (Phase 3)
 
-The code (`Delphi.IOUring.SequentialReader.pas`) is the reference; where it
+The code (`Pascal.IOUring.SequentialReader.pas`) is the reference; where it
 differs from the sketch above:
 
 - **Options:** `sroUnbuffered`, `sroNoSequentialScanHint`, plus two for
@@ -1395,7 +1402,7 @@ code catching `EStreamError` keeps working.
 
 #### Implementation notes (Phase 4)
 
-- `Delphi.IOUring.Streams`. The stream overrides `Read`/`Write` for `Longint`
+- `Pascal.IOUring.Streams`. The stream overrides `Read`/`Write` for `Longint`
   and, in Delphi on 64-bit, the new `NativeInt` overloads of Delphi 13 (so
   big reads go straight to the reader instead of being split by `TStream`).
   The `TBytes`, `Read64`/`Write64` and `ReadData` overloads all end up there.
@@ -1436,10 +1443,10 @@ goes on.
 
 **Two parts, as on the read side:**
 
-- `TIORingSequentialWriter` (unit `Delphi.IOUring.SequentialWriter`): a
+- `TIORingSequentialWriter` (unit `Pascal.IOUring.SequentialWriter`): a
   managed record that does the work.
 - `TSequentialWriteOnlyFileStream = class(TStream)` in
-  `Delphi.IOUring.Streams`, a thin wrapper.
+  `Pascal.IOUring.Streams`, a thin wrapper.
 
 ```pascal
 type
@@ -1515,8 +1522,8 @@ also keeps the file cache free.
 
 #### Implementation notes (Phase 17)
 
-Built as decided above: `Delphi.IOUring.SequentialWriter` (the record) and
-`TSequentialWriteOnlyFileStream` in `Delphi.IOUring.Streams`. Where the code
+Built as decided above: `Pascal.IOUring.SequentialWriter` (the record) and
+`TSequentialWriteOnlyFileStream` in `Pascal.IOUring.Streams`. Where the code
 adds to the decisions:
 
 - **Buffers in turn.** The buffers in flight are always the oldest ones,
@@ -1653,14 +1660,14 @@ collect requests from all threads into a few rings. That is the engine.
   A stale completion or a late `Wait` on a reused slot is detected.
 - A request handle is a small plain record (one `NativeUInt`) the caller
   can `Wait` on, poll, or cancel.
-- Built in Phase 11 (`Delphi.IOUring.RequestPool`); details in §10.7.
+- Built in Phase 11 (`Pascal.IOUring.RequestPool`); details in §10.7.
 
 ### 10.4 Engine APIs (sketch)
 
 **Phase 13 decisions (2026-10-22, before coding; for review)** – built as
 written; implementation notes and findings in §10.9:
 
-- `TIORingEngine` (class, unit `Delphi.IOUring.Engine`):
+- `TIORingEngine` (class, unit `Pascal.IOUring.Engine`):
   `Create(AMaxRequests = 1024, ASubmissionQueueSize = 256)` – request pool of
   `AMaxRequests` slots, request queue of the same size (so enqueue never
   fails), one ring, one I/O thread.
@@ -1715,7 +1722,7 @@ written; implementation notes and findings in §10.9:
 **Phase 14 decisions (2026-10-23, before coding; for review)** – the read
 stream with a block provider:
 
-- `TIORingBlockReader` (unit `Delphi.IOUring.BlockReader`): a managed
+- `TIORingBlockReader` (unit `Pascal.IOUring.BlockReader`): a managed
   record like `TIORingSequentialReader`, used by one thread, reading through
   a shared `TIORingEngine` (not owned) from a file handle (not owned).
 - **Callback or list: both.** The core is a provider,
@@ -1793,7 +1800,7 @@ shutdown). On the hot path:
 | I/O thread sleeping | Waits on {request-queue signal, ring completion event}. Producers signal only when the I/O thread has announced it is going to sleep (a flag set with CAS), so a busy engine costs producers no syscall. **Built in Phase 13** (§10.9). |
 | Counters / stats | Owned by one thread where possible; otherwise atomic increments on counters padded to their own **cache line** (64 bytes) to avoid false sharing. Queue head/tail counters are padded the same way. |
 
-All atomics go through one small unit, `Delphi.IOUring.Atomics` (CAS,
+All atomics go through one small unit, `Pascal.IOUring.Atomics` (CAS,
 exchange, add, load-acquire, store-release, CPU pause/yield, wait/wake on
 address). Delphi intrinsics (`AtomicCmpExchange`, …) and FPC routines
 (`InterlockedCompareExchange…`) differ, and AArch64 (Linux) needs real
@@ -1807,7 +1814,7 @@ ties, the lock stays.
 
 ### 10.6 Atomics unit – implementation notes (Phase 10)
 
-`Delphi.IOUring.Atomics` has one type, `TAtomic`: a record with only static
+`Pascal.IOUring.Atomics` has one type, `TAtomic`: a record with only static
 class methods (nothing to create). Most methods are `inline`.
 
 | Group | Methods | Types |
@@ -1871,7 +1878,7 @@ with Delphi Debug and Release, and with FPC with and without `-O3`
 
 ### 10.7 Request pool – implementation notes (Phase 11)
 
-`Delphi.IOUring.RequestPool` has two managed records (copying one raises,
+`Pascal.IOUring.RequestPool` has two managed records (copying one raises,
 like `TIORing`):
 
 - **`TIORingFreeList`** – a lock-free stack (Treiber) of the indices
@@ -1944,7 +1951,7 @@ threads – in Delphi and FPC, Win32 and Win64. **It stays.**
 
 ### 10.8 Request queue – implementation notes (Phase 12)
 
-`Delphi.IOUring.RequestQueue` has one managed record, `TIORingRequestQueue`:
+`Pascal.IOUring.RequestQueue` has one managed record, `TIORingRequestQueue`:
 a bounded first-in first-out queue of pointer-sized values (request handles)
 – Dmitry Vyukov's bounded MPMC queue.
 
@@ -1974,7 +1981,7 @@ a bounded first-in first-out queue of pointer-sized values (request handles)
 - `Count` is exact only when the queue is idle; otherwise it is a moment's
   picture.
 
-Also new in `Delphi.IOUring.Atomics`: `TAtomic.BackOff` (moved from the free
+Also new in `Pascal.IOUring.Atomics`: `TAtomic.BackOff` (moved from the free
 list, now shared) and `IORingAllocCacheAligned` (cache-line aligned memory,
 used by the pool, the free list and the queue).
 
@@ -2010,14 +2017,14 @@ as every producer and starves when there are many of them. **It stays.**
 
 ### 10.9 Engine – implementation notes (Phase 13)
 
-`Delphi.IOUring.Engine` has `TIORingEngine` (a class, shared by threads), built
+`Pascal.IOUring.Engine` has `TIORingEngine` (a class, shared by threads), built
 as decided in §10.4. Its parts: a request pool of `MaxRequests` slots (the
 payload holds the operation, file, buffer, count, offset, the caller's
 `UserData`, the callback and the result), a request queue of the same size
 (a request is in it at most once, so it is never full), one ring, the I/O
 thread, and an auto-reset "new requests" event. The unit re-exports
-`TIORingRequestHandle`, so users need only `Delphi.IOUring` and
-`Delphi.IOUring.Engine`.
+`TIORingRequestHandle`, so users need only `Pascal.IOUring` and
+`Pascal.IOUring.Engine`.
 
 **The I/O thread**, one round:
 
@@ -2110,7 +2117,7 @@ runs.
 
 ### 10.10 Block reader – implementation notes (Phase 14)
 
-`Delphi.IOUring.BlockReader` has `TIORingBlockReader`, built as decided in
+`Pascal.IOUring.BlockReader` has `TIORingBlockReader`, built as decided in
 §10.4 ("Phase 14 decisions"): a managed record used by one thread, reading
 through a shared engine from a file handle; neither is owned by the reader.
 
@@ -2338,7 +2345,7 @@ take far longer than a wake-up (0 of 25 since).
 
 ### 10.13 Overlap rule – implementation notes (Phase 16)
 
-Built as decided in §11 ("Phase 16 decisions"), in `Delphi.IOUring.Engine`.
+Built as decided in §11 ("Phase 16 decisions"), in `Pascal.IOUring.Engine`.
 
 **Routing.** With `orKeepOrder`, `StartRequest` puts a request into the own
 queue of the I/O thread `(handle shr 2) mod IOThreadCount` (handles are
@@ -2689,9 +2696,9 @@ Where `{$IFDEF FPC}` is accepted (and only there):
 - `uses` clauses (`System.SysUtils` vs `SysUtils`, `Winapi.Windows` vs
   `Windows`).
 - Managed-record operator declarations.
-- `Delphi.IOUring.Atomics` internals.
+- `Pascal.IOUring.Atomics` internals.
 - The API unit's import mechanism (FPC has no `delayed`, §6.3).
-- The raise helpers in `Delphi.IOUring.Backend.Custom`: `noreturn` for
+- The raise helpers in `Pascal.IOUring.Types`: `noreturn` for
   Delphi only (FPC's trunk refuses it on a routine that raises), and the
   caller's address (Delphi `ReturnAddress`, FPC `get_caller_addr`) –
   [CodingStyle.md](CodingStyle.md), "Raising".
@@ -2719,7 +2726,7 @@ tested.
 - The coding style – layout, the 120-character margin, comments, empty
   lines, `inherited`, raising through the raise helpers, `const`/`var`
   parameters – is in [CodingStyle.md](CodingStyle.md) (2026-10-24).
-- Every unit includes `Delphi.IOUring.inc` (holds `{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}`
+- Every unit includes `Pascal.IOUring.inc` (holds `{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}`
   and shared switches).
 - OS constants as typed constants, not enums.
 - Parameter style matching the existing skeletons: `A`-prefixed, `const`
@@ -2729,7 +2736,7 @@ tested.
      purpose** (2026-10-23), so the debugger can step into every routine.
      Delphi: the Debug configurations set "inlining off" (`--inline:off`).
      FPC: the define `IORING_NO_INLINE` switches `{$INLINE OFF}` on in
-     `Delphi.IOUring.inc` (`-Si-` does not work: `{$MODE DELPHI}` turns
+     `Pascal.IOUring.inc` (`-Si-` does not work: `{$MODE DELPHI}` turns
      inlining on again); `Build-FPC.ps1` sets it unless `-Optimize` is given,
      and the Lazarus test project sets it too. What depends on inlining is
      therefore tested in the Release / `-Optimize` builds – both are part of
@@ -2806,9 +2813,9 @@ Found while looking (2026-10-23):
   are a few calls, not different tests. The Linux side of the helpers comes
   with `TLinuxIORing` (Phase 20).
 - **Thin runners.** The Delphi program stays where it is
-  (`Delphi.IOUring.UnitTests.dpr`: DUnitX, TestInsight). **One Free Pascal
+  (`Pascal.IOUring.UnitTests.dpr`: DUnitX, TestInsight). **One Free Pascal
   program for Windows and Linux:**
-  `FPC/Delphi.IOUring.UnitTests.FPC.lpr`, with `{$IFDEF MSWINDOWS}` and
+  `FPC/Pascal.IOUring.UnitTests.FPC.lpr`, with `{$IFDEF MSWINDOWS}` and
   `{$IFDEF LINUX}` in its `uses`; `Build-FPC.ps1 -Platform Linux64` builds
   it in WSL. `Source/UnitTests/Linux` keeps only what is for Linux only (the
   API tests and the layout generator).
@@ -2825,7 +2832,7 @@ Found while looking (2026-10-23):
 
 - Built as decided. `Source/UnitTests/Common` has the 13 test units, the
   helpers and `Tests.Support`; the Delphi runner and the one Free Pascal
-  runner (`FPC/Delphi.IOUring.UnitTests.FPC.lpr`) use them. The old twins
+  runner (`FPC/Pascal.IOUring.UnitTests.FPC.lpr`) use them. The old twins
   (`Tests.*.pas` for Delphi, `FPC/Tests.FPC.*.pas`) and the Delphi-only
   `TestThreadHelpers` are gone. Every unit was made from the FPC twin by a
   script (unit name, `uses` with `{$IFDEF FPC}`, registration), then the
@@ -2858,7 +2865,7 @@ Found while looking (2026-10-23):
   test that compared file bytes with a `string` now compares `TBytes`.
 - `Tests.Support` compiles on Linux too (no Windows calls outside
   `{$IFDEF MSWINDOWS}`; the RTL's interlocked calls instead of
-  `Delphi.IOUring.Atomics`, which is Windows-only until Phase 20). The FPC
+  `Pascal.IOUring.Atomics`, which is Windows-only until Phase 20). The FPC
   runner needs `cthreads` on Linux, which links the C library:
   `Build-FPC.ps1 -Platform Linux64` passes gcc's library folder (`-Fl`).
 - Result: Delphi 242 tests (Win32 and Win64, Debug and Release), FPC 241 on
@@ -2902,7 +2909,7 @@ notes, 2026-10-24):
 - **[DECIDE] 1. What runs where.** Proposed:
   - `ubuntu-24.04` (x64) and `ubuntu-24.04-arm` (ARM64): the Free Pascal
     tests, debug build and `-O3`. On ARM also the layout generator
-    (`Generate-PosixApiLayout.sh`, gcc there): its output must equal the
+    (`Generate-LinuxApiLayout.sh`, gcc there): its output must equal the
     committed `.inc`, so the C header's layout is checked on AArch64 too.
   - `windows-2025`: the Free Pascal tests, Win32 and Win64, debug and
     `-O3` – if the runner has IoRing version 4; if not, build only, and the
@@ -2951,7 +2958,7 @@ capabilities report at the top of the test program's output (3).
   is `O_DIRECTORY`, and `O_DIRECT` is `0200000`. FPC 3.2.2's
   `BaseUnix.O_DIRECT` is `040000` on every CPU, so every unbuffered open
   failed: `ENOTDIR` when opening, `EINVAL` when creating. Fixed with an
-  own `O_DIRECT_FLAG` per CPU in `Delphi.IOUring.Backend.Posix` (and in
+  own `O_DIRECT_FLAG` per CPU in `Pascal.IOUring.Backend.Linux` (and in
   `TestPlatformHelpers`). The other open flags the library uses are the
   same on both CPUs.
 - The logs of a run need a GitHub sign-in, the annotations do not (they
@@ -2998,20 +3005,20 @@ one step: the IDE knows the library, and the units are compiled once.
 **Facts found before Phase 24** (trial packages in a scratch folder,
 2026-10-24):
 
-- **[VERIFIED] Delphi 13:** a runtime package named `Delphi.IOUring` – the
+- **[VERIFIED] Delphi 13:** a runtime package named `Pascal.IOUring` – the
   same name as its main unit – builds without warnings for Win32 and Win64
   from the command line, with every unit except the two Linux ones. With
-  `{$LIBSUFFIX AUTO}` the file is `Delphi.IOUring370.bpl` (the compiler
+  `{$LIBSUFFIX AUTO}` the file is `Pascal.IOUring370.bpl` (the compiler
   version in the name, so packages of several Delphi versions can be
-  installed side by side), the compiled interface `Delphi.IOUring.dcp`. A
-  program that uses `Delphi.IOUring` with runtime packages (`rtl`,
-  `Delphi.IOUring`) builds and runs (a 21 KB program).
+  installed side by side), the compiled interface `Pascal.IOUring.dcp`. A
+  program that uses `Pascal.IOUring` with runtime packages (`rtl`,
+  `Pascal.IOUring`) builds and runs (a 21 KB program).
 - **[VERIFIED] Lazarus:** a package name must be an identifier, so
-  `DelphiIOUring`. A runtime-only package with all 14 units builds with
+  `PascalIOUring`. A runtime-only package with all 14 units builds with
   `lazbuild` for Win64 and Win32 (Lazarus 5.0 RC1) and with the trunk
   Lazarus. The four backend units are not in the package's main unit
   (`AddToUsesPkgSection` False): each system then compiles only its own
-  backend. Lazarus writes that main unit (`DelphiIOUring.pas`, a plain
+  backend. Lazarus writes that main unit (`PascalIOUring.pas`, a plain
   `uses` list); compiled with FPC in WSL it takes the Linux backend.
 - The library has no components, so no design-time package is needed.
 - GitHub's runners have Free Pascal but no Lazarus; Delphi only runs here.
@@ -3019,12 +3026,12 @@ one step: the IDE knows the library, and the units are compiled once.
 **Phase 24 proposal:**
 
 - **[DECIDE] 1. Names and places.** Proposed:
-  `Source/Packages/Delphi/Delphi.IOUring.dpk` (with its `.dproj`; Win32
+  `Source/Packages/Delphi/Pascal.IOUring.dpk` (with its `.dproj`; Win32
   and Win64; runtime only; `{$LIBSUFFIX AUTO}`) and
-  `Source/Packages/Lazarus/DelphiIOUring.lpk` (runtime only; all units, the
+  `Source/Packages/Lazarus/PascalIOUring.lpk` (runtime only; all units, the
   backends kept out of the main unit as above; Lazarus's generated
-  `DelphiIOUring.pas` committed with it, as Lazarus packages usually are).
-  Other choice: the plain name `DelphiIOUring` for both.
+  `PascalIOUring.pas` committed with it, as Lazarus packages usually are).
+  Other choice: the plain name `PascalIOUring` for both.
 - **[DECIDE] 2. Version and settings.** Proposed: both packages say version
   0.9 until the 1.0 release (Phase 25 sets it). The Delphi package's Debug
   configuration turns inlining off, like the test project; Release is
@@ -3046,7 +3053,7 @@ one step: the IDE knows the library, and the units are compiled once.
 - **1 changed: no Delphi package.** In Delphi the library is compiled into
   the program from `Source/Units`; a package adds nothing there. Only the
   Lazarus package, in the place proposed:
-  `Source/Packages/Lazarus/DelphiIOUring.lpk`, with its generated main unit.
+  `Source/Packages/Lazarus/PascalIOUring.lpk`, with its generated main unit.
 - **2 changed: the version stays below 1.0 for a long time** – also when
   everything planned now is done. Once others use the library, suggestions
   (also for the API) are expected first. The package starts at **0.1**;
@@ -3060,18 +3067,18 @@ one step: the IDE knows the library, and the units are compiled once.
 
 **Phase 24 implementation notes** (2026-10-24):
 
-- `Source/Packages/Lazarus/DelphiIOUring.lpk`: runtime only, version 0.1,
+- `Source/Packages/Lazarus/PascalIOUring.lpk`: runtime only, version 0.1,
   requires FCL, all 14 units and the include file; the four backend units
   with `AddToUsesPkgSection` False. Paths are relative (`../../Units`).
   `lazbuild` left the hand-written `.lpk` as it was.
-- The generated main unit `DelphiIOUring.pas` is committed. Lazarus writes
+- The generated main unit `PascalIOUring.pas` is committed. Lazarus writes
   it in its own format (ASCII, CRLF, no BOM) whenever the package is
   compiled, so `Normalize-SourceEncoding.ps1` skips it by default – the two
   would otherwise keep changing it back and forth.
 - `Build-FPC.ps1 -Project Package` compiles that main unit with FPC, like
   Lazarus does: the same check on Windows, in WSL and on the CI runners,
   where there is no Lazarus. Each build takes its own backend (Windows on
-  Win32/Win64, Posix on Linux).
+  Win32/Win64, Linux on Linux).
 
 ### 12.7 Examples and the first tagged version (Phase 25)
 
@@ -3085,7 +3092,7 @@ and run. And there is no version anyone can point at.
   `{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}` and `cthreads` under `{$IFDEF UNIX}`
   builds with Delphi through a `.dproj` made from the benchmarks' template
   (Win32 and Win64, Debug and Release), with Lazarus through an `.lpi`
-  whose main file is the `.dpr` and which requires the `DelphiIOUring`
+  whose main file is the `.dpr` and which requires the `PascalIOUring`
   package (`lazbuild` finds it through a relative path), and with plain FPC.
   The programs run.
 - The README's examples use only the library and the RTL – no Windows
@@ -3117,7 +3124,7 @@ and run. And there is no version anyone can point at.
   arguments – they take seconds; CI does the same on its runners.
 - **[DECIDE] 3. The first tagged version, 0.1.0.** Proposed:
   - `CHANGELOG.md` with what 0.1.0 has (in short, by milestone);
-  - a constant `IORING_LIBRARY_VERSION = '0.1.0'` in `Delphi.IOUring`, and
+  - a constant `IORING_LIBRARY_VERSION = '0.1.0'` in `Pascal.IOUring`, and
     `IORingCapabilities.ToString` names it, so a log says which version
     ran;
   - the README links the examples and says how to get a version;
@@ -3321,7 +3328,7 @@ On GitHub's ARM64 runner the lock-free structures sometimes lose to a mutex
 loop gets 0.87–0.90 of the mutex queue, the free list with 4 threads and
 work 0.88. On x86-64 they always win.
 
-**Facts found before Phase 27** (`Delphi.IOUring.Atomics` and the FPC
+**Facts found before Phase 27** (`Pascal.IOUring.Atomics` and the FPC
 3.2.2 sources, 2026-10-25):
 
 - FPC 3.2.2's `InterlockedCompareExchange`, `InterlockedExchange` and
@@ -3359,7 +3366,7 @@ work 0.88. On x86-64 they always win.
   without benchmarks. Other choice: an input of the existing CI workflow
   (removed in Phase 24).
 - **[DECIDE] 2. What to build.** Proposed: small assembler routines for
-  AArch64 (Free Pascal only) in `Delphi.IOUring.Atomics`, with the same
+  AArch64 (Free Pascal only) in `Pascal.IOUring.Atomics`, with the same
   rules for callers as now (§10.6):
   - compare-exchange, exchange and fetch-add: one routine each – an
     `ldxr`/`stlxr` loop and one `dmb ish` after it (the fully ordered
@@ -3519,7 +3526,7 @@ the small things (6).
 **Phase 28 implementation notes** (2026-10-25):
 
 - **API names (2):** `ATimeoutMilliseconds` everywhere; only
-  `IORING_INFINITE` (the atomics use it from `Backend.Custom`);
+  `IORING_INFINITE` (the atomics use it from `Pascal.IOUring.Types`);
   `TIORingSequentialReaderStats` and `TIORingSequentialWriterStats`;
   `TIORingEngine.Stats` is a property; `IORingReadAt` and `IORingWriteAt`;
   the engine's user data is `TIORingUserData`.
@@ -3532,10 +3539,10 @@ the small things (6).
   inside the methods the short name is enough. Both compilers accept this
   (Delphi 13, FPC 3.2.2 and trunk). The structures benchmark has its own
   `TCardinalArray` now.
-- **Platform units (4):** `Delphi.IOUring.Backend.Windows.Platform`
-  (`TWindowsIORingPlatform`) and `Delphi.IOUring.Backend.Posix.Platform`
+- **Platform units (4):** `Pascal.IOUring.Backend.Windows.Platform`
+  (`TWindowsIORingPlatform`) and `Pascal.IOUring.Backend.Linux.Platform`
   (`TLinuxIORingPlatform`, renamed with the other Linux units later);
-  `Delphi.IOUring` exports them as `TIORingPlatform` as before, so user code
+  `Pascal.IOUring` exports them as `TIORingPlatform` as before, so user code
   does not change. The ring units are now 827 (Windows) and 1 285 (Linux)
   lines, the platform units 270 and 326. The Lazarus package lists the two
   new units. Three constants are in both Linux units (`SYSCALL_EVENTFD2`,
@@ -3543,7 +3550,7 @@ the small things (6).
   io_uring header, and a shared unit for three constants is not worth it.
 - **One buffer check (4):** `IORingCheckBufferArguments` (size a multiple
   of the unit, count in range, all buffers together not too big; returns
-  the total size) and `IORingCheckSectorMultiple` in `Backend.Custom`, used
+  the total size) and `IORingCheckSectorMultiple` in `Pascal.IOUring.Types`, used
   by the reader and the writer. The unbuffered message now says
   "Unbuffered I/O needs …" for both.
 - **The clock (5): [VERIFIED] no gain in WSL2, so FPC's clock stays.** The
@@ -3590,8 +3597,13 @@ the small things (6).
   The Windows benchmarks ran again (Benchmarks.md, "The Windows numbers
   again"): the same as before or better – nothing the library does got
   slower.
-- Still to come: the unit names and the library's new name (1), asked
-  first; then the tag 0.1.0.
+- **The new names (1),** after asking: the library is **Pascal.IOUring**
+  (it is as much Free Pascal as Delphi) – every unit, project and the
+  Lazarus package (`PascalIOUring`); `Delphi.IOUring.Backend.Custom` is
+  `Pascal.IOUring.Types`, `….Backend.Posix…` is `….Backend.Linux…`, the
+  Linux API tests are `Tests.Backend.Linux.API…`. The text of this design
+  uses the new names everywhere except in the review above. Left: the
+  GitHub repository's new name and the tag 0.1.0 (both by the owner).
 
 ---
 
@@ -3671,6 +3683,6 @@ the OS's layout: the neutral records stay (Phase 28 – §5.1 and §12.10).
 | 18 | 2026-10-23 | **One set of tests** for Delphi, Free Pascal and Linux in `Source/UnitTests/Common`: a base class over DUnitX and FPCUnit with the FPCUnit check names; one Free Pascal test program for Windows and Linux; done on main (§12.4). |
 | 19 | 2026-10-24 | **The Linux ring** (§5.7): Phase 20 is the ring, the platform record and the atomics on Linux, Phase 21 the engine on Linux; `NativeResult` is 0 or a negative error code on both systems (bytes in `BytesTransferred`); registration on Linux is a system call at `Prepare` with a completion of its own; minimum Linux 5.11. |
 | 20 | 2026-10-24 | **The engine on Linux** (§10.14): the I/O thread sleeps as on Windows – a wake event and the ring's completion event, through a small event API in `TIORingPlatform` (`eventfd` and `poll` on Linux; the io_uring-only way measured no faster); the benchmarks run on Linux in this phase, WSL2 results marked as not disk numbers. |
-| 21 | 2026-10-24 | **Linux extras** (§5.8): `TLinuxIORing.PrepareSqe` (any io_uring operation, for example sockets) and `LinkToNext` (linked operations) in the low-level ring, one completion per entry; SQPOLL and all other definitions stay in the API unit (measured: no gain for file I/O); the shared `TIORingCapabilities` describes either system – `SystemDescription`, `NotAvailableReason`, `NativeFeatures`, `NativeOps`, `Extras`, `ToString` – and `IORingCapabilities` in `Delphi.IOUring`. |
+| 21 | 2026-10-24 | **Linux extras** (§5.8): `TLinuxIORing.PrepareSqe` (any io_uring operation, for example sockets) and `LinkToNext` (linked operations) in the low-level ring, one completion per entry; SQPOLL and all other definitions stay in the API unit (measured: no gain for file I/O); the shared `TIORingCapabilities` describes either system – `SystemDescription`, `NotAvailableReason`, `NativeFeatures`, `NativeOps`, `Extras`, `ToString` – and `IORingCapabilities` in `Pascal.IOUring`. |
 | 22 | 2026-10-24 | **Big reads straight into the caller's memory** (§12.8): `TIORingSequentialReader.Read` (and so the read stream) reads the part of a call beyond what its buffers have asked for straight into the caller's memory, unbuffered only into sector-aligned memory; the buffers read ahead after the call once all of its reads have started. Kept although cold 64 MiB calls on Windows are about 2 % slower: warm big calls gain 8–24 %, cold ones 11–22 % on Linux. The Linux clock stays as it is (measured: less than 0.1 %). |
-| 23 | 2026-10-25 | **Tidy up before 0.1.0** (§12.10): one name per idea in the API (`ATimeoutMilliseconds`, `IORING_INFINITE`, `TIORingSequential…Stats`, `IORingReadAt`/`IORingWriteAt`); internal types nested in their records; the platform helpers in units of their own and one buffer check; the neutral ref records stay; the Linux clock stays FPC's (the C library's measured no faster in the engine). The library's new name (Pascal.IOUring) and the unit names change together, asked first. |
+| 23 | 2026-10-25 | **Tidy up before 0.1.0** (§12.10): one name per idea in the API (`ATimeoutMilliseconds`, `IORING_INFINITE`, `TIORingSequential…Stats`, `IORingReadAt`/`IORingWriteAt`); internal types nested in their records; the platform helpers in units of their own and one buffer check; the neutral ref records stay; the Linux clock stays FPC's (the C library's measured no faster in the engine). The library is renamed **Pascal.IOUring**, with `Pascal.IOUring.Types` (was `Backend.Custom`) and `Backend.Linux` (was `Backend.Posix`). |

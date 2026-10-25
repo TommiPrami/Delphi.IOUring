@@ -1,9 +1,14 @@
-﻿# Delphi.IOUring
+﻿# Pascal.IOUring
 
-[![CI](https://github.com/TommiPrami/Delphi.IOUring/actions/workflows/ci.yml/badge.svg)](https://github.com/TommiPrami/Delphi.IOUring/actions/workflows/ci.yml)
+[![CI](https://github.com/TommiPrami/Pascal.IOUring/actions/workflows/ci.yml/badge.svg)](https://github.com/TommiPrami/Pascal.IOUring/actions/workflows/ci.yml)
 
-Fast file I/O for Delphi with the operating system's I/O rings: **IoRing** on
-Windows, and `io_uring` on Linux through Free Pascal.
+Fast file I/O for Delphi and Free Pascal with the operating system's I/O
+rings: **IoRing** on Windows, and `io_uring` on Linux through Free Pascal.
+
+*Formerly **Delphi.IOUring**: renamed before version 0.1.0, because the
+library is as much Free Pascal as Delphi. The units are now
+`Pascal.IOUring.*`; `Delphi.IOUring.Backend.Custom` is
+`Pascal.IOUring.Types`, and `….Backend.Posix…` is `….Backend.Linux…`.*
 
 The first ready part is a **read-only, sequential file stream with read-ahead**:
 while your code works on one block, the next blocks are already being read.
@@ -19,23 +24,23 @@ speed of the disk – **about 6.75 GiB/s, 2.7× faster than `TFileStream` with
 
 | Part | State |
 | --- | --- |
-| Complete Windows IoRing API translation (`Delphi.IOUring.Backend.Windows.API`) | done, tested |
-| Core ring `TIORing` (`Delphi.IOUring`) | done, tested |
+| Complete Windows IoRing API translation (`Pascal.IOUring.Backend.Windows.API`) | done, tested |
+| Core ring `TIORing` (`Pascal.IOUring`) | done, tested |
 | Read-ahead reader `TIORingSequentialReader` | done, tested |
 | `TSequentialReadOnlyFileStream` | done, tested, benchmarked |
 | Free Pascal / Lazarus on Windows | done: FPC 3.2.2, Win32 and Win64, all tests pass, same speed as Delphi |
-| Atomics for the engine (`Delphi.IOUring.Atomics`: CAS, acquire/release, wait/wake) | done, tested (Delphi and FPC) |
-| Request pool for the engine (`Delphi.IOUring.RequestPool`: slots, handles, lock-free free list) | done, tested, benchmarked against a lock |
-| Request queue for the engine (`Delphi.IOUring.RequestQueue`: lock-free, producers → I/O thread) | done, tested, benchmarked against a lock |
-| I/O engine `TIORingEngine` (`Delphi.IOUring.Engine`: many threads, one or more I/O threads, many requests in flight) | done, tested, benchmarked through the block reader |
-| Block reader `TIORingBlockReader` (`Delphi.IOUring.BlockReader`: blocks known in advance, read ahead, neighbours merged, handed out in order) | done, tested, benchmarked |
+| Atomics for the engine (`Pascal.IOUring.Atomics`: CAS, acquire/release, wait/wake) | done, tested (Delphi and FPC) |
+| Request pool for the engine (`Pascal.IOUring.RequestPool`: slots, handles, lock-free free list) | done, tested, benchmarked against a lock |
+| Request queue for the engine (`Pascal.IOUring.RequestQueue`: lock-free, producers → I/O thread) | done, tested, benchmarked against a lock |
+| I/O engine `TIORingEngine` (`Pascal.IOUring.Engine`: many threads, one or more I/O threads, many requests in flight) | done, tested, benchmarked through the block reader |
+| Block reader `TIORingBlockReader` (`Pascal.IOUring.BlockReader`: blocks known in advance, read ahead, neighbours merged, handed out in order) | done, tested, benchmarked |
 | Overlap rule of the engine (`orKeepOrder`: per file handle, requests that touch the same bytes take effect in start order) | done, tested, measured |
 | Write stream `TSequentialWriteOnlyFileStream` and writer `TIORingSequentialWriter` (writing in the background) | done, tested, benchmarked |
-| Complete Linux io_uring API translation (`Delphi.IOUring.Backend.Posix.API`, Linux 6.8 header, Free Pascal) | done, tested on x86-64 (WSL2) and ARM64 (CI) |
-| Linux ring `TLinuxIORing` (`Delphi.IOUring.Backend.Posix`; `TIORing` on Linux), the read-ahead reader and the atomics on Linux | done, tested on x86-64 (WSL2) and ARM64 (CI) |
+| Complete Linux io_uring API translation (`Pascal.IOUring.Backend.Linux.API`, Linux 6.8 header, Free Pascal) | done, tested on x86-64 (WSL2) and ARM64 (CI) |
+| Linux ring `TLinuxIORing` (`Pascal.IOUring.Backend.Linux`; `TIORing` on Linux), the read-ahead reader and the atomics on Linux | done, tested on x86-64 (WSL2) and ARM64 (CI) |
 | The engine, block reader, overlap rule and both streams on Linux | done, tested on x86-64 (WSL2) and ARM64 (CI); benchmarks run in WSL2 (a first look, not disk numbers) |
 | Linux extras: any io_uring operation (sockets …) and linked operations on the ring; capabilities that describe the system | done, tested on x86-64 (WSL2) and ARM64 (CI) |
-| Lazarus package `DelphiIOUring` (version 0.1) | done, built with Lazarus 5.0 RC1 and trunk (Win32, Win64); its units compile on Linux too (CI) |
+| Lazarus package `PascalIOUring` (version 0.1) | done, built with Lazarus 5.0 RC1 and trunk (Win32, Win64); its units compile on Linux too (CI) |
 | Demos (`Source/Demos`: six small programs) | done, built and run with Delphi, Lazarus and Free Pascal (Windows, Linux) |
 
 See [Docs/Plan.md](Docs/Plan.md) and [Docs/Design.md](Docs/Design.md).
@@ -67,10 +72,10 @@ The test program prints what the system offers first
 
 - **Delphi:** add `Source\Units` to the project's search path. The library is
   compiled into the program; there is no Delphi package.
-- **Lazarus:** open `Source/Packages/Lazarus/DelphiIOUring.lpk` once
+- **Lazarus:** open `Source/Packages/Lazarus/PascalIOUring.lpk` once
   (Package → Open Package File) and compile it; then add it to a project
-  (Project Inspector → Add → New Requirement → `DelphiIOUring`). From the
-  command line, `lazbuild --add-package-link=Source/Packages/Lazarus/DelphiIOUring.lpk`
+  (Project Inspector → Add → New Requirement → `PascalIOUring`). From the
+  command line, `lazbuild --add-package-link=Source/Packages/Lazarus/PascalIOUring.lpk`
   registers it. The package compiles only the backend of the system it is
   built for. (Plain Free Pascal: add `Source/Units` to the unit and include
   paths.)
@@ -102,7 +107,7 @@ All of them with Free Pascal, and each run once:
 
 ```pascal
 uses
-  Delphi.IOUring.Streams;
+  Pascal.IOUring.Streams;
 
 var
   LStream: TSequentialReadOnlyFileStream;
@@ -131,7 +136,7 @@ memory, without a copy through the stream's buffers. With cached data a
 
 ```pascal
 uses
-  Delphi.IOUring.SequentialReader;
+  Pascal.IOUring.SequentialReader;
 
 var
   LReader: TIORingSequentialReader;   // a record: closed at the end of the scope
@@ -151,7 +156,7 @@ end;
 
 ```pascal
 uses
-  Delphi.IOUring.Streams;
+  Pascal.IOUring.Streams;
 
 var
   LStream: TSequentialWriteOnlyFileStream;
@@ -175,14 +180,14 @@ as fast as `TFileStream`. Because a write fails after `Write` has returned, its
 error comes later as `EWriteError`: at a later `Write`, at `Flush`, or at
 `Free`. `[swoUnbuffered]` writes past the file cache. Write-only and
 forward-only, like the read stream the other way round. Without a stream:
-`TIORingSequentialWriter` (`Delphi.IOUring.SequentialWriter`), also with a
+`TIORingSequentialWriter` (`Pascal.IOUring.SequentialWriter`), also with a
 zero-copy API.
 
 ### The engine (many threads)
 
 ```pascal
 uses
-  Delphi.IOUring, Delphi.IOUring.Engine;
+  Pascal.IOUring, Pascal.IOUring.Engine;
 
 var
   LEngine: TIORingEngine;             // one for the program, shared by all threads
@@ -225,7 +230,7 @@ with few overlaps, and one file then uses one I/O thread
 
 ```pascal
 uses
-  Delphi.IOUring, Delphi.IOUring.Engine, Delphi.IOUring.BlockReader;
+  Pascal.IOUring, Pascal.IOUring.Engine, Pascal.IOUring.BlockReader;
 
 var
   LReader: TIORingBlockReader;        // a record: closed at the end of the scope
@@ -259,7 +264,7 @@ it.
 
 ```pascal
 uses
-  Delphi.IOUring;
+  Pascal.IOUring;
 
 var
   LRing: TIORing;                     // a record: closed at the end of the scope
@@ -274,9 +279,9 @@ begin
 end;
 ```
 
-`Delphi.IOUring.Backend.Windows.API` is a complete, standalone translation of
+`Pascal.IOUring.Backend.Windows.API` is a complete, standalone translation of
 the Windows IoRing API (`ioringapi.h`) that other projects can use on its own.
-`Delphi.IOUring.Backend.Posix.API` is the same for Linux: the whole
+`Pascal.IOUring.Backend.Linux.API` is the same for Linux: the whole
 `linux/io_uring.h` of Linux 6.8 and the three system calls, for Free Pascal
 (no C library, no liburing).
 
@@ -302,7 +307,7 @@ offers beyond the common subset; none on Windows), `NotAvailableReason`.
 ### Linux extras
 
 On Linux the ring can take any io_uring operation, for example sockets
-(`PrepareSqe`, with the names of `Delphi.IOUring.Backend.Posix.API`), and
+(`PrepareSqe`, with the names of `Pascal.IOUring.Backend.Linux.API`), and
 link an entry to the next one (`LinkToNext`). This is Linux code: Windows
 IoRing has neither.
 
@@ -330,27 +335,27 @@ only; measured, it gave no gain for file I/O and cost much more CPU time
 
 - The tests are one set for Delphi and Free Pascal (`Source\UnitTests\Common`);
   each compiler has its own runner.
-- Tests, Delphi: `Source\UnitTests\Delphi.IOUring.UnitTests.dproj` (DUnitX, Win32 and Win64).
+- Tests, Delphi: `Source\UnitTests\Pascal.IOUring.UnitTests.dproj` (DUnitX, Win32 and Win64).
 - Tests, Free Pascal: `Source\Build-FPC.ps1 -Project Tests -Platform Win32 -Run`
   (FPCUnit; calls the compiler directly, no `fpc.exe` or `lazbuild` needed).
   Add `-Optimize` to build them with `-O3`; the multi-thread tests mean most
   that way (with Delphi: the Release configuration). Without it the build is
   for debugging: no inlining, like Delphi's Debug configuration.
-  Lazarus project: `Source\UnitTests\FPC\Delphi.IOUring.UnitTests.FPC.lpi`.
+  Lazarus project: `Source\UnitTests\FPC\Pascal.IOUring.UnitTests.FPC.lpi`.
 - Tests, Linux: `Source\Build-FPC.ps1 -Project Tests -Platform Linux64 -Run`
   builds and runs them in WSL, with the FPC installed there (Ubuntu:
   `sudo apt install fpc`). On Linux all tests run except the Windows API
   tests, plus the Linux API tests. `-Distribution Ubuntu-26.04` picks another
   WSL distribution than the default one. On a Linux machine itself (x86-64
   or ARM64, with PowerShell 7): `pwsh Source/Build-FPC.ps1 -Project Tests -Run`.
-- Benchmarks: `Source\Benchmarks\Delphi.IOUring.Benchmarks.dproj`, and for Free
+- Benchmarks: `Source\Benchmarks\Pascal.IOUring.Benchmarks.dproj`, and for Free
   Pascal `Source\Build-FPC.ps1 -Project Benchmarks` – see
   [Docs/Benchmarks.md](Docs/Benchmarks.md). The engine's data structures
-  (lock-free against a lock): `Delphi.IOUring.Benchmarks.Structures.dproj`, or
+  (lock-free against a lock): `Pascal.IOUring.Benchmarks.Structures.dproj`, or
   `Build-FPC.ps1 -Project Structures`. Blocks known in advance (the block
-  reader and the engine): `Delphi.IOUring.Benchmarks.Blocks.dproj`, or
+  reader and the engine): `Pascal.IOUring.Benchmarks.Blocks.dproj`, or
   `Build-FPC.ps1 -Project Blocks`. Writing (the write stream):
-  `Delphi.IOUring.Benchmarks.Writes.dproj`, or `Build-FPC.ps1 -Project Writes`.
+  `Pascal.IOUring.Benchmarks.Writes.dproj`, or `Build-FPC.ps1 -Project Writes`.
   With `-Platform Linux64` the four Free Pascal benchmarks build (and with
   `-Run` run) in WSL.
 - How the code is written (layout, comments, empty lines, raising through

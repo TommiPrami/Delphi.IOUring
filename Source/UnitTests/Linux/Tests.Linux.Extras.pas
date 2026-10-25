@@ -7,7 +7,7 @@
   the next one.
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -42,7 +42,7 @@ type
 implementation
 
 uses
-  SysUtils, BaseUnix, Sockets, Delphi.IOUring, Delphi.IOUring.Backend.Custom, Delphi.IOUring.Backend.Posix.API;
+  SysUtils, BaseUnix, Sockets, Pascal.IOUring, Pascal.IOUring.Types, Pascal.IOUring.Backend.Linux.API;
 
 // A pointer as a __u64 of an SQE (addr)
 function AddressOf(const APointer: Pointer): UInt64;

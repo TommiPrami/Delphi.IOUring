@@ -1,9 +1,9 @@
 ﻿# Coding style
 
-How the code of Delphi.IOUring is written. It applies to all code in this
+How the code of Pascal.IOUring is written. It applies to all code in this
 repository – `Source/Units`, `Source/UnitTests`, `Source/Demos` and
 `Source/Benchmarks` – but not to third-party code (`Source/3rdParty`) or to
-files that tools write (the Lazarus package's `DelphiIOUring.pas`).
+files that tools write (the Lazarus package's `PascalIOUring.pas`).
 
 What both compilers must support, and the rules for `inline`, are in
 [Design.md](Design.md) §12.2 and §12.3.
@@ -34,8 +34,8 @@ What both compilers must support, and the rules for `inline`, are in
 - **In the interface section, function and procedure declarations are
   indented by 2**, with their comments, so the `type`, `const` and
   `implementation` sections stand out.
-- The OS API translation units (`Delphi.IOUring.Backend.Windows.API`,
-  `Delphi.IOUring.Backend.Posix.API`) keep the layout of the C headers they
+- The OS API translation units (`Pascal.IOUring.Backend.Windows.API`,
+  `Pascal.IOUring.Backend.Linux.API`) keep the layout of the C headers they
   translate.
 
 ```pascal
@@ -111,7 +111,7 @@ function IORingReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuff
   comment starts at column 0.
 
 ```pascal
-unit Delphi.IOUring.SequentialReader;
+unit Pascal.IOUring.SequentialReader;
 
 {
   Reads a file front to back with read-ahead (Docs/Design.md §7).
@@ -164,7 +164,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Engine;
+  Pascal.IOUring, Pascal.IOUring.Engine;
 ```
 
 ## Speed
@@ -202,7 +202,7 @@ the routine – that would keep them out of registers there):
   section, or a private method.
 
 The small procedure raises through one of the raise helpers of
-`Delphi.IOUring.Backend.Custom`:
+`Pascal.IOUring.Types`:
 
 | Helper | Raises |
 | --- | --- |

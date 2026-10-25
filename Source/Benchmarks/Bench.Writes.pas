@@ -19,18 +19,18 @@
   runs.
   The file is deleted after every run.
 
-  Shared by Delphi (Delphi.IOUring.Benchmarks.Writes.dpr) and Free Pascal
-  (FPC\Delphi.IOUring.Benchmarks.Writes.FPC.lpr).
+  Shared by Delphi (Pascal.IOUring.Benchmarks.Writes.dpr) and Free Pascal
+  (FPC\Pascal.IOUring.Benchmarks.Writes.FPC.lpr).
 
   Options:
-    --dir <folder>     where the test file is written (default <temp>/Delphi.IOUring.Bench)
+    --dir <folder>     where the test file is written (default <temp>/Pascal.IOUring.Bench)
     --sizes <list>     file sizes in GiB, comma separated (default 1,10)
     --runs <n>         runs per contender and case; the median is reported (default 3)
     --work-us <n>      CPU work per MiB in the work scenario (default 200)
     --csv <file>       append every single run to this CSV file
 }
 
-{$I Delphi.IOUring.inc}
+{$I Pascal.IOUring.inc}
 
 interface
 
@@ -44,7 +44,7 @@ uses
 {$ELSE}
   System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Backend.Custom, Delphi.IOUring.SequentialWriter, Delphi.IOUring.Streams,
+  Pascal.IOUring, Pascal.IOUring.Types, Pascal.IOUring.SequentialWriter, Pascal.IOUring.Streams,
   Bench.Common;
 
 {$IFDEF FPC}

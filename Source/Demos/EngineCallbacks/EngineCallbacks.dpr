@@ -30,7 +30,7 @@ uses
 {$ELSE}
   System.SysUtils, System.Classes,
 {$ENDIF}
-  Delphi.IOUring, Delphi.IOUring.Atomics, Delphi.IOUring.Backend.Custom, Delphi.IOUring.Engine,
+  Pascal.IOUring, Pascal.IOUring.Atomics, Pascal.IOUring.Types, Pascal.IOUring.Engine,
   Demo.Common in '..\Common\Demo.Common.pas';
 
 const
