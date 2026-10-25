@@ -25,7 +25,7 @@
     <RequiredPackages>
       <Item>
         <PackageName Value="PascalIOUring"/>
-        <DefaultFilename Value="../../Packages/Lazarus/PascalIOUring.lpk"/>
+        <DefaultFilename Value="../../../Packages/Lazarus/PascalIOUring.lpk"/>
       </Item>
     </RequiredPackages>
     <Units>

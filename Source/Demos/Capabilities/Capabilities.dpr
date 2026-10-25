@@ -16,7 +16,7 @@ uses
 {$IFDEF UNIX}
   cthreads,          // Free Pascal on Linux: threads (the library uses them)
 {$ENDIF}
-  Pascal.IOUring;
+  PIRUnit.IORing;
 
 begin
   Writeln(IORingCapabilities.ToString);

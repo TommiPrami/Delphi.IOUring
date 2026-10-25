@@ -1,9 +1,11 @@
 ﻿# Pascal.IOUring – Design Specification
 
-(Until Phase 28 the library was called Delphi.IOUring; its units
-`Delphi.IOUring.Backend.Custom` and `….Backend.Posix` are now
-`Pascal.IOUring.Types` and `….Backend.Linux` – §12.10. The notes of earlier
-phases use the new names, except the review of §12.10.)
+(Until Phase 28 the library was called Delphi.IOUring, and its units
+`Delphi.IOUring.*`. Now the units have the prefix `PIR`: `PIRUnit.IORing`
+(was `Delphi.IOUring`), `PIRUnit.Types` (was `….Backend.Custom`),
+`PIRUnit.Windows.Ring` / `PIRUnit.Linux.Ring` (were `….Backend.Windows` /
+`….Backend.Posix`) and so on – §12.10. The notes of earlier phases use the
+new names, except the review of §12.10.)
 
 Status: **Draft v1.3** (2026-10-23) – Milestones 1, 2 and 3 complete: Delphi 13 and
 Free Pascal 3.2.2 on Windows, Win32 and Win64 (§12.1). Milestone 1 (Phases 1–5):
@@ -144,7 +146,7 @@ Error codes (`winerror.h`, facility 0x46):
 Learn also names `IORING_E_WAIT_TIMEOUT`, `IORING_E_UNKNOWN_VERSION` and
 `IORING_E_UNKNOWN_REQUIRED_FLAG`, which do not exist in the SDK headers.
 **[VERIFIED]** what Windows really returns (Windows 11 build 26300, tests in
-`Tests.Backend.Windows.API`):
+`PIRUnit.Windows.API.Tests`):
 
 | Situation | Result |
 | --- | --- |
@@ -270,26 +272,26 @@ barrier. That is the shape of the core API. Everything outside the subset
 ```
  ┌────────────────────────────────────────────────────────────────────────┐
  │ Layer 3 – Convenience (classes, because TStream is a class)            │
- │   Pascal.IOUring.Streams   TSequentialReadOnlyFileStream               │
+ │   PIRUnit.Streams   TSequentialReadOnlyFileStream               │
  ├────────────────────────────────────────────────────────────────────────┤
  │ Layer 2 – Helpers / engine (records where possible)                    │
- │   Pascal.IOUring.SequentialReader  TIORingSequentialReader (record)   │
- │   Pascal.IOUring.Engine            the I/O thread, Wait, callbacks     │
+ │   PIRUnit.SequentialReader  TIORingSequentialReader (record)   │
+ │   PIRUnit.Engine            the I/O thread, Wait, callbacks     │
  │                                    later: more threads, overlaps       │
- │   Pascal.IOUring.BlockReader       known blocks through the engine     │
- │   Pascal.IOUring.Atomics           CAS / fences / wait-on-address      │
- │   Pascal.IOUring.RequestPool       request slots, lock-free free list  │
- │   Pascal.IOUring.RequestQueue      lock-free queue to the I/O thread   │
+ │   PIRUnit.BlockReader       known blocks through the engine     │
+ │   PIRUnit.Atomics           CAS / fences / wait-on-address      │
+ │   PIRUnit.RequestPool       request slots, lock-free free list  │
+ │   PIRUnit.RequestQueue      lock-free queue to the I/O thread   │
  ├────────────────────────────────────────────────────────────────────────┤
  │ Layer 1 – Core abstraction (OS independent, records)                   │
- │   Pascal.IOUring.Types    shared types, constants, errors     │
- │   Pascal.IOUring.Backend.Windows   TWindowsIORing (record)             │
- │   Pascal.IOUring.Backend.Linux     TLinuxIORing (record)               │
+ │   PIRUnit.Types    shared types, constants, errors     │
+ │   PIRUnit.Windows.Ring   TWindowsIORing (record)             │
+ │   PIRUnit.Linux.Ring     TLinuxIORing (record)               │
  │   Pascal.IOUring                   TIORing = platform ring, helpers    │
  ├────────────────────────────────────────────────────────────────────────┤
  │ Layer 0 – Complete OS API translations (standalone, reusable)          │
- │   Pascal.IOUring.Backend.Windows.API   100 % of ioringapi.h            │
- │   Pascal.IOUring.Backend.Linux.API     100 % of linux/io_uring.h       │
+ │   PIRUnit.Windows.API   100 % of ioringapi.h            │
+ │   PIRUnit.Linux.API     100 % of linux/io_uring.h       │
  └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -297,27 +299,28 @@ Unit responsibilities:
 
 | Unit | Contents | Depends on |
 | --- | --- | --- |
-| `Pascal.IOUring.Backend.Windows.API` | Complete translation of the Windows IoRing API (§6). Nothing else. | `Winapi.Windows` only |
-| `Pascal.IOUring.Backend.Linux.API` | Complete translation of the Linux io_uring user API (§6.4). | RTL only |
-| `Pascal.IOUring.Types` | OS-neutral types (`TIORingCompletion`, `TIORingFileRef`, `TIORingBufferRef`, flags, capabilities), `EIORingError`, shared inline helper routines | RTL only |
-| `Pascal.IOUring.Backend.Windows` | `TWindowsIORing` record, built on the Windows API unit | Types, Windows.API |
-| `Pascal.IOUring.Backend.Windows.Platform` | `TWindowsIORingPlatform`: files, memory, clock, wake event (Phase 28) | Types |
-| `Pascal.IOUring.Backend.Linux` | `TLinuxIORing` record, built on the Linux API unit | Types, Linux.API, Linux.Platform |
-| `Pascal.IOUring.Backend.Linux.Platform` | `TLinuxIORingPlatform`: the same for Linux (Phase 28) | Types |
-| `Pascal.IOUring` *(new)* | `TIORing` = the platform ring type (compile-time alias), `TIORingPlatform`, `IORingAvailable`, blocking helpers | Types + the platform's units via `{$IFDEF}` |
-| `Pascal.IOUring.SequentialReader` *(new)* | Read-ahead engine, usable without streams | `Pascal.IOUring` |
-| `Pascal.IOUring.SequentialWriter` *(new)* | `TIORingSequentialWriter`: write-behind through an engine, usable without streams (§8.2) | `Pascal.IOUring`, Engine |
-| `Pascal.IOUring.Streams` | `TStream` descendants: the read stream and the write stream | SequentialReader, SequentialWriter, Engine |
-| `Pascal.IOUring.Atomics` *(new)* | `TAtomic`: one place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5, §10.6) | RTL only |
-| `Pascal.IOUring.RequestPool` *(new)* | `TIORingRequestPool` (request slots, states, handles, waiting) and `TIORingFreeList` (lock-free stack) (§10.3, §10.7) | `Pascal.IOUring`, Atomics |
-| `Pascal.IOUring.RequestQueue` *(new)* | `TIORingRequestQueue`: bounded lock-free queue from the producers to an I/O thread (§10.5, §10.8) | `Pascal.IOUring`, Atomics |
-| `Pascal.IOUring.Engine` *(new)* | `TIORingEngine`: one or more I/O threads, each with its own ring; `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`, callbacks, batches (§10.4, §10.9, §10.12); the overlap rule `orKeepOrder` as an option (§11, §10.13) | `Pascal.IOUring`, Atomics, RequestPool, RequestQueue |
-| `Pascal.IOUring.BlockReader` *(new)* | `TIORingBlockReader`: blocks known in advance (a provider or a list), read through the engine with read-ahead and merging, delivered in order (§10.4, §10.10) | `Pascal.IOUring`, Engine |
+| `PIRUnit.Windows.API` | Complete translation of the Windows IoRing API (§6). Nothing else. | `Winapi.Windows` only |
+| `PIRUnit.Linux.API` | Complete translation of the Linux io_uring user API (§6.4). | RTL only |
+| `PIRUnit.Types` | OS-neutral types (`TIORingCompletion`, `TIORingFileRef`, `TIORingBufferRef`, flags, capabilities), `EIORingError`, shared inline helper routines | RTL only |
+| `PIRUnit.Windows.Ring` | `TWindowsIORing` record, built on the Windows API unit | Types, Windows.API |
+| `PIRUnit.Windows.Platform` | `TWindowsIORingPlatform`: files, memory, clock, wake event (Phase 28) | Types |
+| `PIRUnit.Linux.Ring` | `TLinuxIORing` record, built on the Linux API unit | Types, Linux.API, Linux.Platform |
+| `PIRUnit.Linux.Platform` | `TLinuxIORingPlatform`: the same for Linux (Phase 28) | Types |
+| `PIRUnit.IORing` *(new)* | `TIORing` = the platform ring type (compile-time alias), `TIORingPlatform`, `IORingAvailable`, blocking helpers | Types + the platform's units via `{$IFDEF}` |
+| `PIRUnit.SequentialReader` *(new)* | Read-ahead engine, usable without streams | `PIRUnit.IORing` |
+| `PIRUnit.SequentialWriter` *(new)* | `TIORingSequentialWriter`: write-behind through an engine, usable without streams (§8.2) | `PIRUnit.IORing`, Engine |
+| `PIRUnit.Streams` | `TStream` descendants: the read stream and the write stream | SequentialReader, SequentialWriter, Engine |
+| `PIRUnit.Atomics` *(new)* | `TAtomic`: one place for atomics, so Delphi/FPC and x86/ARM differences live in one unit (§10.5, §10.6) | RTL only |
+| `PIRUnit.RequestPool` *(new)* | `TIORingRequestPool` (request slots, states, handles, waiting) and `TIORingFreeList` (lock-free stack) (§10.3, §10.7) | `PIRUnit.IORing`, Atomics |
+| `PIRUnit.RequestQueue` *(new)* | `TIORingRequestQueue`: bounded lock-free queue from the producers to an I/O thread (§10.5, §10.8) | `PIRUnit.IORing`, Atomics |
+| `PIRUnit.Engine` *(new)* | `TIORingEngine`: one or more I/O threads, each with its own ring; `ReadAsync`/`WriteAsync`/`FlushAsync`, `Wait`, callbacks, batches (§10.4, §10.9, §10.12); the overlap rule `orKeepOrder` as an option (§11, §10.13) | `PIRUnit.IORing`, Atomics, RequestPool, RequestQueue |
+| `PIRUnit.BlockReader` *(new)* | `TIORingBlockReader`: blocks known in advance (a provider or a list), read through the engine with read-ahead and merging, delivered in order (§10.4, §10.10) | `PIRUnit.IORing`, Engine |
 
-The "all OS-specific code lives in the `Backend.<OS>` units" rule still holds:
-the `.API` units are the raw translation, the `Backend.<OS>` unit next to it
-is the library's implementation on top of it. The new `Pascal.IOUring` unit
-is needed because `Pascal.IOUring.Types` must not use the platform units (that
+The "all OS-specific code lives in the `PIRUnit.<System>.…` units" rule
+still holds: the `.API` units are the raw translation, the `.Ring` unit next
+to it is the library's ring on top of it, and the `.Platform` unit holds the
+other OS services the upper layers need. The `PIRUnit.IORing` unit
+is needed because `PIRUnit.Types` must not use the platform units (that
 would make them circular); it sits above both and is the unit user code
 normally `uses`.
 
@@ -340,7 +343,7 @@ microseconds. So:
    against `TIORing`, which keeps the two implementations honest.
 
    **`inline` – decided in Phase 2:** the public methods are **not** `inline`.
-   User code reaches them through the aliases in `Pascal.IOUring`, and Delphi
+   User code reaches them through the aliases in `PIRUnit.IORing`, and Delphi
    expands an inline routine only if the caller also lists the unit that
    implements it; otherwise every call site gets hint H2443. A normal call
    costs about 1 ns next to the 50–100 ns of the Windows `Build*` call it
@@ -424,7 +427,7 @@ unit. **Not planned until a benchmark asks for it.**
 
 ## 5. Core API (Layer 1) – draft
 
-### 5.1 Types (`Pascal.IOUring.Types`)
+### 5.1 Types (`PIRUnit.Types`)
 
 All plain records.
 
@@ -592,7 +595,7 @@ Design rules:
 
 #### Implementation notes (Phase 2)
 
-The code (`Pascal.IOUring.Backend.Windows.pas`, `Pascal.IOUring.pas`) is the
+The code (`PIRUnit.Windows.Ring.pas`, `PIRUnit.IORing.pas`) is the
 reference; this is what it does where the draft above was open or differs:
 
 - **Close waits.** `CloseIoRing` does **not** cancel operations that are still
@@ -635,7 +638,7 @@ reference; this is what it does where the draft above was open or differs:
 ### 5.3 Sync vs async
 
 There is only **one** mechanism – the async ring. "Sync" is a helper in
-`Pascal.IOUring`:
+`PIRUnit.IORing`:
 
 ```pascal
 // Blocking helpers: Prepare + Submit(wait 1) + Pop, raise on error.
@@ -722,8 +725,8 @@ Usage styles, from fastest/most manual to most convenient:
   thread sleeps and is woken), then the block reader, overlap rule and write
   stream suites, and the benchmarks on Linux. The Linux extras move to
   Phase 22.
-- **`TLinuxIORing` (`Pascal.IOUring.Backend.Linux`)** has the same public
-  methods as `TWindowsIORing`, so `Pascal.IOUring` exports it as `TIORing`:
+- **`TLinuxIORing` (`PIRUnit.Linux.Ring`)** has the same public
+  methods as `TWindowsIORing`, so `PIRUnit.IORing` exports it as `TIORing`:
   - `Open`: `io_uring_setup`, the completion queue at least twice the
     submission queue (`IORING_SETUP_CQSIZE`), the memory mapped once
     (`IORING_FEAT_SINGLE_MMAP`).
@@ -775,7 +778,7 @@ Usage styles, from fastest/most manual to most convenient:
   futex (private to the process). x86-64 needs nothing else. AArch64:
   acquire/release with real barriers (tested on GitHub's ARM64 runner since
   Phase 23; assembler routines since Phase 27, §12.9).
-- **Tests on Linux:** `TestPlatformHelpers` gets its Linux side (files with
+- **Tests on Linux:** `PIRUnit.Test.PlatformHelpers` gets its Linux side (files with
   a neutral set of open flags, pipes, page memory). The expected codes come
   from small helpers (for example "access denied": `E_ACCESSDENIED` on
   Windows, `-EBADF` on Linux). Tests of Windows-only behaviour stay in
@@ -784,7 +787,7 @@ Usage styles, from fastest/most manual to most convenient:
 **Phase 20 implementation notes** (2026-10-24):
 
 - Built as decided: `TLinuxIORing`, `TLinuxIORingPlatform` and the Linux
-  `TIORingSegment` (`Pascal.IOUring.Backend.Linux`); `Pascal.IOUring`
+  `TIORingSegment` (`PIRUnit.Linux.Ring`); `PIRUnit.IORing`
   exports them as `TIORing`, `TIORingPlatform` and `TIORingSegment`. The
   atomics sleep and wake with the futex. On AArch64 every atomic operation
   has DMB barriers around it, `CpuPause` does nothing (first run on ARM in
@@ -946,7 +949,7 @@ Windows, and the higher layers (reader, engine, streams) stay as they are.
     `ieRawEntries` (Windows: none);
   - `ToString` – all of it in a few lines.
 
-  `Pascal.IOUring` gets `IORingCapabilities`, next to `IORingAvailable`.
+  `PIRUnit.IORing` gets `IORingCapabilities`, next to `IORingAvailable`.
 
 **Phase 22 implementation notes** (2026-10-24):
 
@@ -973,7 +976,7 @@ Windows, and the higher layers (reader, engine, streams) stay as they are.
   not; a read of a registered file through `PrepareSqe` with
   `IOSQE_FIXED_FILE`. A SQPOLL ring through the API unit, also after its
   thread has gone to sleep (the wake-up flag).
-- Tests: 11 Linux-only tests (`Tests.Linux.Extras`), a SQPOLL test in the
+- Tests: 11 Linux-only tests (`PIRUnit.Linux.Extras.Tests`), a SQPOLL test in the
   API tests, and a shared capabilities test (both systems).
 - Found on the way: `ioringapi.h` numbers the IoRing versions 1, 2, 300,
   400, so `NativeVersion` is 400 for version 4; `ToString` says "version 4".
@@ -1150,7 +1153,7 @@ plus the three syscall wrappers. x86-64 and AArch64 only.
   newer kernels added (4 more feature bits, a few opcodes and register
   codes) can follow with a newer pin; the generated layout tests (below)
   make that cheap. The core subset (§2.3) needs nothing newer than 5.11.
-- **`Pascal.IOUring.Backend.Linux.API`, standalone** like the Windows unit:
+- **`PIRUnit.Linux.API`, standalone** like the Windows unit:
   original C names; `{$PACKRECORDS C}`; C unions as variant parts of records;
   all constants, enums, flags and records of the header; the mmap offsets
   (`IORING_OFF_SQ_RING`, …); the wrappers `io_uring_setup`, `io_uring_enter`
@@ -1176,7 +1179,7 @@ plus the three syscall wrappers. x86-64 and AArch64 only.
 
 **Phase 18 implementation notes** (2026-10-23):
 
-- Built as decided: `Pascal.IOUring.Backend.Linux.API` (Free Pascal, Linux,
+- Built as decided: `PIRUnit.Linux.API` (Free Pascal, Linux,
   x86-64 and AArch64; only the RTL units `BaseUnix` and `Syscall`). The test
   program is `Source/UnitTests/Linux/Pascal.IOUring.UnitTests.Linux.lpr`:
   `Build-FPC.ps1 -Project Tests -Platform Linux64 -Run`.
@@ -1202,7 +1205,7 @@ plus the three syscall wrappers. x86-64 and AArch64 only.
   reads the header and stops if `LinuxApiLayout.c` misses a constant, record
   or field of it (6.8: 200 constants, 20 records, 147 fields). Then the C
   program writes 373 checks (sizes, offsets, values) into
-  `Tests.Backend.Linux.API.Layout.inc`; the output is the same on
+  `PIRInclude.Linux.API.Layout.inc`; the output is the same on
   every run. A name the Pascal unit does not have does not compile. A new
   header pin: run the script and add what it reports.
 - **[VERIFIED] what the kernel does** (6.18 in WSL2; the live tests):
@@ -1321,7 +1324,7 @@ than the disk delivers it, `DataReady` is always `True` and `Read` is just a
 
 ### Implementation notes (Phase 3)
 
-The code (`Pascal.IOUring.SequentialReader.pas`) is the reference; where it
+The code (`PIRUnit.SequentialReader.pas`) is the reference; where it
 differs from the sketch above:
 
 - **Options:** `sroUnbuffered`, `sroNoSequentialScanHint`, plus two for
@@ -1402,7 +1405,7 @@ code catching `EStreamError` keeps working.
 
 #### Implementation notes (Phase 4)
 
-- `Pascal.IOUring.Streams`. The stream overrides `Read`/`Write` for `Longint`
+- `PIRUnit.Streams`. The stream overrides `Read`/`Write` for `Longint`
   and, in Delphi on 64-bit, the new `NativeInt` overloads of Delphi 13 (so
   big reads go straight to the reader instead of being split by `TStream`).
   The `TBytes`, `Read64`/`Write64` and `ReadData` overloads all end up there.
@@ -1443,10 +1446,10 @@ goes on.
 
 **Two parts, as on the read side:**
 
-- `TIORingSequentialWriter` (unit `Pascal.IOUring.SequentialWriter`): a
+- `TIORingSequentialWriter` (unit `PIRUnit.SequentialWriter`): a
   managed record that does the work.
 - `TSequentialWriteOnlyFileStream = class(TStream)` in
-  `Pascal.IOUring.Streams`, a thin wrapper.
+  `PIRUnit.Streams`, a thin wrapper.
 
 ```pascal
 type
@@ -1522,8 +1525,8 @@ also keeps the file cache free.
 
 #### Implementation notes (Phase 17)
 
-Built as decided above: `Pascal.IOUring.SequentialWriter` (the record) and
-`TSequentialWriteOnlyFileStream` in `Pascal.IOUring.Streams`. Where the code
+Built as decided above: `PIRUnit.SequentialWriter` (the record) and
+`TSequentialWriteOnlyFileStream` in `PIRUnit.Streams`. Where the code
 adds to the decisions:
 
 - **Buffers in turn.** The buffers in flight are always the oldest ones,
@@ -1556,7 +1559,7 @@ adds to the decisions:
   a write never waits for a free request. A shared engine must allow at least
   as many requests as the writer has buffers (checked).
 
-**Tests:** `Tests.SequentialWriter` (DUnitX) and `Tests.FPC.SequentialWriter`
+**Tests:** `PIRUnit.SequentialWriter.Tests` (DUnitX) and `Tests.FPC.SequentialWriter`
 (FPCUnit), 25 each:
 
 - **The record (16):** sizes around the buffer size (0, 1, size – 1, size,
@@ -1660,14 +1663,14 @@ collect requests from all threads into a few rings. That is the engine.
   A stale completion or a late `Wait` on a reused slot is detected.
 - A request handle is a small plain record (one `NativeUInt`) the caller
   can `Wait` on, poll, or cancel.
-- Built in Phase 11 (`Pascal.IOUring.RequestPool`); details in §10.7.
+- Built in Phase 11 (`PIRUnit.RequestPool`); details in §10.7.
 
 ### 10.4 Engine APIs (sketch)
 
 **Phase 13 decisions (2026-10-22, before coding; for review)** – built as
 written; implementation notes and findings in §10.9:
 
-- `TIORingEngine` (class, unit `Pascal.IOUring.Engine`):
+- `TIORingEngine` (class, unit `PIRUnit.Engine`):
   `Create(AMaxRequests = 1024, ASubmissionQueueSize = 256)` – request pool of
   `AMaxRequests` slots, request queue of the same size (so enqueue never
   fails), one ring, one I/O thread.
@@ -1722,7 +1725,7 @@ written; implementation notes and findings in §10.9:
 **Phase 14 decisions (2026-10-23, before coding; for review)** – the read
 stream with a block provider:
 
-- `TIORingBlockReader` (unit `Pascal.IOUring.BlockReader`): a managed
+- `TIORingBlockReader` (unit `PIRUnit.BlockReader`): a managed
   record like `TIORingSequentialReader`, used by one thread, reading through
   a shared `TIORingEngine` (not owned) from a file handle (not owned).
 - **Callback or list: both.** The core is a provider,
@@ -1800,7 +1803,7 @@ shutdown). On the hot path:
 | I/O thread sleeping | Waits on {request-queue signal, ring completion event}. Producers signal only when the I/O thread has announced it is going to sleep (a flag set with CAS), so a busy engine costs producers no syscall. **Built in Phase 13** (§10.9). |
 | Counters / stats | Owned by one thread where possible; otherwise atomic increments on counters padded to their own **cache line** (64 bytes) to avoid false sharing. Queue head/tail counters are padded the same way. |
 
-All atomics go through one small unit, `Pascal.IOUring.Atomics` (CAS,
+All atomics go through one small unit, `PIRUnit.Atomics` (CAS,
 exchange, add, load-acquire, store-release, CPU pause/yield, wait/wake on
 address). Delphi intrinsics (`AtomicCmpExchange`, …) and FPC routines
 (`InterlockedCompareExchange…`) differ, and AArch64 (Linux) needs real
@@ -1814,7 +1817,7 @@ ties, the lock stays.
 
 ### 10.6 Atomics unit – implementation notes (Phase 10)
 
-`Pascal.IOUring.Atomics` has one type, `TAtomic`: a record with only static
+`PIRUnit.Atomics` has one type, `TAtomic`: a record with only static
 class methods (nothing to create). Most methods are `inline`.
 
 | Group | Methods | Types |
@@ -1868,7 +1871,7 @@ Findings **[VERIFIED]**:
   holds every 16th turn for 200 µs so that the other thread really sleeps
   and must be woken.
 
-Tests: `Tests.Atomics` (DUnitX) and `Tests.FPC.Atomics` (FPCUnit), 20 each:
+Tests: `PIRUnit.Atomics.Tests` (DUnitX) and `Tests.FPC.Atomics` (FPCUnit), 20 each:
 every method for every type (64-bit values have different upper and lower
 halves); counters from 4 threads that must come out exact; the half-write
 test; release/acquire hand-over of data 100 000 times; the spin-loop test;
@@ -1878,7 +1881,7 @@ with Delphi Debug and Release, and with FPC with and without `-O3`
 
 ### 10.7 Request pool – implementation notes (Phase 11)
 
-`Pascal.IOUring.RequestPool` has two managed records (copying one raises,
+`PIRUnit.RequestPool` has two managed records (copying one raises,
 like `TIORing`):
 
 - **`TIORingFreeList`** – a lock-free stack (Treiber) of the indices
@@ -1931,7 +1934,7 @@ Why it is safe:
   slot; a handle that old is not recognised as stale (Win32 with 2^20 slots:
   4095 releases; with 1024 slots: about 4 million).
 
-Tests: `Tests.RequestPool` (DUnitX) and `Tests.FPC.RequestPool` (FPCUnit),
+Tests: `PIRUnit.RequestPool.Tests` (DUnitX) and `Tests.FPC.RequestPool` (FPCUnit),
 23 each – free list order, capacity and errors; every slot once, handles and
 generations (also the wrap-around on Win32), stale and out-of-range handles,
 the state rules, payload alignment and separation, `WaitFor` (at once,
@@ -1951,7 +1954,7 @@ threads – in Delphi and FPC, Win32 and Win64. **It stays.**
 
 ### 10.8 Request queue – implementation notes (Phase 12)
 
-`Pascal.IOUring.RequestQueue` has one managed record, `TIORingRequestQueue`:
+`PIRUnit.RequestQueue` has one managed record, `TIORingRequestQueue`:
 a bounded first-in first-out queue of pointer-sized values (request handles)
 – Dmitry Vyukov's bounded MPMC queue.
 
@@ -1981,11 +1984,11 @@ a bounded first-in first-out queue of pointer-sized values (request handles)
 - `Count` is exact only when the queue is idle; otherwise it is a moment's
   picture.
 
-Also new in `Pascal.IOUring.Atomics`: `TAtomic.BackOff` (moved from the free
+Also new in `PIRUnit.Atomics`: `TAtomic.BackOff` (moved from the free
 list, now shared) and `IORingAllocCacheAligned` (cache-line aligned memory,
 used by the pool, the free list and the queue).
 
-Tests: `Tests.RequestQueue` (DUnitX) and `Tests.FPC.RequestQueue` (FPCUnit),
+Tests: `PIRUnit.RequestQueue.Tests` (DUnitX) and `Tests.FPC.RequestQueue` (FPCUnit),
 12 each – order, full and empty, capacity rounding, any value, 10 000 laps
 around the array, the wrap-around of the positions (single-threaded and
 under load), a closed queue; and stress with several producers and one or
@@ -2017,14 +2020,14 @@ as every producer and starves when there are many of them. **It stays.**
 
 ### 10.9 Engine – implementation notes (Phase 13)
 
-`Pascal.IOUring.Engine` has `TIORingEngine` (a class, shared by threads), built
+`PIRUnit.Engine` has `TIORingEngine` (a class, shared by threads), built
 as decided in §10.4. Its parts: a request pool of `MaxRequests` slots (the
 payload holds the operation, file, buffer, count, offset, the caller's
 `UserData`, the callback and the result), a request queue of the same size
 (a request is in it at most once, so it is never full), one ring, the I/O
 thread, and an auto-reset "new requests" event. The unit re-exports
-`TIORingRequestHandle`, so users need only `Pascal.IOUring` and
-`Pascal.IOUring.Engine`.
+`TIORingRequestHandle`, so users need only `PIRUnit.IORing` and
+`PIRUnit.Engine`.
 
 **The I/O thread**, one round:
 
@@ -2085,7 +2088,7 @@ the same code the ring gives), `TIORingCompletion.IsCancelled`.
   itself fails (a system call error, not an I/O error) the I/O thread stops
   and requests in flight do not complete.
 
-**Tests:** `Tests.Engine` (DUnitX) and `Tests.FPC.Engine` (FPCUnit), 19 each –
+**Tests:** `PIRUnit.Engine.Tests` (DUnitX) and `Tests.FPC.Engine` (FPCUnit), 19 each –
 a read with its data and `UserData`; 500 reads through a ring of 8 entries;
 write + flush + read back; end of file (at and across); a bad file handle
 (completes with an error, no exception); `Wait` with a timeout (the handle
@@ -2117,7 +2120,7 @@ runs.
 
 ### 10.10 Block reader – implementation notes (Phase 14)
 
-`Pascal.IOUring.BlockReader` has `TIORingBlockReader`, built as decided in
+`PIRUnit.BlockReader` has `TIORingBlockReader`, built as decided in
 §10.4 ("Phase 14 decisions"): a managed record used by one thread, reading
 through a shared engine from a file handle; neither is owned by the reader.
 
@@ -2225,7 +2228,7 @@ threads with `ReadFile`; on sorted blocks with small gaps `MaxGap` makes it
 `ReadFile` on the P-cores and 43–50 % when it runs on the E-cores. On a
 synchronous handle it is no faster than `ReadFile` (§2.1).
 
-**Tests:** `Tests.BlockReader` (DUnitX) and `Tests.FPC.BlockReader`
+**Tests:** `PIRUnit.BlockReader.Tests` (DUnitX) and `Tests.FPC.BlockReader`
 (FPCUnit), 15 each – blocks in order with their data; the provider asked
 only when there is room; touching blocks merged (100 blocks → 2 reads);
 `MaxGap` 0/99/100 bytes (20/20/1 reads); backward and overlapping blocks read
@@ -2345,7 +2348,7 @@ take far longer than a wake-up (0 of 25 since).
 
 ### 10.13 Overlap rule – implementation notes (Phase 16)
 
-Built as decided in §11 ("Phase 16 decisions"), in `Pascal.IOUring.Engine`.
+Built as decided in §11 ("Phase 16 decisions"), in `PIRUnit.Engine`.
 
 **Routing.** With `orKeepOrder`, `StartRequest` puts a request into the own
 queue of the I/O thread `(handle shr 2) mod IOThreadCount` (handles are
@@ -2391,7 +2394,7 @@ flight, random reads and writes of 1–8 KiB, median of 5):
 and without it the data is wrong. With few overlaps it costs about 3 %. The
 list scan stays: no need for the 64 KiB stripes yet.
 
-**Tests:** `Tests.EngineOverlap` / `Tests.FPC.EngineOverlap`, 13 each:
+**Tests:** `PIRUnit.EngineOverlap.Tests` / `Tests.FPC.EngineOverlap`, 13 each:
 
 - **Order on a file**, 200 rounds each, started without waiting in between:
   write then read (the read sees the write), write then write (the later
@@ -2481,7 +2484,7 @@ Windows byte-range lock).
 - The engine's file hash per system: `handle shr 2` on Windows, the file
   descriptor itself on Linux (a small inline function in the engine).
 - Tests: `OpenPipePair` is a socket pair on Linux; `ReadFromPipe` moves to
-  `TestPlatformHelpers`; the failed writes use a helper,
+  `PIRUnit.Test.PlatformHelpers`; the failed writes use a helper,
   `MakeWritesFail(AFileName)`: the byte-range lock on Windows, the `dup2`
   on Linux. Then the engine, overlap rule, block reader, read stream and
   write stream suites run on Linux too – everything except the Windows API
@@ -2551,7 +2554,7 @@ Windows byte-range lock).
   clock only on slow paths (a stall, a wait, the pool's spin), so it stays
   as it is for now; the benchmarks use the C library's (their busy-wait
   "work" would otherwise be mostly kernel time).
-- The benchmarks on Linux: `Bench.Common` has the file calls for both
+- The benchmarks on Linux: `PIRUnit.Benchmark.Common` has the file calls for both
   systems (`BenchOpenForReading`, `BenchRead`, `BenchReadAt`,
   `BenchFlushFile`, the platform name and the default folder); CPU time
   from the `getrusage` system call (FPC 3.2.2 has no function for it on
@@ -2696,9 +2699,9 @@ Where `{$IFDEF FPC}` is accepted (and only there):
 - `uses` clauses (`System.SysUtils` vs `SysUtils`, `Winapi.Windows` vs
   `Windows`).
 - Managed-record operator declarations.
-- `Pascal.IOUring.Atomics` internals.
+- `PIRUnit.Atomics` internals.
 - The API unit's import mechanism (FPC has no `delayed`, §6.3).
-- The raise helpers in `Pascal.IOUring.Types`: `noreturn` for
+- The raise helpers in `PIRUnit.Types`: `noreturn` for
   Delphi only (FPC's trunk refuses it on a routine that raises), and the
   caller's address (Delphi `ReturnAddress`, FPC `get_caller_addr`) –
   [CodingStyle.md](CodingStyle.md), "Raising".
@@ -2726,7 +2729,7 @@ tested.
 - The coding style – layout, the 120-character margin, comments, empty
   lines, `inherited`, raising through the raise helpers, `const`/`var`
   parameters – is in [CodingStyle.md](CodingStyle.md) (2026-10-24).
-- Every unit includes `Pascal.IOUring.inc` (holds `{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}`
+- Every unit includes `PIRInclude.Compiler.inc` (holds `{$IFDEF FPC}{$MODE DELPHI}{$ENDIF}`
   and shared switches).
 - OS constants as typed constants, not enums.
 - Parameter style matching the existing skeletons: `A`-prefixed, `const`
@@ -2736,7 +2739,7 @@ tested.
      purpose** (2026-10-23), so the debugger can step into every routine.
      Delphi: the Debug configurations set "inlining off" (`--inline:off`).
      FPC: the define `IORING_NO_INLINE` switches `{$INLINE OFF}` on in
-     `Pascal.IOUring.inc` (`-Si-` does not work: `{$MODE DELPHI}` turns
+     `PIRInclude.Compiler.inc` (`-Si-` does not work: `{$MODE DELPHI}` turns
      inlining on again); `Build-FPC.ps1` sets it unless `-Optimize` is given,
      and the Lazarus test project sets it too. What depends on inlining is
      therefore tested in the Release / `-Optimize` builds – both are part of
@@ -2785,30 +2788,30 @@ Found while looking (2026-10-23):
 - Outside the Windows API tests, the tests call Windows only a little:
   `Sleep` (in `SysUtils` on both compilers), a few file flags and error
   codes, pipes and one byte-range lock. Most of it is in
-  `TestPlatformHelpers` already.
+  `PIRUnit.Test.PlatformHelpers` already.
 
 **Phase 19 decisions (decided 2026-10-23):**
 
 - **One unit per test topic, in `Source/UnitTests/Common`**, used by all
-  runners: `Tests.Ring`, `Tests.Engine`, … (the names without `.FPC`), plus
-  the helpers (`TestFileHelpers`, `TestPlatformHelpers`) and a new
-  `Tests.Support`. Each one starts from the FPC unit (it already has no
+  runners: `PIRUnit.IORing.Tests`, `PIRUnit.Engine.Tests`, … (the names without `.FPC`), plus
+  the helpers (`PIRUnit.Test.FileHelpers`, `PIRUnit.Test.PlatformHelpers`) and a new
+  `PIRUnit.Test.Support`. Each one starts from the FPC unit (it already has no
   anonymous methods) and gets the tests that only Delphi has, so no test is
   lost. The Windows API tests go there too: Delphi and FPC both run them;
   they are for Windows only.
-- **`Tests.Support`: a base class `TIORingTestCase`.** With FPC it is an
+- **`PIRUnit.Test.Support`: a base class `TIORingTestCase`.** With FPC it is an
   FPCUnit `TTestCase`; with Delphi a plain class for DUnitX whose
   `[Setup]`/`[TearDown]` methods call the virtual `SetUp`/`TearDown`. Both
   have the same check methods, with the **FPCUnit names**
   (`AssertEquals(Message, Expected, Actual)`, `AssertTrue`, `AssertFalse`,
   `Fail`), so the FPC tests move over almost unchanged; with Delphi they
-  call DUnitX's `Assert`. Also in `Tests.Support`: the thread
+  call DUnitX's `Assert`. Also in `PIRUnit.Test.Support`: the thread
   helpers (`RunThreads` with a method of the test, `TWorkerThread`), `Log`,
   `CheckPattern`, `CheckEqualsU64`, and `RegisterTests(Class)` (FPCUnit's
   `RegisterTest`, DUnitX's `RegisterTestFixture`). Every check counts as an
   assert for DUnitX (the Delphi runner fails tests without asserts).
 - **`{$IFDEF}` only where the platform differs**, and as much as possible of
-  it inside `TestPlatformHelpers` (files, pipes, page memory, the "end of
+  it inside `PIRUnit.Test.PlatformHelpers` (files, pipes, page memory, the "end of
   file" result). A base class per platform is not needed: the differences
   are a few calls, not different tests. The Linux side of the helpers comes
   with `TLinuxIORing` (Phase 20).
@@ -2831,7 +2834,7 @@ Found while looking (2026-10-23):
 **Phase 19 implementation notes** (2026-10-23):
 
 - Built as decided. `Source/UnitTests/Common` has the 13 test units, the
-  helpers and `Tests.Support`; the Delphi runner and the one Free Pascal
+  helpers and `PIRUnit.Test.Support`; the Delphi runner and the one Free Pascal
   runner (`FPC/Pascal.IOUring.UnitTests.FPC.lpr`) use them. The old twins
   (`Tests.*.pas` for Delphi, `FPC/Tests.FPC.*.pas`) and the Delphi-only
   `TestThreadHelpers` are gone. Every unit was made from the FPC twin by a
@@ -2863,9 +2866,9 @@ Found while looking (2026-10-23):
   `const [ref]` in Delphi (§12.2); `TStreamReader` is in FPC's `streamex`
   with other constructors; Delphi's `string` has 2-byte characters, so a
   test that compared file bytes with a `string` now compares `TBytes`.
-- `Tests.Support` compiles on Linux too (no Windows calls outside
+- `PIRUnit.Test.Support` compiles on Linux too (no Windows calls outside
   `{$IFDEF MSWINDOWS}`; the RTL's interlocked calls instead of
-  `Pascal.IOUring.Atomics`, which is Windows-only until Phase 20). The FPC
+  `PIRUnit.Atomics`, which is Windows-only until Phase 20). The FPC
   runner needs `cthreads` on Linux, which links the C library:
   `Build-FPC.ps1 -Platform Linux64` passes gcc's library folder (`-Fl`).
 - Result: Delphi 242 tests (Win32 and Win64, Debug and Release), FPC 241 on
@@ -2958,8 +2961,8 @@ capabilities report at the top of the test program's output (3).
   is `O_DIRECTORY`, and `O_DIRECT` is `0200000`. FPC 3.2.2's
   `BaseUnix.O_DIRECT` is `040000` on every CPU, so every unbuffered open
   failed: `ENOTDIR` when opening, `EINVAL` when creating. Fixed with an
-  own `O_DIRECT_FLAG` per CPU in `Pascal.IOUring.Backend.Linux` (and in
-  `TestPlatformHelpers`). The other open flags the library uses are the
+  own `O_DIRECT_FLAG` per CPU in `PIRUnit.Linux.Ring` (and in
+  `PIRUnit.Test.PlatformHelpers`). The other open flags the library uses are the
   same on both CPUs.
 - The logs of a run need a GitHub sign-in, the annotations do not (they
   can be read through the API). So the workflow's test steps go through a
@@ -3028,7 +3031,7 @@ one step: the IDE knows the library, and the units are compiled once.
 - **[DECIDE] 1. Names and places.** Proposed:
   `Source/Packages/Delphi/Pascal.IOUring.dpk` (with its `.dproj`; Win32
   and Win64; runtime only; `{$LIBSUFFIX AUTO}`) and
-  `Source/Packages/Lazarus/PascalIOUring.lpk` (runtime only; all units, the
+  `Packages/Lazarus/PascalIOUring.lpk` (runtime only; all units, the
   backends kept out of the main unit as above; Lazarus's generated
   `PascalIOUring.pas` committed with it, as Lazarus packages usually are).
   Other choice: the plain name `PascalIOUring` for both.
@@ -3053,7 +3056,7 @@ one step: the IDE knows the library, and the units are compiled once.
 - **1 changed: no Delphi package.** In Delphi the library is compiled into
   the program from `Source/Units`; a package adds nothing there. Only the
   Lazarus package, in the place proposed:
-  `Source/Packages/Lazarus/PascalIOUring.lpk`, with its generated main unit.
+  `Packages/Lazarus/PascalIOUring.lpk`, with its generated main unit.
 - **2 changed: the version stays below 1.0 for a long time** – also when
   everything planned now is done. Once others use the library, suggestions
   (also for the API) are expected first. The package starts at **0.1**;
@@ -3067,7 +3070,7 @@ one step: the IDE knows the library, and the units are compiled once.
 
 **Phase 24 implementation notes** (2026-10-24):
 
-- `Source/Packages/Lazarus/PascalIOUring.lpk`: runtime only, version 0.1,
+- `Packages/Lazarus/PascalIOUring.lpk`: runtime only, version 0.1,
   requires FCL, all 14 units and the include file; the four backend units
   with `AddToUsesPkgSection` False. Paths are relative (`../../Units`).
   `lazbuild` left the hand-written `.lpk` as it was.
@@ -3124,7 +3127,7 @@ and run. And there is no version anyone can point at.
   arguments – they take seconds; CI does the same on its runners.
 - **[DECIDE] 3. The first tagged version, 0.1.0.** Proposed:
   - `CHANGELOG.md` with what 0.1.0 has (in short, by milestone);
-  - a constant `IORING_LIBRARY_VERSION = '0.1.0'` in `Pascal.IOUring`, and
+  - a constant `IORING_LIBRARY_VERSION = '0.1.0'` in `PIRUnit.IORing`, and
     `IORingCapabilities.ToString` names it, so a log says which version
     ran;
   - the README links the examples and says how to get a version;
@@ -3144,7 +3147,7 @@ and run. And there is no version anyone can point at.
 
 **Phase 25 implementation notes** (2026-10-24):
 
-- Six demos and a small shared unit (`Demos/Common/Demo.Common.pas`: a
+- Six demos and a small shared unit (`Demos/Common/PIRUnit.Demo.Common.pas`: a
   temporary file written with `TFileStream`, a clock; nothing from the
   library). Each demo compares its result with a plain way of doing the
   same – `CopyFile` the two files, `Checksum` an Adler-32 over
@@ -3328,7 +3331,7 @@ On GitHub's ARM64 runner the lock-free structures sometimes lose to a mutex
 loop gets 0.87–0.90 of the mutex queue, the free list with 4 threads and
 work 0.88. On x86-64 they always win.
 
-**Facts found before Phase 27** (`Pascal.IOUring.Atomics` and the FPC
+**Facts found before Phase 27** (`PIRUnit.Atomics` and the FPC
 3.2.2 sources, 2026-10-25):
 
 - FPC 3.2.2's `InterlockedCompareExchange`, `InterlockedExchange` and
@@ -3366,7 +3369,7 @@ work 0.88. On x86-64 they always win.
   without benchmarks. Other choice: an input of the existing CI workflow
   (removed in Phase 24).
 - **[DECIDE] 2. What to build.** Proposed: small assembler routines for
-  AArch64 (Free Pascal only) in `Pascal.IOUring.Atomics`, with the same
+  AArch64 (Free Pascal only) in `PIRUnit.Atomics`, with the same
   rules for callers as now (§10.6):
   - compare-exchange, exchange and fetch-add: one routine each – an
     `ldxr`/`stlxr` loop and one `dmb ish` after it (the fully ordered
@@ -3526,7 +3529,7 @@ the small things (6).
 **Phase 28 implementation notes** (2026-10-25):
 
 - **API names (2):** `ATimeoutMilliseconds` everywhere; only
-  `IORING_INFINITE` (the atomics use it from `Pascal.IOUring.Types`);
+  `IORING_INFINITE` (the atomics use it from `PIRUnit.Types`);
   `TIORingSequentialReaderStats` and `TIORingSequentialWriterStats`;
   `TIORingEngine.Stats` is a property; `IORingReadAt` and `IORingWriteAt`;
   the engine's user data is `TIORingUserData`.
@@ -3539,10 +3542,10 @@ the small things (6).
   inside the methods the short name is enough. Both compilers accept this
   (Delphi 13, FPC 3.2.2 and trunk). The structures benchmark has its own
   `TCardinalArray` now.
-- **Platform units (4):** `Pascal.IOUring.Backend.Windows.Platform`
-  (`TWindowsIORingPlatform`) and `Pascal.IOUring.Backend.Linux.Platform`
+- **Platform units (4):** `PIRUnit.Windows.Platform`
+  (`TWindowsIORingPlatform`) and `PIRUnit.Linux.Platform`
   (`TLinuxIORingPlatform`, renamed with the other Linux units later);
-  `Pascal.IOUring` exports them as `TIORingPlatform` as before, so user code
+  `PIRUnit.IORing` exports them as `TIORingPlatform` as before, so user code
   does not change. The ring units are now 827 (Windows) and 1 285 (Linux)
   lines, the platform units 270 and 326. The Lazarus package lists the two
   new units. Three constants are in both Linux units (`SYSCALL_EVENTFD2`,
@@ -3550,7 +3553,7 @@ the small things (6).
   io_uring header, and a shared unit for three constants is not worth it.
 - **One buffer check (4):** `IORingCheckBufferArguments` (size a multiple
   of the unit, count in range, all buffers together not too big; returns
-  the total size) and `IORingCheckSectorMultiple` in `Pascal.IOUring.Types`, used
+  the total size) and `IORingCheckSectorMultiple` in `PIRUnit.Types`, used
   by the reader and the writer. The unbuffered message now says
   "Unbuffered I/O needs …" for both.
 - **The clock (5): [VERIFIED] no gain in WSL2, so FPC's clock stays.** The
@@ -3597,13 +3600,32 @@ the small things (6).
   The Windows benchmarks ran again (Benchmarks.md, "The Windows numbers
   again"): the same as before or better – nothing the library does got
   slower.
-- **The new names (1),** after asking: the library is **Pascal.IOUring**
-  (it is as much Free Pascal as Delphi) – every unit, project and the
-  Lazarus package (`PascalIOUring`); `Delphi.IOUring.Backend.Custom` is
-  `Pascal.IOUring.Types`, `….Backend.Posix…` is `….Backend.Linux…`, the
-  Linux API tests are `Tests.Backend.Linux.API…`. The text of this design
-  uses the new names everywhere except in the review above. Left: the
-  GitHub repository's new name and the tag 0.1.0 (both by the owner).
+- **The new names (1),** after asking, in two steps:
+  - The library is **Pascal.IOUring** (it is as much Free Pascal as Delphi):
+    the projects (`Pascal.IOUring.UnitTests`, `Pascal.IOUring.Benchmarks…`),
+    the Lazarus package `PascalIOUring`, the repository.
+  - Units, forms and include files get the owner's naming scheme
+    (CodingStyle.md, "Units and files"): the prefix `PIR`, the kind, then
+    what the unit holds – not the library's name again. `PIRUnit.IORing`
+    (the unit user code `uses`), `PIRUnit.Types`, `PIRUnit.Engine`, …; each
+    system's three units are `PIRUnit.<System>.API` (the OS header),
+    `….Ring` (the library's ring) and `….Platform` (files, memory, clock,
+    events) – the word "Backend" said nothing the system's name does not.
+    Tests are named after the tested unit (`PIRUnit.Engine.Tests`), their
+    helpers `PIRUnit.Test.…`, benchmarks `PIRUnit.Benchmark.…`; the include
+    files `PIRInclude.Compiler.inc` and `PIRInclude.Linux.API.Layout.inc`.
+  - Folders: the Delphi test and benchmark projects in `Delphi/` (next to
+    `FPC/` and `Linux/`), the package in `Packages/Lazarus` at the root.
+  - The text of this design uses the new names everywhere except in the
+    review above. Left: the GitHub repository's new name and the tag 0.1.0
+    (both by the owner).
+- **No "local global variables"** (a new rule in CodingStyle.md): nested
+  routines come before the routine's `var` section and get what they need
+  as parameters. Six places did otherwise, five of them changing the
+  outer routine's variables; all six were rewritten (none was on a hot
+  path). `CheckAvailability` on Linux needed no nested function at all: the
+  probe loop fills the set of the kernel's opcodes, and the checks look
+  there.
 
 ---
 
@@ -3683,6 +3705,6 @@ the OS's layout: the neutral records stay (Phase 28 – §5.1 and §12.10).
 | 18 | 2026-10-23 | **One set of tests** for Delphi, Free Pascal and Linux in `Source/UnitTests/Common`: a base class over DUnitX and FPCUnit with the FPCUnit check names; one Free Pascal test program for Windows and Linux; done on main (§12.4). |
 | 19 | 2026-10-24 | **The Linux ring** (§5.7): Phase 20 is the ring, the platform record and the atomics on Linux, Phase 21 the engine on Linux; `NativeResult` is 0 or a negative error code on both systems (bytes in `BytesTransferred`); registration on Linux is a system call at `Prepare` with a completion of its own; minimum Linux 5.11. |
 | 20 | 2026-10-24 | **The engine on Linux** (§10.14): the I/O thread sleeps as on Windows – a wake event and the ring's completion event, through a small event API in `TIORingPlatform` (`eventfd` and `poll` on Linux; the io_uring-only way measured no faster); the benchmarks run on Linux in this phase, WSL2 results marked as not disk numbers. |
-| 21 | 2026-10-24 | **Linux extras** (§5.8): `TLinuxIORing.PrepareSqe` (any io_uring operation, for example sockets) and `LinkToNext` (linked operations) in the low-level ring, one completion per entry; SQPOLL and all other definitions stay in the API unit (measured: no gain for file I/O); the shared `TIORingCapabilities` describes either system – `SystemDescription`, `NotAvailableReason`, `NativeFeatures`, `NativeOps`, `Extras`, `ToString` – and `IORingCapabilities` in `Pascal.IOUring`. |
+| 21 | 2026-10-24 | **Linux extras** (§5.8): `TLinuxIORing.PrepareSqe` (any io_uring operation, for example sockets) and `LinkToNext` (linked operations) in the low-level ring, one completion per entry; SQPOLL and all other definitions stay in the API unit (measured: no gain for file I/O); the shared `TIORingCapabilities` describes either system – `SystemDescription`, `NotAvailableReason`, `NativeFeatures`, `NativeOps`, `Extras`, `ToString` – and `IORingCapabilities` in `PIRUnit.IORing`. |
 | 22 | 2026-10-24 | **Big reads straight into the caller's memory** (§12.8): `TIORingSequentialReader.Read` (and so the read stream) reads the part of a call beyond what its buffers have asked for straight into the caller's memory, unbuffered only into sector-aligned memory; the buffers read ahead after the call once all of its reads have started. Kept although cold 64 MiB calls on Windows are about 2 % slower: warm big calls gain 8–24 %, cold ones 11–22 % on Linux. The Linux clock stays as it is (measured: less than 0.1 %). |
-| 23 | 2026-10-25 | **Tidy up before 0.1.0** (§12.10): one name per idea in the API (`ATimeoutMilliseconds`, `IORING_INFINITE`, `TIORingSequential…Stats`, `IORingReadAt`/`IORingWriteAt`); internal types nested in their records; the platform helpers in units of their own and one buffer check; the neutral ref records stay; the Linux clock stays FPC's (the C library's measured no faster in the engine). The library is renamed **Pascal.IOUring**, with `Pascal.IOUring.Types` (was `Backend.Custom`) and `Backend.Linux` (was `Backend.Posix`). |
+| 23 | 2026-10-25 | **Tidy up before 0.1.0** (§12.10): one name per idea in the API (`ATimeoutMilliseconds`, `IORING_INFINITE`, `TIORingSequential…Stats`, `IORingReadAt`/`IORingWriteAt`); internal types nested in their records; the platform helpers in units of their own and one buffer check; the neutral ref records stay; the Linux clock stays FPC's (the C library's measured no faster in the engine). The library is renamed **Pascal.IOUring**; units, forms and include files get the prefix `PIR` and say what they hold (`PIRUnit.IORing`, `PIRUnit.Types`, `PIRUnit.Windows.Ring` …; CodingStyle.md); nested routines get parameters instead of seeing their caller's variables. |

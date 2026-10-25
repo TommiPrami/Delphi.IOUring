@@ -23,6 +23,33 @@ What both compilers must support, and the rules for `inline`, are in
 - Types start with `T`, pointer types with `P`, exceptions with `E`.
 - Constants are `UPPER_CASE`.
 
+### Units and files
+
+Every unit, form and include file starts with the prefix **`PIR`**
+(**P**ascal.**I**OU**R**ing) and a word for its kind, then a description of
+what it holds – not the library's name again:
+
+| Kind | Name | Example |
+| --- | --- | --- |
+| Unit | `PIRUnit.<Description>.pas` | `PIRUnit.BlockReader.pas` |
+| Form | `PIRForm.<Description>.pas`; the class `TPIR<Name>Form`, its variable and `Name` `PIR<Name>Form` | `PIRForm.Settings.pas`, `TPIRSettingsForm` |
+| Include file | `PIRInclude.<Description>.inc` | `PIRInclude.Compiler.inc` |
+
+- **The system's units:** `PIRUnit.<System>.API` (the translation of the
+  OS header), `PIRUnit.<System>.Ring` (the library's ring on it) and
+  `PIRUnit.<System>.Platform` (files, memory, clock, events) – `Windows` or
+  `Linux`.
+- **Tests:** the tested unit's name and `.Tests` (`PIRUnit.Engine.Tests`,
+  `PIRUnit.Linux.API.Tests`); the folder says where they run. Helpers of the
+  tests: `PIRUnit.Test.<Description>`.
+- **Benchmarks and demos:** `PIRUnit.Benchmark.<Description>`,
+  `PIRUnit.Demo.<Description>`.
+- **Projects** keep the library's name (`Pascal.IOUring.UnitTests.dpr`,
+  `Pascal.IOUring.Benchmarks.Blocks.dpr`); demo projects are named after the
+  demo (`CopyFile.dpr`). The Lazarus package is `PascalIOUring.lpk`, and its
+  main unit, which Lazarus writes, is named after it.
+- Type names do not get the prefix: they keep `TIORing…`.
+
 ## Layout
 
 - Indent with 2 spaces, no tabs. `begin` and `end` on lines of their own.
@@ -34,8 +61,8 @@ What both compilers must support, and the rules for `inline`, are in
 - **In the interface section, function and procedure declarations are
   indented by 2**, with their comments, so the `type`, `const` and
   `implementation` sections stand out.
-- The OS API translation units (`Pascal.IOUring.Backend.Windows.API`,
-  `Pascal.IOUring.Backend.Linux.API`) keep the layout of the C headers they
+- The OS API translation units (`PIRUnit.Windows.API`,
+  `PIRUnit.Linux.API`) keep the layout of the C headers they
   translate.
 
 ```pascal
@@ -111,7 +138,7 @@ function IORingReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuff
   comment starts at column 0.
 
 ```pascal
-unit Pascal.IOUring.SequentialReader;
+unit PIRUnit.SequentialReader;
 
 {
   Reads a file front to back with read-ahead (Docs/Design.md §7).
@@ -142,6 +169,32 @@ begin
 end;
 ```
 
+- **Nested routines come before the routine's `var` section.** A nested
+  routine can see every local variable declared above it – "local global
+  variables": when it changes one, it is hard to see where and why the
+  variable changed. So the nested routine gets what it needs as parameters,
+  and the compiler then makes sure it cannot touch the routine's locals.
+
+```pascal
+procedure ParseOptions;
+
+  // The value after option AName: the next parameter (AIndex moves to it)
+  function NextValue(var AIndex: Integer; const AName: string): string;
+  begin
+    Inc(AIndex);
+    …
+  end;
+
+var
+  LIndex: Integer;
+  LName: string;
+begin
+```
+
+  The only exception: measurably faster (a benchmark shows it). Then only
+  the variables the nested routine uses go above it, with a comment saying
+  why, and every line that uses them in the nested routine has a comment.
+
 - **`case`:** a short branch on one line; `else` is indented like the
   branches.
 
@@ -164,7 +217,7 @@ uses
 {$ELSE}
   System.SysUtils,
 {$ENDIF}
-  Pascal.IOUring, Pascal.IOUring.Engine;
+  PIRUnit.IORing, PIRUnit.Engine;
 ```
 
 ## Speed
@@ -202,7 +255,7 @@ the routine – that would keep them out of registers there):
   section, or a private method.
 
 The small procedure raises through one of the raise helpers of
-`Pascal.IOUring.Types`:
+`PIRUnit.Types`:
 
 | Helper | Raises |
 | --- | --- |

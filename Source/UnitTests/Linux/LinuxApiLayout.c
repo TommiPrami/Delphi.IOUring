@@ -1,8 +1,8 @@
 /*
- * Writes Tests.Backend.Linux.API.Layout.inc: the size of every record,
+ * Writes PIRInclude.Linux.API.Layout.inc: the size of every record,
  * the offset of every field and the value of every constant of
  * linux/io_uring.h, as checks of the Pascal translation
- * (Pascal.IOUring.Backend.Linux.API).
+ * (PIRUnit.Linux.API).
  *
  * Do not run this by hand: Generate-LinuxApiLayout.sh builds and runs it, and
  * also checks that this list names everything in the header.

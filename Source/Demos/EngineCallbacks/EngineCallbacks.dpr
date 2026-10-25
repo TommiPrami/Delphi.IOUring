@@ -30,8 +30,8 @@ uses
 {$ELSE}
   System.SysUtils, System.Classes,
 {$ENDIF}
-  Pascal.IOUring, Pascal.IOUring.Atomics, Pascal.IOUring.Types, Pascal.IOUring.Engine,
-  Demo.Common in '..\Common\Demo.Common.pas';
+  PIRUnit.IORing, PIRUnit.Atomics, PIRUnit.Types, PIRUnit.Engine,
+  PIRUnit.Demo.Common in '..\Common\PIRUnit.Demo.Common.pas';
 
 const
   BLOCK_SIZE = 4096;

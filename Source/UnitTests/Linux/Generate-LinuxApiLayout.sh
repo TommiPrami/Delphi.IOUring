@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Writes Tests.Backend.Linux.API.Layout.inc: the layout checks of
-# Pascal.IOUring.Backend.Linux.API, taken from the installed C header
+# Writes PIRInclude.Linux.API.Layout.inc: the layout checks of
+# PIRUnit.Linux.API, taken from the installed C header
 # /usr/include/linux/io_uring.h (package linux-libc-dev) with gcc.
 #
 # Run on Linux (WSL too), from any folder:
@@ -20,7 +20,7 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 header=/usr/include/linux/io_uring.h
 source_file="$here/LinuxApiLayout.c"
-output="$here/Tests.Backend.Linux.API.Layout.inc"
+output="$here/PIRInclude.Linux.API.Layout.inc"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT

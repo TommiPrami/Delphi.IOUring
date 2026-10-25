@@ -26,7 +26,7 @@ uses
 {$ELSE}
   System.SysUtils, System.Classes,
 {$ENDIF}
-  Pascal.IOUring, Pascal.IOUring.Engine, Pascal.IOUring.BlockReader, Demo.Common in '..\Common\Demo.Common.pas';
+  PIRUnit.IORing, PIRUnit.Engine, PIRUnit.BlockReader, PIRUnit.Demo.Common in '..\Common\PIRUnit.Demo.Common.pas';
 
 const
   BLOCK_SIZE = 4096;

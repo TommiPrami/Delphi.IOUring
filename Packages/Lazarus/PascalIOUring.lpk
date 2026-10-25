@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <Name Value="PascalIOUring"/>
+    <Type Value="RunTimeOnly"/>
+    <Author Value="Tommi Prami"/>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <IncludeFiles Value="../../Source/Units"/>
+        <OtherUnitFiles Value="../../Source/Units"/>
+        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
+      </SearchPaths>
+    </CompilerOptions>
+    <Description Value="File I/O with the operating system's I/O rings: Windows IoRing (Win32, Win64) and Linux io_uring (x86-64, AArch64). The backend units (Windows, Posix) are not in the package's main unit: each system compiles only its own."/>
+    <License Value="MIT"/>
+    <Version Minor="1"/>
+    <Files Count="17">
+      <Item1>
+        <Filename Value="../../Source/Units/PIRUnit.IORing.pas"/>
+        <UnitName Value="PIRUnit.IORing"/>
+      </Item1>
+      <Item2>
+        <Filename Value="../../Source/Units/PIRUnit.Atomics.pas"/>
+        <UnitName Value="PIRUnit.Atomics"/>
+      </Item2>
+      <Item3>
+        <Filename Value="../../Source/Units/PIRUnit.Types.pas"/>
+        <UnitName Value="PIRUnit.Types"/>
+      </Item3>
+      <Item4>
+        <Filename Value="../../Source/Units/PIRUnit.RequestPool.pas"/>
+        <UnitName Value="PIRUnit.RequestPool"/>
+      </Item4>
+      <Item5>
+        <Filename Value="../../Source/Units/PIRUnit.RequestQueue.pas"/>
+        <UnitName Value="PIRUnit.RequestQueue"/>
+      </Item5>
+      <Item6>
+        <Filename Value="../../Source/Units/PIRUnit.Engine.pas"/>
+        <UnitName Value="PIRUnit.Engine"/>
+      </Item6>
+      <Item7>
+        <Filename Value="../../Source/Units/PIRUnit.SequentialReader.pas"/>
+        <UnitName Value="PIRUnit.SequentialReader"/>
+      </Item7>
+      <Item8>
+        <Filename Value="../../Source/Units/PIRUnit.SequentialWriter.pas"/>
+        <UnitName Value="PIRUnit.SequentialWriter"/>
+      </Item8>
+      <Item9>
+        <Filename Value="../../Source/Units/PIRUnit.BlockReader.pas"/>
+        <UnitName Value="PIRUnit.BlockReader"/>
+      </Item9>
+      <Item10>
+        <Filename Value="../../Source/Units/PIRUnit.Streams.pas"/>
+        <UnitName Value="PIRUnit.Streams"/>
+      </Item10>
+      <Item11>
+        <Filename Value="../../Source/Units/PIRUnit.Windows.API.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="PIRUnit.Windows.API"/>
+      </Item11>
+      <Item12>
+        <Filename Value="../../Source/Units/PIRUnit.Windows.Ring.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="PIRUnit.Windows.Ring"/>
+      </Item12>
+      <Item13>
+        <Filename Value="../../Source/Units/PIRUnit.Windows.Platform.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="PIRUnit.Windows.Platform"/>
+      </Item13>
+      <Item14>
+        <Filename Value="../../Source/Units/PIRUnit.Linux.API.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="PIRUnit.Linux.API"/>
+      </Item14>
+      <Item15>
+        <Filename Value="../../Source/Units/PIRUnit.Linux.Ring.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="PIRUnit.Linux.Ring"/>
+      </Item15>
+      <Item16>
+        <Filename Value="../../Source/Units/PIRUnit.Linux.Platform.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="PIRUnit.Linux.Platform"/>
+      </Item16>
+      <Item17>
+        <Filename Value="../../Source/Units/PIRInclude.Compiler.inc"/>
+        <Type Value="Include"/>
+      </Item17>
+    </Files>
+    <RequiredPkgs Count="1">
+      <Item1>
+        <PackageName Value="FCL"/>
+      </Item1>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+  </Package>
+</CONFIG>

@@ -12,7 +12,7 @@
       Structures  Source\Benchmarks\FPC\Pascal.IOUring.Benchmarks.Structures.FPC.lpr (optimized)
       Blocks      Source\Benchmarks\FPC\Pascal.IOUring.Benchmarks.Blocks.FPC.lpr (optimized)
       Writes      Source\Benchmarks\FPC\Pascal.IOUring.Benchmarks.Writes.FPC.lpr (optimized)
-      Package     Source\Packages\Lazarus\PascalIOUring.pas: the main unit of the
+      Package     Packages\Lazarus\PascalIOUring.pas: the main unit of the
                   Lazarus package, compiled without Lazarus (optimized; no -Run)
       Demos       Source\Demos\<Name>\<Name>.dpr, every demo of the platform
                   (optimized); -Run runs each one once without arguments
@@ -240,7 +240,7 @@ function ConvertTo-CompilerPath([string] $Path) {
 # folder, its main file, extra unit folders, code options.
 $builds = @()
 if ($Project -eq 'Tests') {
-    $extraUnits = @(Join-Source 'UnitTests\Common')         # Tests.Support, the shared tests and helpers
+    $extraUnits = @(Join-Source 'UnitTests\Common')         # PIRUnit.Test.Support, the shared tests and helpers
     if ($isLinuxTarget) {
         $extraUnits += Join-Source 'UnitTests\Linux'          # the Linux-only tests
     }
@@ -248,7 +248,7 @@ if ($Project -eq 'Tests') {
     if ($Optimize) {
         $codeOptions += '-O3'
     } else {
-        $codeOptions += '-dIORING_NO_INLINE'                 # debug build: no inlining (Pascal.IOUring.inc)
+        $codeOptions += '-dIORING_NO_INLINE'                 # debug build: no inlining (PIRInclude.Compiler.inc)
     }
     $builds += @{ Dir = (Join-Source 'UnitTests\FPC'); File = 'Pascal.IOUring.UnitTests.FPC.lpr';
         Units = $extraUnits; Options = $codeOptions }
@@ -258,7 +258,7 @@ if ($Project -eq 'Tests') {
     if ($Run) {
         throw '-Run: the package is a unit, there is nothing to run.'
     }
-    $builds += @{ Dir = (Join-Source 'Packages\Lazarus'); File = 'PascalIOUring.pas'; Units = @(); Options = @('-O3') }
+    $builds += @{ Dir = (Join-Source '..\Packages\Lazarus'); File = 'PascalIOUring.pas'; Units = @(); Options = @('-O3') }
 } elseif ($Project -eq 'Demos') {
     # -Run runs each demo once, without arguments (each one checks its own result)
     $demoNames = @('Capabilities', 'CopyFile', 'Checksum', 'ReadBlocks', 'EngineCallbacks')
@@ -276,7 +276,7 @@ if ($Project -eq 'Tests') {
         'Blocks'     { $programFile = 'Pascal.IOUring.Benchmarks.Blocks.FPC.lpr' }
         'Writes'     { $programFile = 'Pascal.IOUring.Benchmarks.Writes.FPC.lpr' }
     }
-    # Bench.Common, Bench.Readers, Bench.Structures, Bench.Blocks, Bench.Writes;
+    # PIRUnit.Benchmark.Common, PIRUnit.Benchmark.Readers, PIRUnit.Benchmark.Structures, PIRUnit.Benchmark.Blocks, PIRUnit.Benchmark.Writes;
     # optimized, smart linking, stripped
     $builds += @{ Dir = (Join-Source 'Benchmarks\FPC'); File = $programFile;
         Units = @(Join-Source 'Benchmarks'); Options = @('-O3', '-CX', '-XX', '-Xs') }

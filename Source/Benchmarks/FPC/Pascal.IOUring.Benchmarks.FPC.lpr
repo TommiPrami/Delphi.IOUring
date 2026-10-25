@@ -4,7 +4,7 @@
   Free Pascal version of the sequential reading benchmark (Plan, Phase 9).
 
   The same method as the Delphi benchmark (Source\Benchmarks): same files,
-  same consumer (Bench.Common) and the same reading routines (Bench.Readers),
+  same consumer (PIRUnit.Benchmark.Common) and the same reading routines (PIRUnit.Benchmark.Readers),
   but only the main contenders - enough to compare the code Free Pascal makes
   for the library with Delphi's. The Delphi-only contenders (TBufferedFileStream,
   threads) are left out.
@@ -23,14 +23,14 @@
          (Win64, or Linux64: built in WSL)
 }
 
-{$I Pascal.IOUring.inc}
+{$I PIRInclude.Compiler.inc}
 
 uses
 {$IFDEF UNIX}
   cthreads,           // threads on Linux: must come first
 {$ENDIF}
-  SysUtils, Classes, Pascal.IOUring, Pascal.IOUring.Types, Pascal.IOUring.SequentialReader, Bench.Common,
-  Bench.Readers;
+  SysUtils, Classes, PIRUnit.IORing, PIRUnit.Types, PIRUnit.SequentialReader, PIRUnit.Benchmark.Common,
+  PIRUnit.Benchmark.Readers;
 
 type
   TContender = (cnFileStream64K, cnFileStream1M, cnReadFile1M, cnOverlapped, cnOverlappedUnbuffered,
@@ -91,22 +91,22 @@ procedure ParseOptions;
     RaiseErrorFmt(Exception, 'Unknown option %s', [ParamStr(AIndex)]);
   end;
 
+  // The value after option AName: the next parameter (AIndex moves to it)
+  function NextValue(var AIndex: Integer; const AName: string): string;
+  begin
+    Inc(AIndex);
+
+    if AIndex > ParamCount then
+      RaiseMissingValue(AName);
+
+    Result := ParamStr(AIndex);
+  end;
+
 var
   LIndex: Integer;
   LName: string;
   LParts: TStringList;
   LPart: Integer;
-
-  function NextValue: string;
-  begin
-    Inc(LIndex);
-
-    if LIndex > ParamCount then
-      RaiseMissingValue(LName);
-
-    Result := ParamStr(LIndex);
-  end;
-
 begin
   GFolder := DefaultBenchFolder;
   SetLength(GSizes, 2);
@@ -123,12 +123,12 @@ begin
     LName := LowerCase(ParamStr(LIndex));
 
     if LName = '--dir' then
-      GFolder := NextValue
+      GFolder := NextValue(LIndex, LName)
     else if LName = '--sizes' then
     begin
       LParts := TStringList.Create;
       try
-        LParts.CommaText := NextValue;
+        LParts.CommaText := NextValue(LIndex, LName);
         SetLength(GSizes, LParts.Count);
 
         for LPart := 0 to LParts.Count - 1 do
@@ -138,9 +138,9 @@ begin
       end;
     end
     else if LName = '--runs' then
-      GRuns := StrToInt(NextValue)
+      GRuns := StrToInt(NextValue(LIndex, LName))
     else if LName = '--work-us' then
-      GWorkMicroseconds := StrToInt(NextValue)
+      GWorkMicroseconds := StrToInt(NextValue(LIndex, LName))
     else if LName = '--keep' then
       GKeep := True
     else

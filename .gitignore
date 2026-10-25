@@ -79,15 +79,15 @@ __recovery/
 *.stat
 
 # Pascal.IOUring: test project build output and generated resource file
-Source/UnitTests/Win32/
-Source/UnitTests/Win64/
-Source/UnitTests/*.res
+Source/UnitTests/Delphi/Win32/
+Source/UnitTests/Delphi/Win64/
+Source/UnitTests/Delphi/*.res
 
 # Pascal.IOUring: benchmark build output, generated resource file and results
-Source/Benchmarks/Win32/
-Source/Benchmarks/Win64/
-Source/Benchmarks/*.res
-Source/Benchmarks/*.csv
+Source/Benchmarks/Delphi/Win32/
+Source/Benchmarks/Delphi/Win64/
+Source/Benchmarks/Delphi/*.res
+Source/Benchmarks/Delphi/*.csv
 
 # Pascal.IOUring: Free Pascal / Lazarus build output and session files
 Source/UnitTests/FPC/Win32/
@@ -100,11 +100,11 @@ Source/Benchmarks/FPC/Win64/
 Source/Benchmarks/FPC/Linux64/
 Source/Benchmarks/FPC/bin/
 Source/Benchmarks/FPC/lib/
-Source/Packages/Lazarus/lib/
-Source/Packages/Lazarus/Win32/
-Source/Packages/Lazarus/Win64/
-Source/Packages/Lazarus/Linux64/
-Source/Packages/Lazarus/LinuxArm64/
+Packages/Lazarus/lib/
+Packages/Lazarus/Win32/
+Packages/Lazarus/Win64/
+Packages/Lazarus/Linux64/
+Packages/Lazarus/LinuxArm64/
 Source/Demos/*/Win32/
 Source/Demos/*/Win64/
 Source/Demos/*/Linux64/

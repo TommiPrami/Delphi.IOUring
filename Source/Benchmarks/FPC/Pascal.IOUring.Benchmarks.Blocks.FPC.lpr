@@ -2,20 +2,20 @@
 
 {
   Free Pascal build of the "blocks known in advance" benchmark: the same code
-  as the Delphi one (Bench.Blocks). What is measured, and the options: see
-  Bench.Blocks.
+  as the Delphi one (PIRUnit.Benchmark.Blocks). What is measured, and the options: see
+  PIRUnit.Benchmark.Blocks.
 
   Build and run: Source\Build-FPC.ps1 -Project Blocks -Platform Win64 -Run
                  (Win32, or Linux64: built and run in WSL)
 }
 
-{$I Pascal.IOUring.inc}
+{$I PIRInclude.Compiler.inc}
 
 uses
 {$IFDEF UNIX}
   cthreads,           // threads on Linux: must come first
 {$ENDIF}
-  SysUtils, Bench.Blocks;
+  SysUtils, PIRUnit.Benchmark.Blocks;
 
 begin
   try

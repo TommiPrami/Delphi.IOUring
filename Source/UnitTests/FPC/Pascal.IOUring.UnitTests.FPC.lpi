@@ -29,59 +29,59 @@
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.Support.pas"/>
+        <Filename Value="..\Common\PIRUnit.Test.Support.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.TestFileHelpers.pas"/>
+        <Filename Value="..\Common\PIRUnit.Test.FileHelpers.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.Backend.Windows.API.Layout.pas"/>
+        <Filename Value="..\Common\PIRUnit.Windows.API.Layout.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.Backend.Windows.API.pas"/>
+        <Filename Value="..\Common\PIRUnit.Windows.API.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.Ring.pas"/>
+        <Filename Value="..\Common\PIRUnit.IORing.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.SequentialReader.pas"/>
+        <Filename Value="..\Common\PIRUnit.SequentialReader.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.Streams.pas"/>
+        <Filename Value="..\Common\PIRUnit.Streams.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.Atomics.pas"/>
+        <Filename Value="..\Common\PIRUnit.Atomics.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.RequestPool.pas"/>
+        <Filename Value="..\Common\PIRUnit.RequestPool.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.RequestQueue.pas"/>
+        <Filename Value="..\Common\PIRUnit.RequestQueue.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.Engine.pas"/>
+        <Filename Value="..\Common\PIRUnit.Engine.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.BlockReader.pas"/>
+        <Filename Value="..\Common\PIRUnit.BlockReader.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.EngineOverlap.pas"/>
+        <Filename Value="..\Common\PIRUnit.EngineOverlap.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Common\Tests.SequentialWriter.pas"/>
+        <Filename Value="..\Common\PIRUnit.SequentialWriter.Tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
     </Units>

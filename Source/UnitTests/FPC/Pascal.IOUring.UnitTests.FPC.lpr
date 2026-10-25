@@ -4,7 +4,7 @@
   Free Pascal test runner (FPCUnit, console), for Windows and Linux.
 
   The tests are the same units as for Delphi (Source\UnitTests\Common: the
-  base class in Tests.Support hides the difference between FPCUnit and
+  base class in PIRUnit.Test.Support hides the difference between FPCUnit and
   DUnitX). Linux-only tests are in Source\UnitTests\Linux; the Windows API
   tests run on Windows only.
 
@@ -17,7 +17,7 @@
   runner's version).
 }
 
-{$I Pascal.IOUring.inc}
+{$I PIRInclude.Compiler.inc}
 
 uses
 {$IFDEF UNIX}
@@ -27,16 +27,16 @@ uses
 {$IFDEF UNIX}
   BaseUnix,
 {$ENDIF}
-  fpcunit, testregistry, Pascal.IOUring, Tests.Support,
+  fpcunit, testregistry, PIRUnit.IORing, PIRUnit.Test.Support,
 {$IFDEF MSWINDOWS}
-  Tests.Backend.Windows.API.Layout, Tests.Backend.Windows.API,
+  PIRUnit.Windows.API.Layout.Tests, PIRUnit.Windows.API.Tests,
 {$ENDIF}
-  Tests.Ring, Tests.SequentialReader, Tests.Streams, Tests.Atomics, Tests.RequestPool, Tests.RequestQueue, Tests.Engine,
-  Tests.BlockReader, Tests.EngineOverlap, Tests.SequentialWriter,
+  PIRUnit.IORing.Tests, PIRUnit.SequentialReader.Tests, PIRUnit.Streams.Tests, PIRUnit.Atomics.Tests, PIRUnit.RequestPool.Tests, PIRUnit.RequestQueue.Tests, PIRUnit.Engine.Tests,
+  PIRUnit.BlockReader.Tests, PIRUnit.EngineOverlap.Tests, PIRUnit.SequentialWriter.Tests,
 {$IFDEF LINUX}
-  Tests.Backend.Linux.API.Layout, Tests.Backend.Linux.API, Tests.Linux.Extras,
+  PIRUnit.Linux.API.Layout.Tests, PIRUnit.Linux.API.Tests, PIRUnit.Linux.Extras.Tests,
 {$ENDIF}
-  Tests.TestFileHelpers;
+  PIRUnit.Test.FileHelpers.Tests;
 
 type
   // TComponent: interface without reference counting, as TTestResult expects

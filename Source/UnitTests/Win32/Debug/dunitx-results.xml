@@ -1,0 +1,336 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<test-results name="C:\git_opensource\TommiPrami\Delphi.IOUring\Source\UnitTests\Win32\Debug\Pascal.IOUring.UnitTests.exe" total="252" errors="0" failures="0" ignored="0" inconclusive="0" not-run="0" skipped="0" invalid="0" date="2026-10-25" time="12:57:22">
+  <culture-info current-culture="en" current-uiculture="en" />
+  <test-suite type="Assembly" name="Pascal.IOUring.UnitTests.exe" executed="true" result="Success" success="True" time="10.101" asserts="0">
+    <results>
+        <test-suite type="Namespace" name="Tests" executed="true" result="Success" success="True" time="10.101" asserts="0" >
+          <results>
+              <test-suite type="Fixture" name="TAtomicTests" executed="True" result="Success" success="True" time="0.482" >
+                <results>
+                  <test-case name="CompareExchange_AllTypes" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="CompareExchange64_ComparesBothHalves" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="TryCompareExchange_AllTypes" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Exchange_AllTypes" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="FetchAdd_ReturnsOldValueAndWraps" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="IncrementDecrement_ReturnNewValue" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="LoadStore_AllTypes" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="NativeTypes_UseMatchingSize" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="BarrierAndPause_Run" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="BackOff_DoublesUpToTheLimit" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Stress_Increment32_IsExact" executed="True" result="Success" success="True" time="0.011" asserts="0" />
+                  <test-case name="Stress_FetchAdd64_CarriesIntoUpperHalf" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                  <test-case name="Stress_CompareExchange64Loop_IsExact" executed="True" result="Success" success="True" time="0.034" asserts="0" />
+                  <test-case name="Stress_Load64_NeverSeesHalfAWrite" executed="True" result="Success" success="True" time="0.009" asserts="0" />
+                  <test-case name="Stress_ReleaseAcquire_HandsOverData" executed="True" result="Success" success="True" time="0.008" asserts="0" />
+                  <test-case name="Spin_SeesWriteOfOtherThread" executed="True" result="Success" success="True" time="0.032" asserts="0" />
+                  <test-case name="Wait_ValueDiffers_ReturnsAtOnce" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Wait_Timeout_ReturnsFalse" executed="True" result="Success" success="True" time="0.064" asserts="0" />
+                  <test-case name="WakeOne_WakesSleepingThread" executed="True" result="Success" success="True" time="0.062" asserts="0" />
+                  <test-case name="WakeAll_WakesAllSleepingThreads" executed="True" result="Success" success="True" time="0.112" asserts="0" />
+                  <test-case name="Stress_PingPong_NoLostWakeUps" executed="True" result="Success" success="True" time="0.132" asserts="0" />
+                </results>
+              </test-suite>
+              <test-suite type="Namespace" name="API" executed="true" result="Success" success="True" time="0.539" asserts="0" >
+                <results>
+                    <test-suite type="Fixture" name="TWindowsIoRingApiLayoutTests" executed="True" result="Success" success="True" time="0.000" >
+                      <results>
+                        <test-case name="HIORING_IsPointerSized" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IORING_CREATE_FLAGS_Layout" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IORING_INFO_Layout" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IORING_CAPABILITIES_Layout" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IORING_HANDLE_REF_Layout" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IORING_REGISTERED_BUFFER_Layout" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IORING_BUFFER_REF_Layout" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IORING_BUFFER_INFO_Layout" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IORING_CQE_Layout" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="FILE_SEGMENT_ELEMENT_Layout" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IoRingHandleRefFromHandle_SetsRawHandle" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IoRingHandleRefFromIndex_SetsRegisteredIndex" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IoRingBufferRefFromPointer_SetsRawAddress" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IoRingBufferRefFromIndexAndOffset_SetsRegisteredBuffer" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                      </results>
+                    </test-suite>
+                    <test-suite type="Fixture" name="TWindowsIoRingApiTests" executed="True" result="Success" success="True" time="0.538" >
+                      <results>
+                        <test-case name="QueryIoRingCapabilities_ReportsVersion4" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="CreateIoRing_RoundsQueueSizesToPowersOfTwo" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                        <test-case name="CreateIoRing_UnknownVersion_Fails" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                        <test-case name="CreateIoRing_TooBigSubmissionQueue_Fails" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="IsIoRingOpSupported_AllOperations" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="SetIoRingCompletionEvent_SignalsOnFirstCompletion" executed="True" result="Success" success="True" time="0.013" asserts="0" />
+                        <test-case name="ReadFile_RawRefs_ReadsRightData" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="PopIoRingCompletion_EmptyQueue_ReturnsSFalse" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="ReadFile_RegisteredFileAndBuffers_ReadsRightData" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="RegisterBuffers_SparseEntry_Succeeds" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="WriteFlushRead_WithDrain_RoundTrip" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                        <test-case name="ReadFileScatter_Unbuffered_ReadsRightData" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                        <test-case name="WriteFileGather_Unbuffered_WritesRightData" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                        <test-case name="ReadFileScatter_Buffered_FailsWithInvalidParameter" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="CancelRequest_CancelsPendingPipeRead" executed="True" result="Success" success="True" time="0.051" asserts="0" />
+                        <test-case name="SubmitIoRing_WaitTimeout_Result" executed="True" result="Success" success="True" time="0.065" asserts="0" />
+                        <test-case name="BuildIoRingReadFile_SubmissionQueueFull" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                        <test-case name="SubmitIoRing_CompletionQueueTooFull" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="SubmitIoRing_WhileOtherThreadWaits_SubmitInProgress" executed="True" result="Success" success="True" time="0.214" asserts="0" />
+                        <test-case name="ReadFile_AtAndAfterEndOfFile" executed="True" result="Success" success="True" time="0.008" asserts="0" />
+                        <test-case name="ReadFile_NonOverlappedHandle_Works" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="CloseIoRing_WithPendingRead_DoesNotCancelIt" executed="True" result="Success" success="True" time="0.118" asserts="0" />
+                        <test-case name="CancelIoEx_CancelsPendingRingRead" executed="True" result="Success" success="True" time="0.061" asserts="0" />
+                      </results>
+                    </test-suite>
+                </results>
+              </test-suite>
+              <test-suite type="Fixture" name="TBlockReaderTests" executed="True" result="Success" success="True" time="0.372" >
+                <results>
+                  <test-case name="List_BlocksComeInOrderWithTheirData" executed="True" result="Success" success="True" time="0.008" asserts="0" />
+                  <test-case name="Provider_IsAskedLazily" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="TouchingBlocks_AreMerged" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="MaxGap_MergesAcrossSmallGaps" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="BackwardAndOverlappingBlocks_AreReadAgain" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="EndOfFile_ShortensBlocks" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="EmptyList_IsFinishedAtOnce" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="NoWait_ReturnsFalseUntilTheDataIsThere" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="BadArguments_Raise" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="WrongCallOrder_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="FailedRead_RaisesEveryTime" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Close_WaitsForTheReadsInFlight" executed="True" result="Success" success="True" time="0.119" asserts="0" />
+                  <test-case name="Stats_CountBlocksReadsAndStalls" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Stress_ManyRandomBlocks" executed="True" result="Success" success="True" time="0.163" asserts="0" />
+                  <test-case name="Stress_SeveralReadersShareOneEngine" executed="True" result="Success" success="True" time="0.062" asserts="0" />
+                </results>
+              </test-suite>
+              <test-suite type="Fixture" name="TIORingEngineTests" executed="True" result="Success" success="True" time="1.414" >
+                <results>
+                  <test-case name="Read_ReturnsDataAndUserData" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="ManyReads_MoreThanTheRingHolds" executed="True" result="Success" success="True" time="0.005" asserts="0" />
+                  <test-case name="WriteFlushRead_RoundTrip" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                  <test-case name="EndOfFile_AtAndAcross" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="BadFileHandle_CompletesWithError" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Wait_Timeout_KeepsTheRequest" executed="True" result="Success" success="True" time="0.057" asserts="0" />
+                  <test-case name="TryGetResult_FalseUntilDone" executed="True" result="Success" success="True" time="0.015" asserts="0" />
+                  <test-case name="Wait_HandleNotValid_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Callback_RunsOnTheIOThread" executed="True" result="Success" success="True" time="0.015" asserts="0" />
+                  <test-case name="CallbackException_IsCaughtAndCounted" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                  <test-case name="Batch_GoesToTheRingInOneSubmit" executed="True" result="Success" success="True" time="0.094" asserts="0" />
+                  <test-case name="Batch_WithoutBegin_Raises" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="FullPool_StartWaitsForAFreeRequest" executed="True" result="Success" success="True" time="0.125" asserts="0" />
+                  <test-case name="Stats_CountTheRequests" executed="True" result="Success" success="True" time="0.031" asserts="0" />
+                  <test-case name="Destroy_CancelsRequestsInFlight" executed="True" result="Success" success="True" time="0.062" asserts="0" />
+                  <test-case name="Destroy_WakesAThreadInWait" executed="True" result="Success" success="True" time="0.062" asserts="0" />
+                  <test-case name="Destroy_IdleEngine_IsQuick" executed="True" result="Success" success="True" time="0.203" asserts="0" />
+                  <test-case name="Destroy_TenEngines_AreQuick" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                  <test-case name="IOThreads_BadCount_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="IOThreads_ABacklogIsShared" executed="True" result="Success" success="True" time="0.173" asserts="0" />
+                  <test-case name="IOThreads_LightLoad_StaysOnOneThread" executed="True" result="Success" success="True" time="0.028" asserts="0" />
+                  <test-case name="IOThreads_Destroy_CancelsEverything" executed="True" result="Success" success="True" time="0.014" asserts="0" />
+                  <test-case name="Stress_ManyProducers_RandomReads" executed="True" result="Success" success="True" time="0.090" asserts="0" />
+                  <test-case name="Stress_ManyProducers_FourIOThreads" executed="True" result="Success" success="True" time="0.084" asserts="0" />
+                  <test-case name="Stress_CallbacksAndWaitsMixed" executed="True" result="Success" success="True" time="0.161" asserts="0" />
+                  <test-case name="Stress_CallbacksAndWaitsMixed_FourIOThreads" executed="True" result="Success" success="True" time="0.168" asserts="0" />
+                </results>
+              </test-suite>
+              <test-suite type="Fixture" name="TEngineOverlapTests" executed="True" result="Success" success="True" time="0.414" >
+                <results>
+                  <test-case name="WriteThenRead_ReadSeesTheWrite" executed="True" result="Success" success="True" time="0.004" asserts="0" />
+                  <test-case name="WriteThenWrite_TheLaterOneWins" executed="True" result="Success" success="True" time="0.006" asserts="0" />
+                  <test-case name="ReadThenWrite_ReadSeesTheOldData" executed="True" result="Success" success="True" time="0.004" asserts="0" />
+                  <test-case name="PendingRead_HoldsBackAWriteOfTheSameBytes" executed="True" result="Success" success="True" time="0.063" asserts="0" />
+                  <test-case name="ReadsDoNotWaitForReads" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                  <test-case name="OtherBytes_DoNotWait" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="HeldBackRequests_StartInOrder" executed="True" result="Success" success="True" time="0.078" asserts="0" />
+                  <test-case name="Flush_WaitsForAnEarlierWrite" executed="True" result="Success" success="True" time="0.077" asserts="0" />
+                  <test-case name="Destroy_CancelsHeldBackRequests" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                  <test-case name="RuleOff_NothingIsHeldBack" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="OneHandle_UsesOneIOThread" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                  <test-case name="Model_RandomReadsAndWrites" executed="True" result="Success" success="True" time="0.038" asserts="0" />
+                  <test-case name="Model_FourProducersOnOneHandle" executed="True" result="Success" success="True" time="0.107" asserts="0" />
+                </results>
+              </test-suite>
+              <test-suite type="Namespace" name="RequestPool" executed="true" result="Success" success="True" time="0.730" asserts="0" >
+                <results>
+                    <test-suite type="Fixture" name="TFreeListTests" executed="True" result="Success" success="True" time="0.138" >
+                      <results>
+                        <test-case name="Open_Full_PopsEveryIndexOnce" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="Open_Empty_LastPushedComesFirst" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="CapacityOne_Works" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="BadArguments_Raise" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="Stress_NoIndexLostOrTakenTwice" executed="True" result="Success" success="True" time="0.138" asserts="0" />
+                      </results>
+                    </test-suite>
+                    <test-suite type="Fixture" name="TRequestPoolTests" executed="True" result="Success" success="True" time="0.592" >
+                      <results>
+                        <test-case name="Open_EverySlotAcquirableOnce" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="BadArguments_Raise" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                        <test-case name="Handle_HoldsIndexAndGeneration" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="Release_MakesHandleStale" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="EmptyAndOutOfRangeHandles_AreStale" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="StateChanges_FollowTheRules" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="TryChangeState_FreeOrStale_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="Payload_IsAlignedSeparateAndZeroed" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="GenerationBits_DependOnCapacity" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                        <test-case name="Generation_WrapsAroundWithoutZero" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                        <test-case name="WaitFor_Completed_ReturnsAtOnce" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="WaitFor_ZeroTimeout_OnlyChecks" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                        <test-case name="WaitFor_Timeout_ReturnsAfterTimeout" executed="True" result="Success" success="True" time="0.054" asserts="0" />
+                        <test-case name="WaitFor_WokenByCompletion" executed="True" result="Success" success="True" time="0.062" asserts="0" />
+                        <test-case name="WaitFor_WokenByRelease_ReturnsStale" executed="True" result="Success" success="True" time="0.063" asserts="0" />
+                        <test-case name="Stress_NoSlotTakenTwice" executed="True" result="Success" success="True" time="0.071" asserts="0" />
+                        <test-case name="Stress_EngineSimulation" executed="True" result="Success" success="True" time="0.154" asserts="0" />
+                        <test-case name="Stress_EngineSimulation_WithoutSpinning" executed="True" result="Success" success="True" time="0.153" asserts="0" />
+                      </results>
+                    </test-suite>
+                </results>
+              </test-suite>
+              <test-suite type="Fixture" name="TRequestQueueTests" executed="True" result="Success" success="True" time="0.218" >
+                <results>
+                  <test-case name="Open_RoundsCapacityUp" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="BadArguments_Raise" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="FirstInFirstOut_FullAndEmpty" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="AnyValue_PassesThrough" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="ManyLaps_KeepOrder" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                  <test-case name="PositionWrapAround_KeepsOrder" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="ClosedQueue_RefusesValues" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Stress_ManyProducersOneConsumer" executed="True" result="Success" success="True" time="0.043" asserts="0" />
+                  <test-case name="Stress_ManyProducersManyConsumers" executed="True" result="Success" success="True" time="0.060" asserts="0" />
+                  <test-case name="Stress_SmallQueue_OftenFullAndEmpty" executed="True" result="Success" success="True" time="0.032" asserts="0" />
+                  <test-case name="Stress_PositionWrapAroundUnderLoad" executed="True" result="Success" success="True" time="0.042" asserts="0" />
+                  <test-case name="Stress_ConsumerWaitsForEveryValue" executed="True" result="Success" success="True" time="0.038" asserts="0" />
+                </results>
+              </test-suite>
+              <test-suite type="Fixture" name="TIORingTests" executed="True" result="Success" success="True" time="0.676" >
+                <results>
+                  <test-case name="Available_AndCapabilities" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Capabilities_DescribeTheSystem" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Open_RoundsQueueSizes" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Open_Twice_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Close_Twice_DoesNothing" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="PrepareRead_OnClosedRing_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="EndOfScope_ClosesRing" executed="True" result="Success" success="True" time="0.302" asserts="0" />
+                  <test-case name="Copy_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="ConstParameter_DoesNotCopy" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="PrepareRead_FullSubmissionQueue_ReturnsFalse" executed="True" result="Success" success="True" time="0.009" asserts="0" />
+                  <test-case name="Prepare_NeverOverfillsCompletionQueue" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="RandomReads_EveryCompletionVerified" executed="True" result="Success" success="True" time="0.007" asserts="0" />
+                  <test-case name="RegisterFilesAndBuffers_ArraysAreCopied" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="WriteFlushRead_WithDrain" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Flush_AllModes" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                  <test-case name="WriteThrough_UnbufferedFile" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="ReadScatter_UsesOnlySegmentCountEntries" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="PrepareCancel_CancelsPendingPipeRead" executed="True" result="Success" success="True" time="0.023" asserts="0" />
+                  <test-case name="ReadOnWriteOnlyHandle_GivesFailedCompletion" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="CompletionEvent_SignalsAfterSubmit" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="WaitForCompletions_CountsCompletionsAlreadyInQueue" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Close_WaitsForPendingOperations" executed="True" result="Success" success="True" time="0.312" asserts="0" />
+                  <test-case name="ReadAt_ReadsData" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="ReadAt_AtAndAfterEndOfFile" executed="True" result="Success" success="True" time="0.009" asserts="0" />
+                  <test-case name="ReadAt_OnBusyRing_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="WriteAt_ThenReadAt_RoundTrip" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Completion_HasLayoutOfIoRingCqe" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="BufferInfo_HasLayoutOfIoRingBufferInfo" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="ErrorMessage_DescribesCodes" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                </results>
+              </test-suite>
+              <test-suite type="Fixture" name="TSequentialReaderTests" executed="True" result="Success" success="True" time="0.974" >
+                <results>
+                  <test-case name="Read_SizeAndChunkMatrix_Buffered" executed="True" result="Success" success="True" time="0.233" asserts="0" />
+                  <test-case name="Read_SizeAndChunkMatrix_Unbuffered" executed="True" result="Success" success="True" time="0.195" asserts="0" />
+                  <test-case name="Read_SizeAndChunkMatrix_FixedReadAheadNoRegistration" executed="True" result="Success" success="True" time="0.066" asserts="0" />
+                  <test-case name="Read_LargeFile_Buffered" executed="True" result="Success" success="True" time="0.202" asserts="0" />
+                  <test-case name="Read_LargeFile_Unbuffered" executed="True" result="Success" success="True" time="0.124" asserts="0" />
+                  <test-case name="ZeroCopy_DeliversSameContent" executed="True" result="Success" success="True" time="0.006" asserts="0" />
+                  <test-case name="ReadAndZeroCopy_Mixed" executed="True" result="Success" success="True" time="0.008" asserts="0" />
+                  <test-case name="EmptyFile_IsEndOfFileAtOnce" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="BigReads_GoStraightIntoTheCallersMemory" executed="True" result="Success" success="True" time="0.015" asserts="0" />
+                  <test-case name="SmallReads_UseOnlyTheBuffers" executed="True" result="Success" success="True" time="0.004" asserts="0" />
+                  <test-case name="BigReads_Unbuffered_OnlyIntoSectorAlignedMemory" executed="True" result="Success" success="True" time="0.013" asserts="0" />
+                  <test-case name="BigReads_MixedWithSmallReadsAndChunks" executed="True" result="Success" success="True" time="0.012" asserts="0" />
+                  <test-case name="AppendedWhileReading_StopsAtSizeAtOpen" executed="True" result="Success" success="True" time="0.008" asserts="0" />
+                  <test-case name="ShortenedWhileReading_EndsAtNewEnd" executed="True" result="Success" success="True" time="0.008" asserts="0" />
+                  <test-case name="ShortenedWhileBigReads_EndsAtNewEnd" executed="True" result="Success" success="True" time="0.010" asserts="0" />
+                  <test-case name="Close_InTheMiddle_IsClean" executed="True" result="Success" success="True" time="0.025" asserts="0" />
+                  <test-case name="EndOfScope_ClosesFile" executed="True" result="Success" success="True" time="0.012" asserts="0" />
+                  <test-case name="OpenHandle_NotOwned_KeepsHandleOpen" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Open_BadArguments_Raise" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Open_MissingFile_Raises" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Open_Twice_Raises" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Copy_Raises" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Read_WithChunkAcquired_Raises" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="ReleaseChunk_WithoutChunk_Raises" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="TryAcquireChunk_WithoutWait_GetsDataEventually" executed="True" result="Success" success="True" time="0.015" asserts="0" />
+                  <test-case name="Stats_AreConsistent" executed="True" result="Success" success="True" time="0.008" asserts="0" />
+                </results>
+              </test-suite>
+              <test-suite type="Namespace" name="SequentialWriter" executed="true" result="Success" success="True" time="0.334" asserts="0" >
+                <results>
+                    <test-suite type="Fixture" name="TSequentialWriterTests" executed="True" result="Success" success="True" time="0.273" >
+                      <results>
+                        <test-case name="RoundTrip_SizesAroundTheBufferSize" executed="True" result="Success" success="True" time="0.053" asserts="0" />
+                        <test-case name="Pieces_OfEverySize" executed="True" result="Success" success="True" time="0.042" asserts="0" />
+                        <test-case name="DefaultBuffers_SeveralMiB" executed="True" result="Success" success="True" time="0.050" asserts="0" />
+                        <test-case name="ZeroCopy_AcquireAndCommit" executed="True" result="Success" success="True" time="0.008" asserts="0" />
+                        <test-case name="Flush_PutsAPartlyFilledBufferIntoTheFile" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                        <test-case name="FlushToDisk_Works" executed="True" result="Success" success="True" time="0.010" asserts="0" />
+                        <test-case name="Unbuffered_CutsTheLastBuffer" executed="True" result="Success" success="True" time="0.024" asserts="0" />
+                        <test-case name="Unbuffered_FlushInBetween" executed="True" result="Success" success="True" time="0.012" asserts="0" />
+                        <test-case name="FailedWrite_RaisesAtALaterWrite" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                        <test-case name="FailedWrite_RaisesAtFlushAndAgain" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                        <test-case name="FailedWrite_CloseRaises" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                        <test-case name="BadArguments_Raise" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                        <test-case name="WrongCallOrder_Raises" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                        <test-case name="EndOfScope_WritesTheRest" executed="True" result="Success" success="True" time="0.006" asserts="0" />
+                        <test-case name="Stats_CountWrites" executed="True" result="Success" success="True" time="0.007" asserts="0" />
+                        <test-case name="SharedEngine_SeveralWriters" executed="True" result="Success" success="True" time="0.028" asserts="0" />
+                      </results>
+                    </test-suite>
+                    <test-suite type="Fixture" name="TWriteStreamTests" executed="True" result="Success" success="True" time="0.061" >
+                      <results>
+                        <test-case name="WriteBufferAndCopyFrom_RoundTrip" executed="True" result="Success" success="True" time="0.009" asserts="0" />
+                        <test-case name="SaveToStream_Text" executed="True" result="Success" success="True" time="0.021" asserts="0" />
+                        <test-case name="PositionSizeAndSeek" executed="True" result="Success" success="True" time="0.007" asserts="0" />
+                        <test-case name="ReadAndSetSize_Raise" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                        <test-case name="CannotCreate_RaisesEFCreateError" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                        <test-case name="FailedWrite_FlushRaisesEWriteError_FreeDoesNot" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                        <test-case name="FailedWrite_FreeRaisesEWriteError" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                        <test-case name="SharedEngine" executed="True" result="Success" success="True" time="0.007" asserts="0" />
+                        <test-case name="Unbuffered_RoundTrip" executed="True" result="Success" success="True" time="0.009" asserts="0" />
+                      </results>
+                    </test-suite>
+                </results>
+              </test-suite>
+              <test-suite type="Fixture" name="TSequentialReadOnlyFileStreamTests" executed="True" result="Success" success="True" time="3.934" >
+                <results>
+                  <test-case name="Content_SameAsFileStream" executed="True" result="Success" success="True" time="3.863" asserts="0" />
+                  <test-case name="Content_Unbuffered" executed="True" result="Success" success="True" time="0.010" asserts="0" />
+                  <test-case name="ReadOverloads_Work" executed="True" result="Success" success="True" time="0.008" asserts="0" />
+                  <test-case name="ReadBuffer_PastEnd_RaisesEReadError" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="PositionAndSize_AtAllTimes" executed="True" result="Success" success="True" time="0.007" asserts="0" />
+                  <test-case name="SeekToCurrentPosition_IsAllowed" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="SeekElsewhere_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Write_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="SetSize_Raises" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="StreamError_IsAnEStreamError" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="MemoryStream_CopyFromWholeStream" executed="True" result="Success" success="True" time="0.007" asserts="0" />
+                  <test-case name="MemoryStream_CopyFromPartsThenRest" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="BytesStream_LoadFromStream" executed="True" result="Success" success="True" time="0.007" asserts="0" />
+                  <test-case name="MemoryStream_LoadFromStream_ReadsDirectly" executed="True" result="Success" success="True" time="0.009" asserts="0" />
+                  <test-case name="StreamReader_ReadsLines" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                  <test-case name="Create_MissingFile_RaisesEFOpenError" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Create_BadBufferSize_RaisesEIORingError" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Stats_AreAvailable" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                </results>
+              </test-suite>
+              <test-suite type="Fixture" name="TTestFileHelpersTests" executed="True" result="Success" success="True" time="0.015" >
+                <results>
+                  <test-case name="PatternWord_IsDeterministic" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="PatternWord_NeighboursDiffer" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="FillPattern_MatchesExpectedByte" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="CheckPattern_AcceptsCorrectData" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="CheckPattern_DetectsShiftedData" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="CheckPattern_ReportsFirstBadOffset" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="CreatePatternFile_HasRightSizeAndContent" executed="True" result="Success" success="True" time="0.014" asserts="0" />
+                </results>
+              </test-suite>
+          </results>
+        </test-suite>
+    </results>
+  </test-suite>
+</test-results>

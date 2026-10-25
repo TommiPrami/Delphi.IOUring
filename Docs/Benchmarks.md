@@ -248,7 +248,7 @@ sequential-scan hint on, registration on).
 
 Measured 2026-10-22, later the same day (Milestone 2, Phase 9): Free Pascal
 3.2.2 with `Source/Benchmarks/FPC` – the same files, consumer and reading
-routines (`Bench.Common`, `Bench.Readers`) as the Delphi program, main
+routines (`PIRUnit.Benchmark.Common`, `PIRUnit.Benchmark.Readers`) as the Delphi program, main
 contenders only. Each Delphi/FPC pair was run **right after each other**,
 1 GiB, 3 runs, median MiB/s.
 
@@ -1085,8 +1085,8 @@ Before = the Win64 numbers in the sections above.
 ## How to run
 
 ```
-Source\Benchmarks\Win64\Release\Pascal.IOUring.Benchmarks.exe --sizes 1,10 --runs 3 --csv results.csv
-Source\Benchmarks\Win64\Release\Pascal.IOUring.Benchmarks.exe --tune --sizes 10 --runs 3
+Source\Benchmarks\Delphi\Win64\Release\Pascal.IOUring.Benchmarks.exe --sizes 1,10 --runs 3 --csv results.csv
+Source\Benchmarks\Delphi\Win64\Release\Pascal.IOUring.Benchmarks.exe --tune --sizes 10 --runs 3
 ```
 
 Free Pascal (`-Platform Win32` or `Win64`):
@@ -1106,7 +1106,7 @@ Engine structures (free list about 30 s, queue about 5 min per build; options
 `--only freelist|queue`, `--runs`, `--threads`, `--csv`):
 
 ```
-Source\Benchmarks\Win64\Release\Pascal.IOUring.Benchmarks.Structures.exe --runs 3 --csv structures.csv
+Source\Benchmarks\Delphi\Win64\Release\Pascal.IOUring.Benchmarks.Structures.exe --runs 3 --csv structures.csv
 Source\Build-FPC.ps1 -Project Structures -Platform Win64 -Run
 ```
 
@@ -1116,7 +1116,7 @@ Blocks known in advance (about 1.5 minutes per build; options `--dir`,
 than once), `--keep`):
 
 ```
-Source\Benchmarks\Win64\Release\Pascal.IOUring.Benchmarks.Blocks.exe --runs 3 --csv blocks.csv
+Source\Benchmarks\Delphi\Win64\Release\Pascal.IOUring.Benchmarks.Blocks.exe --runs 3 --csv blocks.csv
 Source\Build-FPC.ps1 -Project Blocks -Platform Win64 -Run
 ```
 
@@ -1125,7 +1125,7 @@ Writing a file (options `--dir`, `--sizes` (GiB, default 1,10), `--runs`,
 largest size):
 
 ```
-Source\Benchmarks\Win64\Release\Pascal.IOUring.Benchmarks.Writes.exe --sizes 1,10 --runs 3 --csv writes.csv
+Source\Benchmarks\Delphi\Win64\Release\Pascal.IOUring.Benchmarks.Writes.exe --sizes 1,10 --runs 3 --csv writes.csv
 Source\Build-FPC.ps1 -Project Writes -Platform Win64 -Run
 ```
 

@@ -75,21 +75,21 @@ jobs:
         shell: bash
         run: |
           cd Source/UnitTests/Linux
-          cp Tests.Backend.Linux.API.Layout.inc "$RUNNER_TEMP/committed.inc"
+          cp PIRInclude.Linux.API.Layout.inc "$RUNNER_TEMP/committed.inc"
           if ! bash Generate-LinuxApiLayout.sh > "$RUNNER_TEMP/generate.log" 2>&1; then
             cat "$RUNNER_TEMP/generate.log"
             tail -n 10 "$RUNNER_TEMP/generate.log" | while IFS= read -r line; do echo "::error title=Layout generator::${line//%/%25}"; done
             exit 1
           fi
           cat "$RUNNER_TEMP/generate.log"
-          head -n 2 Tests.Backend.Linux.API.Layout.inc
+          head -n 2 PIRInclude.Linux.API.Layout.inc
           if ! diff <(grep -F 'ACheck(' "$RUNNER_TEMP/committed.inc" | tr -d '\r') \
-                    <(grep -F 'ACheck(' Tests.Backend.Linux.API.Layout.inc | tr -d '\r') > "$RUNNER_TEMP/layout.diff"; then
+                    <(grep -F 'ACheck(' PIRInclude.Linux.API.Layout.inc | tr -d '\r') > "$RUNNER_TEMP/layout.diff"; then
             cat "$RUNNER_TEMP/layout.diff"
             head -n 10 "$RUNNER_TEMP/layout.diff" | while IFS= read -r line; do echo "::error title=Layout differs on this CPU::${line//%/%25}"; done
             exit 1
           fi
-          echo "The same $(grep -cF 'ACheck(' Tests.Backend.Linux.API.Layout.inc) checks as the committed file"
+          echo "The same $(grep -cF 'ACheck(' PIRInclude.Linux.API.Layout.inc) checks as the committed file"
 
       # The Lazarus package's main unit, compiled with FPC (no Lazarus here)
       - name: Build the benchmarks and the Lazarus package
