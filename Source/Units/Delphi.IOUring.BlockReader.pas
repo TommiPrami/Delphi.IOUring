@@ -60,24 +60,26 @@ type
     StallMicroseconds: UInt64;    // total time spent waiting in those stalls
   end;
 
-  // One buffer and its read (internal)
-  TIORingBlockSlotState = (bssFree, bssInFlight, bssReady);
-  PIORingBlockSlot = ^TIORingBlockSlot;
-
-  TIORingBlockSlot = record
-    State: TIORingBlockSlotState;
-    Data: PByte;
-    Offset: UInt64;               // file offset of the read
-    Length: Cardinal;             // bytes asked for
-    BytesRead: Cardinal;          // bytes the read returned
-    NativeResult: Integer;        // < 0 (and not end of file): the read failed
-    Request: TIORingRequestHandle;
-    Blocks: array of TIORingBlock;    // the blocks of this read, in order
-    BlockCount: Integer;
-  end;
-
   // Custom managed record: owns the buffer memory and waits for its reads at the end of scope. Not copyable.
   TIORingBlockReader = record
+  private
+    type
+      // One buffer and its read
+      TSlotState = (bssFree, bssInFlight, bssReady);
+      PSlot = ^TSlot;
+
+      TSlot = record
+        State: TSlotState;
+        Data: PByte;
+        Offset: UInt64;               // file offset of the read
+        Length: Cardinal;             // bytes asked for
+        BytesRead: Cardinal;          // bytes the read returned
+        NativeResult: Integer;        // < 0 (and not end of file): the read failed
+        Request: TIORingRequestHandle;
+        Blocks: array of TIORingBlock;    // the blocks of this read, in order
+        BlockCount: Integer;
+      end;
+
   private
     FEngine: TIORingEngine;
     FFile: THandle;
@@ -87,7 +89,7 @@ type
     FUseList: Boolean;
     FMemory: PByte;
     FMemorySize: NativeUInt;      // for FreePages
-    FSlots: array of TIORingBlockSlot;
+    FSlots: array of TSlot;
     FBufferSize: Cardinal;
     FMaxGap: Cardinal;
     FHead: Integer;                   // the slot of the next block to deliver
@@ -101,7 +103,7 @@ type
     procedure OpenCommon(const AEngine: TIORingEngine; const AFile: THandle; const AReadAhead, ABufferSize,
       AMaxGap: Cardinal);
     function FetchBlock(var ABlock: TIORingBlock): Boolean;
-    function CanJoin(const ASlot: PIORingBlockSlot; const ABlock: TIORingBlock): Boolean;
+    function CanJoin(const ASlot: PSlot; const ABlock: TIORingBlock): Boolean;
     procedure StartReads;
     function CompleteHead(const AWait: Boolean): Boolean;
     function GetReadAhead: Integer;
@@ -407,7 +409,7 @@ begin
     RaiseBadBlockLength(ABlock.Length, ABlock.Offset, FBufferSize);
 end;
 
-function TIORingBlockReader.CanJoin(const ASlot: PIORingBlockSlot; const ABlock: TIORingBlock): Boolean;
+function TIORingBlockReader.CanJoin(const ASlot: TIORingBlockReader.PSlot; const ABlock: TIORingBlock): Boolean;
 var
   LEnd: UInt64;
 begin
@@ -419,7 +421,7 @@ end;
 
 procedure TIORingBlockReader.StartReads;
 var
-  LSlot: PIORingBlockSlot;
+  LSlot: PSlot;
 begin
   if not FHaveNext or (FOutstanding >= Length(FSlots)) then
     Exit;
@@ -459,7 +461,7 @@ end;
 
 function TIORingBlockReader.CompleteHead(const AWait: Boolean): Boolean;
 var
-  LSlot: PIORingBlockSlot;
+  LSlot: PSlot;
   LCompletion: TIORingCompletion;
   LStart: UInt64;
 begin
@@ -512,7 +514,7 @@ function TIORingBlockReader.TryGetBlock(out ABlock: TIORingBlock; out AData: PBy
   end;
 
 var
-  LSlot: PIORingBlockSlot;
+  LSlot: PSlot;
   LStart: UInt64;
 begin
   ABlock := TIORingBlock.Create(0, 0);
@@ -564,7 +566,7 @@ procedure TIORingBlockReader.ReleaseBlock;
   end;
 
 var
-  LSlot: PIORingBlockSlot;
+  LSlot: PSlot;
 
 begin
   if not FBlockAcquired then

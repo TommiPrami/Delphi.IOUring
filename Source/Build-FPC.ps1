@@ -59,7 +59,8 @@
 
 .PARAMETER Define
     Symbols to define for the compiler (-d), e.g. IORING_ATOMICS_AARCH64_RTL
-    (the atomics as before Phase 27, for comparing; Docs/Design.md §12.9).
+    (the atomics as before Phase 27, for comparing; Docs/Design.md §12.9) or
+    IORING_CLOCK_LIBC (the C library's clock on Linux, for comparing; §12.10).
 
 .EXAMPLE
     .\Build-FPC.ps1 -Project Tests -Platform Win32 -Run

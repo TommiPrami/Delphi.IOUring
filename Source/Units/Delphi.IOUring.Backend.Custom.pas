@@ -175,6 +175,12 @@ type
   procedure RaiseErrorFmt(const AClass: ExceptClass; const AFormat: string; const AArgs: array of const);
     {$IFNDEF FPC} noreturn; {$ENDIF}
 
+  { The buffer arguments of the sequential reader and writer: ABufferSize a multiple of ASizeUnit (not 0), ABufferCount
+    1..AMaxCount, and all buffers together not too big for memory. Returns their total size; raises EIORingError. }
+  function IORingCheckBufferArguments(const ABufferSize, ABufferCount, ASizeUnit, AMaxCount: Cardinal): UInt64;
+  // Unbuffered I/O: ABufferSize must be a multiple of the sector size; raises EIORingError
+  procedure IORingCheckSectorMultiple(const ABufferSize, ASectorSize: Cardinal);
+
 implementation
 
 {$IFDEF MSWINDOWS}
@@ -440,6 +446,48 @@ begin
 {$ELSE}
   raise AClass.CreateFmt(AFormat, AArgs) at ReturnAddress;
 {$ENDIF}
+end;
+
+function IORingCheckBufferArguments(const ABufferSize, ABufferCount, ASizeUnit, AMaxCount: Cardinal): UInt64;
+
+  procedure RaiseBufferSizeNotMultiple(const ASize, AUnit: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('Buffer size %d is not a multiple of %d', [ASize, AUnit]);
+  end;
+
+  procedure RaiseBufferCountOutOfRange(const ACount, AMax: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('Buffer count %d is not between 1 and %d', [ACount, AMax]);
+  end;
+
+  procedure RaiseBuffersTooBig(const ACount, ASize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('%d buffers of %d bytes do not fit in memory', [ACount, ASize]);
+  end;
+
+begin
+  if (ABufferSize = 0) or (ABufferSize mod ASizeUnit <> 0) then
+    RaiseBufferSizeNotMultiple(ABufferSize, ASizeUnit);
+
+  if (ABufferCount = 0) or (ABufferCount > AMaxCount) then
+    RaiseBufferCountOutOfRange(ABufferCount, AMaxCount);
+
+  Result := UInt64(ABufferSize) * ABufferCount;
+
+  if Result > UInt64(High(NativeInt) div 2) then
+    RaiseBuffersTooBig(ABufferCount, ABufferSize);
+end;
+
+procedure IORingCheckSectorMultiple(const ABufferSize, ASectorSize: Cardinal);
+
+  procedure RaiseNotSectorMultiple(const ASector: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorFmt('Unbuffered I/O needs a buffer size that is a multiple of the sector size %d', [ASector]);
+  end;
+
+begin
+  if ABufferSize mod ASectorSize <> 0 then
+    RaiseNotSectorMultiple(ASectorSize);
 end;
 
 end.

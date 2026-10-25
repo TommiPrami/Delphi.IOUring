@@ -243,7 +243,7 @@ Important semantics:
   CQE = 16 bytes (`user_data: u64; res: s32; flags: u32`).
 - `res` is bytes transferred or **negative errno**.
 - No liburing dependency is planned; raw syscalls + memory barriers, so it
-  works with FPC without C libraries. [DECIDE later: liburing would be simpler]
+  works with FPC without C libraries (decided in Phase 18, §6.4).
 - Can be disabled (`kernel.io_uring_disabled` sysctl, seccomp in containers –
   PostgreSQL documents the same caveat), so availability is a runtime check.
 - Rich op set (read/write/fsync/openat/close/statx/accept/send/recv/…),
@@ -479,9 +479,10 @@ Notes:
 - Own records instead of OS records keep user code OS-neutral. The backend
   converts them into `IORING_HANDLE_REF`/`IORING_BUFFER_REF` (a couple of
   register moves – negligible next to the `Build*` call).
-- **[DECIDE later]** `TIORingFileRef`/`TIORingBufferRef` could alternatively
-  be defined per platform with identical layout to the OS struct, saving the
-  conversion. Start with the neutral records; switch if the benchmark shows it.
+- `TIORingFileRef`/`TIORingBufferRef` could alternatively be defined per
+  platform with identical layout to the OS struct, saving the conversion.
+  Decided in Phase 28 (§12.10): the neutral records stay – the conversion
+  never showed in a benchmark.
 
 ### 5.2 The ring
 
@@ -528,16 +529,16 @@ type
 
     // --- submit (one syscall) ---
     // Submits everything prepared; optionally waits until AWaitCount completions
-    // are available or ATimeoutMs elapses. Returns number of entries submitted.
+    // are available or ATimeoutMilliseconds elapses. Returns number of entries submitted.
     function Submit(const AWaitCount: Cardinal = 0;
-      const ATimeoutMs: Cardinal = INFINITE): Cardinal;
+      const ATimeoutMilliseconds: Cardinal = INFINITE): Cardinal;
 
     // --- reap (no syscall on either platform) ---
     function TryPopCompletion(out ACompletion: TIORingCompletion): Boolean; inline;
     function PopCompletions(var ACompletions: array of TIORingCompletion): Integer;
 
     // --- waiting without submitting ---
-    function WaitForCompletions(const ACount: Cardinal; const ATimeoutMs: Cardinal): Boolean;
+    function WaitForCompletions(const ACount: Cardinal; const ATimeoutMilliseconds: Cardinal): Boolean;
     // OS event (Windows event / Linux eventfd) signalled when CQ goes from empty
     // to non-empty. Lets a ring be integrated into an existing event loop /
     // WaitForMultipleObjects. Rule: pop until empty before waiting on it.
@@ -619,7 +620,7 @@ reference; this is what it does where the draft above was open or differs:
   **[VERIFIED]** only `SegmentCount` entries are used – no terminating entry.
 - **Copying a ring** raises `EInvalidOpException` (the `Assign` / FPC `Copy`
   operator). `Open` on an open ring raises `EIORingError`.
-- **`ReadAt` / `WriteAt`** need an idle ring and raise otherwise; `ReadAt`
+- **`IORingReadAt` / `IORingWriteAt`** need an idle ring and raise otherwise; `IORingReadAt`
   returns 0 at or after EOF.
 - `GetIoRingInfo` on a closed ring handle still returns `S_OK` (it can't be
   used to check whether a ring is open).
@@ -631,9 +632,9 @@ There is only **one** mechanism – the async ring. "Sync" is a helper in
 
 ```pascal
 // Blocking helpers: Prepare + Submit(wait 1) + Pop, raise on error.
-function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer;
+function IORingReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer;
   const ACount: Cardinal; const AOffset: UInt64): Cardinal;
-function WriteAt(...): Cardinal;
+function IORingWriteAt(...): Cardinal;
 ```
 
 Usage styles, from fastest/most manual to most convenient:
@@ -662,7 +663,7 @@ Usage styles, from fastest/most manual to most convenient:
   `EIORingError` with the HRESULT/errno and a readable message (the
   `IORING_E_*` codes get their own texts).
 - Per-I/O failures come back in `TIORingCompletion.NativeResult`; the core
-  never raises for them – helpers (`ReadAt`, streams) do.
+  never raises for them – helpers (`IORingReadAt`, streams) do.
 - EOF is not an error: Windows returns `HRESULT_FROM_WIN32(ERROR_HANDLE_EOF)`
   (0x80070026) for reads at/after EOF; Linux returns `res = 0`.
   `IsEndOfFile` normalizes it. **[VERIFIED]** A read that starts before EOF
@@ -765,8 +766,8 @@ Usage styles, from fastest/most manual to most convenient:
   systems (its callers know the size).
 - **Atomics on Linux:** `WaitWhileEqual`, `WakeOne` and `WakeAll` with the
   futex (private to the process). x86-64 needs nothing else. AArch64:
-  acquire/release with real barriers – written, but **[VERIFY]** until it
-  runs on an ARM machine.
+  acquire/release with real barriers (tested on GitHub's ARM64 runner since
+  Phase 23; assembler routines since Phase 27, §12.9).
 - **Tests on Linux:** `TestPlatformHelpers` gets its Linux side (files with
   a neutral set of open flags, pipes, page memory). The expected codes come
   from small helpers (for example "access denied": `E_ACCESSDENIED` on
@@ -779,8 +780,8 @@ Usage styles, from fastest/most manual to most convenient:
   `TIORingSegment` (`Delphi.IOUring.Backend.Posix`); `Delphi.IOUring`
   exports them as `TIORing`, `TIORingPlatform` and `TIORingSegment`. The
   atomics sleep and wake with the futex. On AArch64 every atomic operation
-  has DMB barriers around it, `CpuPause` does nothing; **[VERIFY]**, not
-  compiled for ARM yet (no cross compiler here). `FreePages` has a size
+  has DMB barriers around it, `CpuPause` does nothing (first run on ARM in
+  Phase 23, §12.5; replaced in Phase 27, §12.9). `FreePages` has a size
   parameter on both systems.
 - One change of plan: the **read stream suite moves to Phase 21**. The
   stream unit also holds the write stream, which needs the engine; rather
@@ -1163,8 +1164,8 @@ plus the three syscall wrappers. x86-64 and AArch64 only.
   gets `-Platform Linux64`, which compiles and runs it inside WSL, so the
   same script builds everything.
 - **AArch64:** the unit is written for it (the same system call numbers;
-  the records have no pointer-size differences), but it can only be tested
-  on an ARM machine – marked [VERIFY] until then.
+  the records have no pointer-size differences); tested on GitHub's ARM64
+  runner since Phase 23 (§12.5).
 
 **Phase 18 implementation notes** (2026-10-23):
 
@@ -1267,7 +1268,7 @@ type
     property Position: Int64;      // bytes delivered to the caller
     property Size: Int64;          // file size taken at open
     property Eof: Boolean;
-    property Stats: TIORingReaderStats;  // plain record: reads issued, bytes, stalls, wait time
+    property Stats: TIORingSequentialReaderStats;  // plain record: reads issued, bytes, stalls, wait time
   end;
 ```
 
@@ -1463,7 +1464,7 @@ type
     // Flush(False), cut the file to its size (unbuffered), close
     procedure Close;
     property Position: Int64;      // bytes accepted
-    property Stats: TIORingWriterStats;   // writes, bytes, waits for a free buffer
+    property Stats: TIORingSequentialWriterStats;   // writes, bytes, waits for a free buffer
   end;
 ```
 
@@ -1600,7 +1601,7 @@ PostgreSQL 18 (2025) added asynchronous I/O with three `io_method`s: `sync`,
 | **I/O handle life cycle** (`HANDED_OUT → DEFINED → STAGED → SUBMITTED → COMPLETED`), handles identified by id + **generation** so a reused handle can't be confused with its previous use. | Request pool with the same states; `UserData` = slot index + generation (§10.3). |
 | **Batch mode**: stage several I/Os, submit them with one syscall. | Already the core model (Prepare/Submit). Engine drains its input queue into one `Submit` per loop. |
 | **Worker pool**: one shared submission queue, a submit wakes one worker which wakes at most two more (avoid thundering herd); failed/crashed worker → its requests fail. | Engine with N I/O threads, careful wake-up policy, every request always completes (success, error or cancelled). |
-| Only work whose future blocks are **known in advance** benefits (seq scans, bitmap scans, VACUUM); single-block OLTP lookups stay synchronous. Writes stayed synchronous in v18. | Same honesty for us: async is for read-ahead and batches. A single blocking `ReadAt` is not faster than `ReadFile`. |
+| Only work whose future blocks are **known in advance** benefits (seq scans, bitmap scans, VACUUM); single-block OLTP lookups stay synchronous. Writes stayed synchronous in v18. | Same honesty for us: async is for read-ahead and batches. A single blocking `IORingReadAt` is not faster than `ReadFile`. |
 | **Monitoring** (`pg_aios` view) was needed to understand behaviour. | Stats counters on reader and engine (issued, completed, in flight, stalls, wait time). |
 | A process can **wait for an I/O another process started** on the same buffer instead of issuing a duplicate. | The basis of the overlap handling in §11. |
 
@@ -1819,7 +1820,7 @@ class methods (nothing to create). Most methods are `inline`.
 `NativeInt` / `NativeUInt` variables pick the 32-bit or 64-bit versions by
 themselves (both compilers). Only the `Integer` and `Int64` versions have
 their own code; the others call them through a typecast of the same size.
-Constants: `IORING_CACHE_LINE_SIZE = 64`, `IORING_WAIT_INFINITE`.
+Constants: `IORING_CACHE_LINE_SIZE = 64`, `IORING_INFINITE`.
 
 | | Delphi | Free Pascal |
 | --- | --- | --- |
@@ -2986,7 +2987,8 @@ capabilities report at the top of the test program's output (3).
 - Two things not explained yet ([open], Benchmarks.md): on the Linux
   runners a block reader with 8 reads in flight beats 32 and 128 (27
   against 20 thousand blocks per second); on Windows unbuffered block reads
-  gain nothing over `ReadFile` there (6.2 against 5.8 thousand).
+  gain nothing over `ReadFile` there (6.2 against 5.8 thousand). Parked in
+  Phase 28 (§13).
 
 ### 12.6 Packages (Phase 24)
 
@@ -3423,6 +3425,174 @@ with work (3).
 - Noise: the runner's numbers jump between rounds (free list, tight, 4
   threads: 9.4 and 21.6), so only differences seen in both rounds count.
 
+### 12.10 Review before 0.1.0 (Phase 28)
+
+A review of the code, its API and names, and its structure, 2026-10-25
+(Plan, Milestone 7). The library is in good shape: one unit per job, one
+backend unit per system, no unit over about 1 550 lines, one style. What
+it found:
+
+**Names and API** (all public; the version is 0.x, so changes are fine):
+
+- Timeouts are `ATimeoutMs` in the rings and `ATimeoutMilliseconds` in the
+  engine, the request pool and the atomics. "Wait forever" is
+  `IORING_INFINITE` and, in `Delphi.IOUring.Atomics`, also
+  `IORING_WAIT_INFINITE` (the same value).
+- The statistics types do not match their owners:
+  `TIORingSequentialReader` has `TIORingReaderStats`,
+  `TIORingSequentialWriter` has `TIORingWriterStats` (the block reader's is
+  `TIORingBlockReaderStats`). `TIORingEngine.Stats` is a function, the
+  others are properties.
+- `ReadAt` and `WriteAt` (`Delphi.IOUring`) have very general names; the
+  other routines there start with `IORing`.
+- The engine takes `AUserData: NativeUInt`, the rings `TIORingUserData`
+  (the same type).
+- Internal types are in the interface: the slot records of the readers and
+  the writer, `TIORingQueueCell`, and `TCardinalArray`/`PCardinalArray` –
+  a name general enough to clash with other code.
+
+**Unit names and structure:**
+
+- `Delphi.IOUring.Backend.Custom` holds the types shared by all systems;
+  "Custom" says nothing about that. `Delphi.IOUring.Backend.Posix` and
+  `….Posix.API` are Linux only (io_uring is Linux's), not POSIX.
+- The two backend units are the largest (Linux 1 553 lines, Windows 1 076):
+  each holds the ring and the platform helpers (`T…IORingPlatform`: files,
+  memory, clock, events).
+- The reader and the writer check their buffer arguments with the same
+  code, written twice.
+
+**Speed** (measurable, small):
+
+- **The engine's wait spin reads the clock every 8 pauses**
+  (`TIORingRequestPool.WaitFor`). On Linux that clock is FPC's
+  `clock_gettime`, a system call: 94 ns, against 13 ns through the C
+  library (§10.14). In the 4 µs spin that is about a third of the time in
+  system calls. Phase 26 measured only the reader's stalls (less than
+  0.1 %), not this spin.
+- FPC x64 calls a small RTL routine for every atomic operation (Delphi
+  inlines its own). Not changeable with FPC 3.2.2: assembler routines cannot
+  be inlined there.
+
+**Phase 28 proposal:**
+
+- **[DECIDE] 1. Unit names.** Proposed: `Backend.Custom` →
+  `Delphi.IOUring.Types`, `Backend.Posix` → `Backend.Linux`,
+  `Backend.Posix.API` → `Backend.Linux.API` – together with the library's
+  new name (Pascal.IOUring), in one step before the tag, since every unit
+  name changes then anyway; asked before it is done. Other choice: rename
+  the units now.
+- **[DECIDE] 2. API names.** Proposed, all of them: one timeout name
+  `ATimeoutMilliseconds` and one `IORING_INFINITE`;
+  `TIORingSequentialReaderStats` and `TIORingSequentialWriterStats`, and
+  `TIORingEngine.Stats` a property; `IORingReadAt` and `IORingWriteAt`;
+  `TIORingUserData` in the engine.
+- **[DECIDE] 3. Internal types.** Proposed: they become nested types of the
+  record that uses them (both compilers have nested types in records), so
+  the interface shows only what users need, and `TCardinalArray` cannot
+  clash any more. Other choice: only rename them.
+- **[DECIDE] 4. Smaller backend units.** Proposed: the platform helpers go
+  to units of their own (`Backend.Windows.Platform`,
+  `Backend.Linux.Platform`), the ring stays in the backend unit; one shared
+  check for the buffer arguments of the reader and the writer. The engine
+  stays as it is (its overlap bookkeeping belongs to the I/O thread).
+- **[DECIDE] 5. The wait spin.** Proposed: on Linux, the clock through the
+  C library (the programs link it already, for threads); measured with the
+  engine (Blocks benchmark, cached blocks) in WSL2 and on the ARM64 runner,
+  and kept only if it gains. Other choice: count the spin in pauses,
+  measured once at start, so the spin reads no clock at all.
+- **[DECIDE] 6. The small things.** Proposed: close §14 (keep the neutral
+  `TIORingFileRef`/`TIORingBufferRef` records – the conversion never showed
+  in a benchmark); remove the answered [VERIFY] markers (§5.7, §6.4); park
+  the two unexplained findings of GitHub's runners (§13); write a plan for
+  Linux sockets as a part of their own (§13, decided a.); run the Windows
+  benchmarks again at the end, after the changes.
+
+Last, the tag 0.1.0 (decided c.), after asking about the new name.
+
+**Phase 28 decisions (decided 2026-10-25):** all six as proposed – the unit
+names change together with the library's name, asked first (1); the API
+names (2); nested internal types (3); platform units of their own and one
+buffer check (4); the C library's clock on Linux, kept only if it gains (5);
+the small things (6).
+
+**Phase 28 implementation notes** (2026-10-25):
+
+- **API names (2):** `ATimeoutMilliseconds` everywhere; only
+  `IORING_INFINITE` (the atomics use it from `Backend.Custom`);
+  `TIORingSequentialReaderStats` and `TIORingSequentialWriterStats`;
+  `TIORingEngine.Stats` is a property; `IORingReadAt` and `IORingWriteAt`;
+  the engine's user data is `TIORingUserData`.
+- **Nested types (3):** the slots of the sequential reader (and its reads
+  straight into the caller's memory), of the writer and of the block reader
+  (`TSlot`, `PSlot`, `TSlotState`, `TDirectRead`), the queue's cells
+  (`TCell`, `TCellArray`) and the free list's links (`TIndexArray`) are
+  nested types of the records that use them. In the implementation the
+  method headers name them with the record (`TIORingBlockReader.PSlot`);
+  inside the methods the short name is enough. Both compilers accept this
+  (Delphi 13, FPC 3.2.2 and trunk). The structures benchmark has its own
+  `TCardinalArray` now.
+- **Platform units (4):** `Delphi.IOUring.Backend.Windows.Platform`
+  (`TWindowsIORingPlatform`) and `Delphi.IOUring.Backend.Posix.Platform`
+  (`TLinuxIORingPlatform`, renamed with the other Linux units later);
+  `Delphi.IOUring` exports them as `TIORingPlatform` as before, so user code
+  does not change. The ring units are now 827 (Windows) and 1 285 (Linux)
+  lines, the platform units 270 and 326. The Lazarus package lists the two
+  new units. Three constants are in both Linux units (`SYSCALL_EVENTFD2`,
+  `O_CLOEXEC_FLAG`, `EFD_CLOEXEC`): the API unit translates only the
+  io_uring header, and a shared unit for three constants is not worth it.
+- **One buffer check (4):** `IORingCheckBufferArguments` (size a multiple
+  of the unit, count in range, all buffers together not too big; returns
+  the total size) and `IORingCheckSectorMultiple` in `Backend.Custom`, used
+  by the reader and the writer. The unbuffered message now says
+  "Unbuffered I/O needs …" for both.
+- **The clock (5): [VERIFIED] no gain in WSL2, so FPC's clock stays.** The
+  Blocks benchmark (new option `--cache warm`; 1 GiB file, 20 000 blocks,
+  median of 5 runs) built with each clock, six rounds in turns, the order
+  reversed after three. Thousand blocks per second, average of the rounds
+  (raw output:
+  [BenchmarkResults/2026-10-25-linux-wsl2-clock.txt](BenchmarkResults/2026-10-25-linux-wsl2-clock.txt)):
+
+| Contender (warm cache) | FPC's (system call) | C library (vDSO) |
+| --- | ---: | ---: |
+| Random, block reader, read-ahead 1 | 44.3 | 45.5 (+2.6 %) |
+| Random, block reader, read-ahead 8 | 463 | 471 (+1.6 %) |
+| Random, block reader, read-ahead 32 | 1 472 | 1 406 (−4.5 %) |
+| Random, block reader, read-ahead 128 | 1 555 | 1 553 |
+| Sorted, block reader, read-ahead 1 | 52.4 | 52.7 |
+| Sorted, block reader, read-ahead 8 | 737 | 602 (−18 %) |
+| Sorted, block reader, read-ahead 32 | 1 617 | 1 594 (−1.4 %) |
+| Random, `pread` (does not use the clock) | 1 822 | 1 814 |
+
+  - Read-ahead 1, where the engine waits for every block, is within the
+    noise, CPU time the same (446 against 460 ms). The spin ends after
+    4 µs either way; a cheaper clock only lets it check more often.
+  - Read-ahead 32 (random) and 8 (sorted) were slower with the C library's
+    clock in nearly every round, in both orders; not explained. Either way
+    nothing gains.
+  - `IORING_CLOCK_LIBC` builds the C library's clock, for comparing. The
+    hand-started ARM64 workflow (now "ARM64 benchmarks") can measure both
+    clocks there (`benchmark: clock`) – not run yet.
+- **[VERIFIED] A hang on Linux, found and fixed:** in the full test run a
+  writer test hung for good. `/proc` showed one completion in the ring
+  (CQ tail 1, head 0: a 4 KiB write, done) and the ring's eventfd at 0;
+  the I/O thread slept in `poll`, the test waited for the request. The I/O
+  thread asked for the ring's completion event only when it went to sleep
+  the first time, and on Linux that first call registers the eventfd: a
+  completion posted before it (here a write that the kernel had handed to
+  its worker thread) never signals it. Since Phase 21; Windows creates its
+  event in `Open`. Now the I/O thread takes the event right after opening
+  its ring, before anything is submitted, and the comment of
+  `TLinuxIORing.CompletionEventHandle` says so.
+- **The small things (6):** §14 closed; the answered [VERIFY] and
+  [DECIDE later] markers replaced by their answers (§2, §5.1, §5.7, §6.4);
+  the two findings of GitHub's runners and a plan for Linux sockets in §13.
+  The Windows benchmarks ran again (Benchmarks.md, "The Windows numbers
+  again"): the same as before or better – nothing the library does got
+  slower.
+- Still to come: the unit names and the library's new name (1), asked
+  first; then the tag 0.1.0.
+
 ---
 
 ## 13. Ideas parked for later
@@ -3438,16 +3608,42 @@ with work (3).
   straight into the caller's memory than through the buffers (§12.8). Not
   explained: the memory not being registered explains 0.7 %; bigger pieces
   and more reading ahead did not help.
+- Two findings on GitHub's runners (Phase 23, §12.5; Benchmarks.md): on the
+  Linux runners a block reader with 8 reads in flight beats 32 and 128 (27
+  against 20 thousand blocks per second); unbuffered on Windows, the block
+  reader gets no more than `ReadFile` (6.2 against 5.8 thousand). Parked in
+  Phase 28: slow, throttled cloud disks, not the machines the library is
+  for. Looking into them needs benchmarks on the runners (a hand-started
+  workflow, as in Phase 27).
+- **Linux sockets – a plan** (Phase 28; Milestone 7: low priority, a part of
+  the library of its own). Today sockets work through
+  `TLinuxIORing.PrepareSqe` (§5.8, the `SocketEcho` demo). When a real
+  program needs more:
+  1. **Units of their own,** Linux only, on top of `TLinuxIORing`; the file
+     part of the library does not change (Windows IoRing has no sockets).
+  2. **Typed Prepare methods:** `PrepareAccept`, `PrepareConnect`,
+     `PrepareSend`, `PrepareRecv`, `PrepareShutdown`, `PrepareClose` – a few
+     lines each over `PrepareSqe`. Tests on a socket pair and on loopback,
+     as in Phase 22; `SocketEcho` uses them.
+  3. **A socket engine:** an I/O thread with its own ring, like the file
+     engine, but for requests that wait for the network – a receive may
+     never complete, so cancelling and time limits (a linked
+     `IORING_OP_LINK_TIMEOUT`) are needed from the start. The overlap rules
+     of files do not apply.
+  4. **Only if a benchmark asks for it:** multishot accept and receive with
+     provided buffers (the CQE flags in the completion, and a completion
+     count that knows `IORING_CQE_F_MORE`), zero-copy send, SQPOLL.
+  - Measured against a plain `epoll` server: an echo server with many
+    clients, requests per second and CPU time.
 
 ---
 
 ## 14. Open questions
 
-1. **[DECIDE later]** Neutral ref records vs OS-layout records (§5.1).
-
-(Overlap handling in the engine: decided in Phase 16 – §11 and decision 15.
-Linux backend: raw syscalls, no liburing – decided in Phase 18, §6.4 and
-decision 17.)
+None at the moment. Answered earlier: overlap handling in the engine (Phase
+16 – §11 and decision 15); the Linux backend: raw syscalls, no liburing
+(Phase 18 – §6.4 and decision 17); neutral ref records against records with
+the OS's layout: the neutral records stay (Phase 28 – §5.1 and §12.10).
 
 ---
 
@@ -3477,3 +3673,4 @@ decision 17.)
 | 20 | 2026-10-24 | **The engine on Linux** (§10.14): the I/O thread sleeps as on Windows – a wake event and the ring's completion event, through a small event API in `TIORingPlatform` (`eventfd` and `poll` on Linux; the io_uring-only way measured no faster); the benchmarks run on Linux in this phase, WSL2 results marked as not disk numbers. |
 | 21 | 2026-10-24 | **Linux extras** (§5.8): `TLinuxIORing.PrepareSqe` (any io_uring operation, for example sockets) and `LinkToNext` (linked operations) in the low-level ring, one completion per entry; SQPOLL and all other definitions stay in the API unit (measured: no gain for file I/O); the shared `TIORingCapabilities` describes either system – `SystemDescription`, `NotAvailableReason`, `NativeFeatures`, `NativeOps`, `Extras`, `ToString` – and `IORingCapabilities` in `Delphi.IOUring`. |
 | 22 | 2026-10-24 | **Big reads straight into the caller's memory** (§12.8): `TIORingSequentialReader.Read` (and so the read stream) reads the part of a call beyond what its buffers have asked for straight into the caller's memory, unbuffered only into sector-aligned memory; the buffers read ahead after the call once all of its reads have started. Kept although cold 64 MiB calls on Windows are about 2 % slower: warm big calls gain 8–24 %, cold ones 11–22 % on Linux. The Linux clock stays as it is (measured: less than 0.1 %). |
+| 23 | 2026-10-25 | **Tidy up before 0.1.0** (§12.10): one name per idea in the API (`ATimeoutMilliseconds`, `IORING_INFINITE`, `TIORingSequential…Stats`, `IORingReadAt`/`IORingWriteAt`); internal types nested in their records; the platform helpers in units of their own and one buffer check; the neutral ref records stay; the Linux clock stays FPC's (the C library's measured no faster in the engine). The library's new name (Pascal.IOUring) and the unit names change together, asked first. |

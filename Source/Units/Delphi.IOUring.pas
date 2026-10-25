@@ -26,10 +26,10 @@ interface
 uses
   Delphi.IOUring.Backend.Custom
 {$IFDEF MSWINDOWS}
-  , Delphi.IOUring.Backend.Windows
+  , Delphi.IOUring.Backend.Windows, Delphi.IOUring.Backend.Windows.Platform
 {$ENDIF}
 {$IFDEF LINUX}
-  , Delphi.IOUring.Backend.Posix
+  , Delphi.IOUring.Backend.Posix, Delphi.IOUring.Backend.Posix.Platform
 {$ENDIF}
   ;
 
@@ -66,13 +66,13 @@ type
 
 {$IFDEF MSWINDOWS}
   TIORing = Delphi.IOUring.Backend.Windows.TWindowsIORing;
-  TIORingPlatform = Delphi.IOUring.Backend.Windows.TWindowsIORingPlatform;
+  TIORingPlatform = Delphi.IOUring.Backend.Windows.Platform.TWindowsIORingPlatform;
   TIORingSegment = Delphi.IOUring.Backend.Windows.TIORingSegment;
   PIORingSegment = Delphi.IOUring.Backend.Windows.PIORingSegment;
 {$ENDIF}
 {$IFDEF LINUX}
   TIORing = Delphi.IOUring.Backend.Posix.TLinuxIORing;
-  TIORingPlatform = Delphi.IOUring.Backend.Posix.TLinuxIORingPlatform;
+  TIORingPlatform = Delphi.IOUring.Backend.Posix.Platform.TLinuxIORingPlatform;
   TIORingSegment = Delphi.IOUring.Backend.Posix.TIORingSegment;
   PIORingSegment = Delphi.IOUring.Backend.Posix.PIORingSegment;
 {$ENDIF}
@@ -111,10 +111,10 @@ const
   function IORingSegment(const AAddress: Pointer): TIORingSegment;
 
   { Blocking helpers: prepare, submit, wait, pop. They need an idle ring (nothing prepared or in flight) and raise
-    EIORingError on failure. ReadAt returns the bytes read; 0 at or after the end of the file. }
-  function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
+    EIORingError on failure. IORingReadAt returns the bytes read; 0 at or after the end of the file. }
+  function IORingReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
     const AOffset: UInt64): Cardinal;
-  function WriteAt(var ARing: TIORing; const AFile: TIORingFileRef; const ABuffer; const ACount: Cardinal;
+  function IORingWriteAt(var ARing: TIORing; const AFile: TIORingFileRef; const ABuffer; const ACount: Cardinal;
     const AOffset: UInt64): Cardinal;
 
 implementation
@@ -171,50 +171,50 @@ begin
     RaiseNoCompletion(AOperation);
 end;
 
-function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
+function IORingReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
   const AOffset: UInt64): Cardinal;
 
   procedure RaiseNoRoom; {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    RaiseIORingError('ReadAt: no room in the ring');
+    RaiseIORingError('IORingReadAt: no room in the ring');
   end;
 
 var
   LCompletion: TIORingCompletion;
 begin
-  CheckIdle(ARing, 'ReadAt');
+  CheckIdle(ARing, 'IORingReadAt');
 
   if not ARing.PrepareRead(AFile, TIORingBufferRef.FromPointer(@ABuffer), ACount, AOffset, 0) then
     RaiseNoRoom;
 
-  LCompletion := WaitForSingleCompletion(ARing, 'ReadAt');
+  LCompletion := WaitForSingleCompletion(ARing, 'IORingReadAt');
 
   if LCompletion.IsEndOfFile then
     Exit(0);
 
-  LCompletion.RaiseIfFailed('ReadAt');
+  LCompletion.RaiseIfFailed('IORingReadAt');
 
   Result := LCompletion.BytesTransferred;
 end;
 
-function WriteAt(var ARing: TIORing; const AFile: TIORingFileRef; const ABuffer; const ACount: Cardinal;
+function IORingWriteAt(var ARing: TIORing; const AFile: TIORingFileRef; const ABuffer; const ACount: Cardinal;
   const AOffset: UInt64): Cardinal;
 
   procedure RaiseNoRoom; {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
-    RaiseIORingError('WriteAt: no room in the ring');
+    RaiseIORingError('IORingWriteAt: no room in the ring');
   end;
 
 var
   LCompletion: TIORingCompletion;
 begin
-  CheckIdle(ARing, 'WriteAt');
+  CheckIdle(ARing, 'IORingWriteAt');
 
   if not ARing.PrepareWrite(AFile, TIORingBufferRef.FromPointer(@ABuffer), ACount, AOffset, 0) then
     RaiseNoRoom;
 
-  LCompletion := WaitForSingleCompletion(ARing, 'WriteAt');
-  LCompletion.RaiseIfFailed('WriteAt');
+  LCompletion := WaitForSingleCompletion(ARing, 'IORingWriteAt');
+  LCompletion.RaiseIfFailed('IORingWriteAt');
 
   Result := LCompletion.BytesTransferred;
 end;

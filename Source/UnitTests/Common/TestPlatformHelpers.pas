@@ -104,8 +104,8 @@ const
   // Reads ACount bytes from a pipe (waits for them)
   procedure ReadFromPipe(const APipe: THandle; const ACount: Cardinal);
 
-  // True when the event (Windows event / Linux eventfd) is signalled within ATimeoutMs
-  function WaitForEvent(const AHandle: THandle; const ATimeoutMs: Cardinal): Boolean;
+  // True when the event (Windows event / Linux eventfd) is signalled within ATimeoutMilliseconds
+  function WaitForEvent(const AHandle: THandle; const ATimeoutMilliseconds: Cardinal): Boolean;
 
   function PageSize: NativeUInt;
 
@@ -375,9 +375,9 @@ begin
   end;
 end;
 
-function WaitForEvent(const AHandle: THandle; const ATimeoutMs: Cardinal): Boolean;
+function WaitForEvent(const AHandle: THandle; const ATimeoutMilliseconds: Cardinal): Boolean;
 begin
-  Result := WaitForSingleObject(AHandle, ATimeoutMs) = WAIT_OBJECT_0;
+  Result := WaitForSingleObject(AHandle, ATimeoutMilliseconds) = WAIT_OBJECT_0;
 end;
 
 function PageSize: NativeUInt;
@@ -546,7 +546,7 @@ begin
   end;
 end;
 
-function WaitForEvent(const AHandle: THandle; const ATimeoutMs: Cardinal): Boolean;
+function WaitForEvent(const AHandle: THandle; const ATimeoutMilliseconds: Cardinal): Boolean;
 var
   LPoll: TPollFd;
 begin
@@ -554,7 +554,7 @@ begin
   LPoll.events := POLLIN;
   LPoll.revents := 0;
 
-  Result := FpPoll(@LPoll, 1, Integer(ATimeoutMs)) = 1;
+  Result := FpPoll(@LPoll, 1, Integer(ATimeoutMilliseconds)) = 1;
 end;
 
 function PageSize: NativeUInt;

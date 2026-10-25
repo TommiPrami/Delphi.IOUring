@@ -96,7 +96,7 @@ type
     function LocalCompletionCount: Cardinal;
     procedure AddLocalCompletion(const AUserData: TIORingUserData; const AResult: Integer);
     function ReadyCount: Cardinal;
-    function SubmitAndWait(const AWaitCount, ATimeoutMs: Cardinal): Boolean;
+    function SubmitAndWait(const AWaitCount, ATimeoutMilliseconds: Cardinal): Boolean;
     procedure WaitForAllPending;
   public
     class operator Initialize(var ADest: TLinuxIORing);
@@ -163,7 +163,7 @@ type
       the number of outstanding operations) or the timeout ends. A timeout is
       not an error. Returns the number of entries submitted.
     }
-    function Submit(const AWaitCount: Cardinal = 0; const ATimeoutMs: Cardinal = IORING_INFINITE): Cardinal;
+    function Submit(const AWaitCount: Cardinal = 0; const ATimeoutMilliseconds: Cardinal = IORING_INFINITE): Cardinal;
 
     // --- Reap: no system call
     function TryPopCompletion(out ACompletion: TIORingCompletion): Boolean;
@@ -171,10 +171,11 @@ type
 
     { Waits until ACount completions are available (at most the number of outstanding operations). False on timeout.
       Uses the same system call as Submit, so it also submits prepared entries. }
-    function WaitForCompletions(const ACount: Cardinal; const ATimeoutMs: Cardinal = IORING_INFINITE): Boolean;
+    function WaitForCompletions(const ACount: Cardinal; const ATimeoutMilliseconds: Cardinal = IORING_INFINITE): Boolean;
 
     { An eventfd that the kernel signals for every completion (created and registered with the ring on the first call).
-      Read it to reset it; pop until TryPopCompletion returns False before waiting on it. }
+      Read it to reset it; pop until TryPopCompletion returns False before waiting on it. Call it first before anything
+      is submitted: a completion posted before the first call never signals it. }
     function CompletionEventHandle: THandle;
 
     class function Available: Boolean; static;
@@ -188,83 +189,31 @@ type
     property PendingCount: Cardinal read FPendingCount;
   end;
 
-  { File, memory and clock services the higher layers need; the same names as TWindowsIORingPlatform. Delphi.IOUring
-    exports it as TIORingPlatform. Failures raise EIORingError (NativeCode = -errno). }
-  TLinuxIORingPlatform = record
-  public
-    // Read-only. AUnbuffered = O_DIRECT, ASequentialHint = posix_fadvise(POSIX_FADV_SEQUENTIAL).
-    class function OpenFileForRead(const AFileName: string; const AUnbuffered, ASequentialHint: Boolean): THandle; static;
-    // Creates the file, or empties it if it exists; write access. AUnbuffered = O_DIRECT.
-    class function CreateFileForWrite(const AFileName: string; const AUnbuffered: Boolean): THandle; static;
-    // Makes the file ASize bytes long (cuts it, or extends it with zeros)
-    class procedure SetFileSize(const AHandle: THandle; const ASize: Int64); static;
-    class procedure CloseFile(const AHandle: THandle); static;
-    class function GetFileSize(const AHandle: THandle): Int64; static;
-    { The alignment unbuffered I/O needs for offsets and sizes (statx, STATX_DIOALIGN, Linux 6.1 and newer). 4096 if
-      the kernel does not tell. }
-    class function GetSectorSize(const AHandle: THandle): Cardinal; static;
-    class function PageSize: Cardinal; static;
-    // Page-aligned, zero-filled memory (mmap); FreePages(nil, ...) does nothing. ASize: the size given to AllocPages.
-    class function AllocPages(const ASize: NativeUInt): Pointer; static;
-    class procedure FreePages(const AMemory: Pointer; const ASize: NativeUInt); static;
-    // Monotonic clock for statistics
-    class function TimestampMicroseconds: UInt64; static;
-
-    { An auto-reset event for waking a thread (an eventfd): SignalWakeEvent sets it, WaitForEvents resets it
-      when it returns because of it }
-    class function CreateWakeEvent: THandle; static;
-    class procedure SignalWakeEvent(const AEvent: THandle); static;
-    class procedure CloseWakeEvent(const AEvent: THandle); static;
-    { Waits, without a time limit, until AEvent1 or AEvent2 is signalled (poll), and resets the signalled ones (reads
-      them). AEvent2 may be a ring's CompletionEventHandle. }
-    class procedure WaitForEvents(const AEvent1, AEvent2: THandle); static;
-  end;
-
 implementation
 
 uses
-  BaseUnix, Linux, Syscall, Delphi.IOUring.Atomics;
+  BaseUnix, Linux, Syscall, Delphi.IOUring.Atomics, Delphi.IOUring.Backend.Posix.Platform;
 
 { Pointers go to the kernel as system call arguments and in SQE fields. The unit is for 64-bit CPUs
   only, where both are 64 bits. }
 {$WARN 4055 OFF}
 
 const
-  // System calls that FPC 3.2.2 has no number for (they differ per CPU)
+  // A system call that FPC 3.2.2 has no number for (it differs per CPU)
 {$IF defined(CPUX86_64)}
   SYSCALL_EVENTFD2 = 290;
-  SYSCALL_STATX = 332;
 {$ELSE}
   SYSCALL_EVENTFD2 = 19;
-  SYSCALL_STATX = 291;
 {$ENDIF}
 
-  // linux/fs.h, fcntl.h, mman.h, eventfd.h, fadvise.h, stat.h
+  // linux/fs.h, fcntl.h, mman.h, eventfd.h
   RWF_DSYNC = 2;
   SYNC_FILE_RANGE_WAIT_BEFORE = 1;
   SYNC_FILE_RANGE_WRITE = 2;
   SYNC_FILE_RANGE_WAIT_AFTER = 4;
   O_CLOEXEC_FLAG = &02000000;
-  {
-    ARM64 has fcntl.h values of its own: there 040000 (O_DIRECT elsewhere) is O_DIRECTORY. FPC 3.2.2's
-    BaseUnix.O_DIRECT is 040000 on every CPU, so on AArch64 an unbuffered open failed with ENOTDIR (found by the first
-    run on an ARM machine, Phase 23).
-  }
-{$IF defined(CPUAARCH64)}
-  O_DIRECT_FLAG = &0200000;
-{$ELSE}
-  O_DIRECT_FLAG = &040000;
-{$ENDIF}
   MAP_POPULATE_FLAG = $8000;
   EFD_CLOEXEC = O_CLOEXEC_FLAG;
-  EFD_NONBLOCK = &04000;
-  POSIX_FADV_SEQUENTIAL = 2;
-  AT_EMPTY_PATH = $1000;
-  STATX_DIOALIGN = $2000;
-  AT_PAGESZ = 6;
-
-  DEFAULT_SECTOR_SIZE = 4096;
-  DEFAULT_PAGE_SIZE = 4096;
 
   // The kernel's limits (IORING_MAX_ENTRIES, IORING_MAX_CQ_ENTRIES)
   MAX_SUBMISSION_QUEUE_SIZE = 32768;
@@ -276,17 +225,6 @@ const
     IORING_OP_READV);
   REQUIRED_FEATURES = IORING_FEAT_SINGLE_MMAP or IORING_FEAT_NODROP or IORING_FEAT_EXT_ARG;
 
-type
-  // struct statx: the fields up to the direct I/O alignment (256 bytes in all)
-  TStatx = record
-    stx_mask: Cardinal;
-    stx_blksize: Cardinal;
-    stx_rest: array[0..$97 - 8] of Byte;   // up to offset $98
-    stx_dio_mem_align: Cardinal;          // offset $98
-    stx_dio_offset_align: Cardinal;       // offset $9C
-    stx_spare: array[0..95] of Byte;
-  end;
-
 var
   // 0 = not checked yet, 1 = available, -1 = not available
   GAvailability: Integer = 0;
@@ -297,7 +235,6 @@ var
   GNativeFeatures: UInt64;
   // 0 = not checked yet, 1 = a SQPOLL ring can be set up, -1 = not
   GSqPollAllowed: Integer = 0;
-  GPageSize: Cardinal = 0;
 
 function AddressOf(const APointer: Pointer): UInt64; inline;
 begin
@@ -1104,7 +1041,7 @@ begin
   Result := LocalCompletionCount + (TAtomic.LoadAcquire(FCqTail^) - FCqHead^);
 end;
 
-function TLinuxIORing.SubmitAndWait(const AWaitCount, ATimeoutMs: Cardinal): Boolean;
+function TLinuxIORing.SubmitAndWait(const AWaitCount, ATimeoutMilliseconds: Cardinal): Boolean;
 
   procedure RaiseEnterFailed(const AResult: Integer); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
@@ -1137,8 +1074,8 @@ begin
   // Hand the prepared SQEs to the kernel: their contents before the tail
   TAtomic.StoreRelease(FSqTail^, FSqLocalTail);
 
-  LTimeout.tv_sec := ATimeoutMs div 1000;
-  LTimeout.tv_nsec := Int64(ATimeoutMs mod 1000) * 1000000;
+  LTimeout.tv_sec := ATimeoutMilliseconds div 1000;
+  LTimeout.tv_nsec := Int64(ATimeoutMilliseconds mod 1000) * 1000000;
   FillChar(LArg, SizeOf(LArg), 0);
   LArg.ts := AddressOf(@LTimeout);
 
@@ -1154,7 +1091,7 @@ begin
       LFlags := IORING_ENTER_GETEVENTS;
       LMinComplete := LWaitCount - LocalCompletionCount;
 
-      if ATimeoutMs <> IORING_INFINITE then
+      if ATimeoutMilliseconds <> IORING_INFINITE then
       begin
         LFlags := LFlags or IORING_ENTER_EXT_ARG;
         LArgPointer := @LArg;
@@ -1182,19 +1119,19 @@ begin
   Result := ReadyCount >= LWaitCount;
 end;
 
-function TLinuxIORing.Submit(const AWaitCount, ATimeoutMs: Cardinal): Cardinal;
+function TLinuxIORing.Submit(const AWaitCount, ATimeoutMilliseconds: Cardinal): Cardinal;
 var
   LPrepared: Cardinal;
 begin
   LPrepared := FPreparedCount;
-  SubmitAndWait(AWaitCount, ATimeoutMs);
+  SubmitAndWait(AWaitCount, ATimeoutMilliseconds);
 
   Result := LPrepared - FPreparedCount;
 end;
 
-function TLinuxIORing.WaitForCompletions(const ACount, ATimeoutMs: Cardinal): Boolean;
+function TLinuxIORing.WaitForCompletions(const ACount, ATimeoutMilliseconds: Cardinal): Boolean;
 begin
-  Result := SubmitAndWait(ACount, ATimeoutMs);
+  Result := SubmitAndWait(ACount, ATimeoutMilliseconds);
 end;
 
 function TLinuxIORing.TryPopCompletion(out ACompletion: TIORingCompletion): Boolean;
@@ -1261,12 +1198,12 @@ begin
     Inc(Result);
 end;
 
-procedure RaiseEventFdFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
-begin
-  RaiseIORingErrorNative(-fpgeterrno, 'eventfd');
-end;
-
 function TLinuxIORing.CompletionEventHandle: THandle;
+
+  procedure RaiseEventFdFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseIORingErrorNative(-fpgeterrno, 'eventfd');
+  end;
 
   procedure RaiseRegisterEventFdFailed(const AResult: Integer); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
@@ -1344,210 +1281,6 @@ begin
     if SqPollAllowed then
       Include(Result.Extras, ieSqPoll);
   end;
-end;
-
-{ TLinuxIORingPlatform }
-
-function OpenFlags(const AUnbuffered: Boolean): Integer;
-begin
-  Result := O_CLOEXEC_FLAG;
-
-  if AUnbuffered then
-    Result := Result or O_DIRECT_FLAG;
-end;
-
-class function TLinuxIORingPlatform.OpenFileForRead(const AFileName: string; const AUnbuffered,
-  ASequentialHint: Boolean): THandle;
-
-  procedure RaiseOpenFailed(const AName: string); {$IFNDEF FPC} noreturn; {$ENDIF}
-  begin
-    RaiseIORingErrorNativeFmt(-fpgeterrno, 'Open "%s"', [AName]);
-  end;
-
-begin
-  Result := FpOpen(AFileName, O_RDONLY or OpenFlags(AUnbuffered));
-
-  if Result < 0 then
-    RaiseOpenFailed(AFileName);
-
-  // A hint only: a failure does not matter
-  if ASequentialHint then
-    do_SysCall(syscall_nr_fadvise64, TSysParam(Result), 0, 0, POSIX_FADV_SEQUENTIAL);
-end;
-
-class function TLinuxIORingPlatform.CreateFileForWrite(const AFileName: string; const AUnbuffered: Boolean): THandle;
-
-  procedure RaiseCreateFailed(const AName: string); {$IFNDEF FPC} noreturn; {$ENDIF}
-  begin
-    RaiseIORingErrorNativeFmt(-fpgeterrno, 'Create "%s"', [AName]);
-  end;
-
-begin
-  Result := FpOpen(AFileName, O_WRONLY or O_CREAT or O_TRUNC or OpenFlags(AUnbuffered), &666);
-
-  if Result < 0 then
-    RaiseCreateFailed(AFileName);
-end;
-
-class procedure TLinuxIORingPlatform.SetFileSize(const AHandle: THandle; const ASize: Int64);
-
-  procedure RaiseSetFileSizeFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
-  begin
-    RaiseIORingErrorNative(-fpgeterrno, 'Set the file size');
-  end;
-
-begin
-  if FpFtruncate(AHandle, ASize) < 0 then
-    RaiseSetFileSizeFailed;
-end;
-
-class procedure TLinuxIORingPlatform.CloseFile(const AHandle: THandle);
-begin
-  FpClose(AHandle);
-end;
-
-class function TLinuxIORingPlatform.GetFileSize(const AHandle: THandle): Int64;
-
-  procedure RaiseFstatFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
-  begin
-    RaiseIORingErrorNative(-fpgeterrno, 'fstat');
-  end;
-
-var
-  LStat: Stat;
-begin
-  if FpFstat(AHandle, LStat) < 0 then
-    RaiseFstatFailed;
-
-  Result := LStat.st_size;
-end;
-
-class function TLinuxIORingPlatform.GetSectorSize(const AHandle: THandle): Cardinal;
-var
-  LStatx: TStatx;
-begin
-  FillChar(LStatx, SizeOf(LStatx), 0);
-
-  if (do_SysCall(SYSCALL_STATX, TSysParam(AHandle), TSysParam(PChar('')), AT_EMPTY_PATH, STATX_DIOALIGN,
-    TSysParam(@LStatx)) = 0) and (LStatx.stx_mask and STATX_DIOALIGN <> 0) and (LStatx.stx_dio_offset_align > 0) then
-    Result := LStatx.stx_dio_offset_align
-  else
-    Result := DEFAULT_SECTOR_SIZE;
-end;
-
-{ AT_PAGESZ from the auxiliary vector (pairs of type and value, ended by 0): AArch64 systems can
-  have 4, 16 or 64 KiB pages }
-function ReadPageSize: Cardinal;
-var
-  LFile: Integer;
-  LPair: array[0..1] of NativeUInt;
-begin
-  Result := DEFAULT_PAGE_SIZE;
-
-  LFile := FpOpen('/proc/self/auxv', O_RDONLY or O_CLOEXEC_FLAG);
-
-  if LFile < 0 then
-    Exit;
-
-  try
-    while (FpRead(LFile, LPair, SizeOf(LPair)) = SizeOf(LPair)) and (LPair[0] <> 0) do
-      if LPair[0] = AT_PAGESZ then
-      begin
-        if LPair[1] > 0 then
-          Result := Cardinal(LPair[1]);
-
-        Break;
-      end;
-  finally
-    FpClose(LFile);
-  end;
-end;
-
-class function TLinuxIORingPlatform.PageSize: Cardinal;
-begin
-  if GPageSize = 0 then
-    GPageSize := ReadPageSize;
-
-  Result := GPageSize;
-end;
-
-class function TLinuxIORingPlatform.AllocPages(const ASize: NativeUInt): Pointer;
-
-  procedure RaiseMmapFailed; {$IFNDEF FPC} noreturn; {$ENDIF}
-  begin
-    RaiseIORingErrorNative(-fpgeterrno, 'mmap');
-  end;
-
-begin
-  Result := fpmmap(nil, ASize, PROT_READ or PROT_WRITE, MAP_PRIVATE or MAP_ANONYMOUS, -1, 0);
-
-  if Result = MAP_FAILED then
-    RaiseMmapFailed;
-end;
-
-class procedure TLinuxIORingPlatform.FreePages(const AMemory: Pointer; const ASize: NativeUInt);
-begin
-  if AMemory <> nil then
-    fpmunmap(AMemory, ASize);
-end;
-
-class function TLinuxIORingPlatform.TimestampMicroseconds: UInt64;
-var
-  LTime: TTimeSpec;
-begin
-  clock_gettime(CLOCK_MONOTONIC, @LTime);
-
-  Result := UInt64(LTime.tv_sec) * 1000000 + UInt64(LTime.tv_nsec div 1000);
-end;
-
-class function TLinuxIORingPlatform.CreateWakeEvent: THandle;
-var
-  LFd: Integer;
-begin
-  // Non-blocking: resetting it never waits
-  LFd := Integer(do_SysCall(SYSCALL_EVENTFD2, 0, EFD_CLOEXEC or EFD_NONBLOCK));
-
-  if LFd < 0 then
-    RaiseEventFdFailed;
-
-  Result := THandle(LFd);
-end;
-
-class procedure TLinuxIORingPlatform.SignalWakeEvent(const AEvent: THandle);
-var
-  LOne: UInt64;
-begin
-  LOne := 1;
-  FpWrite(AEvent, LOne, SizeOf(LOne));
-end;
-
-class procedure TLinuxIORingPlatform.CloseWakeEvent(const AEvent: THandle);
-begin
-  FpClose(AEvent);
-end;
-
-class procedure TLinuxIORingPlatform.WaitForEvents(const AEvent1, AEvent2: THandle);
-var
-  LPoll: array[0..1] of TPollFd;
-  LIndex: Integer;
-  LValue: UInt64;
-begin
-  LPoll[0].fd := AEvent1;
-  LPoll[1].fd := AEvent2;
-
-  repeat
-    for LIndex := 0 to 1 do
-    begin
-      LPoll[LIndex].events := POLLIN;
-      LPoll[LIndex].revents := 0;
-    end;
-  until (FpPoll(@LPoll[0], 2, -1) > 0) or (fpgeterrno <> ESysEINTR);
-
-  { Reset what woke us: an eventfd read takes its count back to 0 (the ring's completion eventfd blocks on reading, so
-    only when it is signalled) }
-  for LIndex := 0 to 1 do
-    if LPoll[LIndex].revents and POLLIN <> 0 then
-      FpRead(LPoll[LIndex].fd, LValue, SizeOf(LValue));
 end;
 
 end.

@@ -124,6 +124,8 @@ end;
 type
   TNativeUIntArray = array[0..MaxInt div SizeOf(NativeUInt) - 1] of NativeUInt;
   PNativeUIntArray = ^TNativeUIntArray;
+  TCardinalArray = array[0..MaxInt div SizeOf(Cardinal) - 1] of Cardinal;
+  PCardinalArray = ^TCardinalArray;
 
   { The same stack as TIORingFreeList, behind the lock. The lock and the count share one cache line of their own
     (like the lock-free head). }

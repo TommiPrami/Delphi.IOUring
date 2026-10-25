@@ -20,12 +20,12 @@ type
   private
     FResources: TTestResources;
     function CheckReadAll(const ASize: Int64; const AOptions: TIORingSequentialReaderOptions;
-      const ABufferSize, ABufferCount: Cardinal; const AChunkSize: Integer): TIORingReaderStats;
+      const ABufferSize, ABufferCount: Cardinal; const AChunkSize: Integer): TIORingSequentialReaderStats;
     procedure CheckSizeAndChunkMatrix(const AOptions: TIORingSequentialReaderOptions;
       const ABufferCounts: array of Cardinal);
     procedure CheckZeroCopyReadAll(const ASize: Int64; const ABufferSize, ABufferCount: Cardinal);
     function CheckBigReads(const ASize: Int64; const AOptions: TIORingSequentialReaderOptions;
-      const ABufferCount: Cardinal; const AChunkSize, AMisalign: Integer): TIORingReaderStats;
+      const ABufferCount: Cardinal; const AChunkSize, AMisalign: Integer): TIORingSequentialReaderStats;
     function OpenRaisesIORingError(const AFileName: string; const ABufferSize, ABufferCount: Cardinal): Boolean;
   protected
     procedure SetUp; override;
@@ -99,7 +99,7 @@ begin
 end;
 
 function TSequentialReaderTests.CheckReadAll(const ASize: Int64; const AOptions: TIORingSequentialReaderOptions;
-  const ABufferSize, ABufferCount: Cardinal; const AChunkSize: Integer): TIORingReaderStats;
+  const ABufferSize, ABufferCount: Cardinal; const AChunkSize: Integer): TIORingSequentialReaderStats;
 var
   LReader: TIORingSequentialReader;
   LBuffer: TBytes;
@@ -199,7 +199,7 @@ end;
 { Reads the whole file in calls of AChunkSize into page-aligned memory moved by AMisalign bytes (unbuffered, the reader
   reads straight into the caller's memory only when it starts on a sector boundary). SMALL_BUFFER buffers. }
 function TSequentialReaderTests.CheckBigReads(const ASize: Int64; const AOptions: TIORingSequentialReaderOptions;
-  const ABufferCount: Cardinal; const AChunkSize, AMisalign: Integer): TIORingReaderStats;
+  const ABufferCount: Cardinal; const AChunkSize, AMisalign: Integer): TIORingSequentialReaderStats;
 var
   LReader: TIORingSequentialReader;
   LMemory: PByte;
@@ -277,7 +277,7 @@ end;
 procedure TSequentialReaderTests.Read_LargeFile_Buffered;
 var
   LStart: UInt64;
-  LStats: TIORingReaderStats;
+  LStats: TIORingSequentialReaderStats;
 begin
   LStart := TThread.GetTickCount64;
   LStats := CheckReadAll(LARGE_FILE_SIZE, [], IORING_READER_DEFAULT_BUFFER_SIZE,
@@ -289,7 +289,7 @@ end;
 procedure TSequentialReaderTests.Read_LargeFile_Unbuffered;
 var
   LStart: UInt64;
-  LStats: TIORingReaderStats;
+  LStats: TIORingSequentialReaderStats;
 begin
   LStart := TThread.GetTickCount64;
   LStats := CheckReadAll(LARGE_FILE_SIZE, [sroUnbuffered], IORING_READER_DEFAULT_BUFFER_SIZE,
@@ -386,7 +386,7 @@ const
   B = SMALL_BUFFER;
   FILE_SIZE = 20 * B + 123;
 var
-  LStats: TIORingReaderStats;
+  LStats: TIORingSequentialReaderStats;
 begin
   // Calls of 8 buffers: what the buffers have not asked for is read directly
   LStats := CheckBigReads(FILE_SIZE, [], 4, 8 * B, 0);
@@ -797,7 +797,7 @@ const
 var
   LReader: TIORingSequentialReader;
   LBuffer: TBytes;
-  LStats: TIORingReaderStats;
+  LStats: TIORingSequentialReaderStats;
 begin
   SetLength(LBuffer, B);
   LReader.Open(SharedPatternFile(FILE_SIZE), [], B, 4);

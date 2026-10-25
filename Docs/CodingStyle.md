@@ -39,7 +39,7 @@ What both compilers must support, and the rules for `inline`, are in
   translate.
 
 ```pascal
-function ReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
+function IORingReadAt(var ARing: TIORing; const AFile: TIORingFileRef; var ABuffer; const ACount: Cardinal;
   const AOffset: UInt64): Cardinal;
 ```
 

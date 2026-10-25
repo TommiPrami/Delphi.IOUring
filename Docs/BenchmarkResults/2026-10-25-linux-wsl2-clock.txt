@@ -1,0 +1,399 @@
+Phase 28, decision 5 (Docs/Design.md §12.10): the Blocks benchmark (FPC 3.2.2, Linux64, WSL2) built with FPC's clock_gettime (syscall, the default) and with the C library's (libc, IORING_CLOCK_LIBC), run in turns: --cache warm --size-gib 1 --runs 5. Rounds 1-3 libc first, rounds 4-6 syscall first. 2026-10-25.
+
+=== libc, round 1
+Blocks known in advance: FPC Linux64, 2026-10-25 09:46
+Creating /tmp/Delphi.IOUring.Bench/blocks-1GiB.dat (1 GiB) ... done
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1472.1    5750.4        14
+  pread                                                       1810.8    7073.3        11
+  pread, 8 threads                                            1224.8    4784.4        96
+  Block reader, read-ahead 1                                    44.7     174.6       453
+  Block reader, read-ahead 8                                   444.8    1737.7        57
+  Block reader, read-ahead 32                                 1383.4    5404.0        24
+  Block reader, read-ahead 128                                1558.1    6086.4        20
+  Block reader, read-ahead 128, 2 I/O threads                 2866.6   11197.5        19
+  Block reader, read-ahead 128, 4 I/O threads                 2061.6    8053.3        28
+  Block reader, read-ahead 128, overlap rule                  1142.9    4464.5        24
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1167.6    4561.0        24
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1495.4    5841.6        13
+  pread                                                       1934.2    7555.6        11
+  pread, 8 threads                                            1833.2    7160.9        60
+  Block reader, read-ahead 1                                    53.0     206.9       387
+  Block reader, read-ahead 8                                   579.5    2263.8        44
+  Block reader, read-ahead 32                                 1601.0    6254.0        21
+  Block reader, read-ahead 128                                1680.7    6565.1        19
+  Block reader, read-ahead 128, 2 I/O threads                 3338.3   13040.4        17
+  Block reader, read-ahead 128, 4 I/O threads                 1678.1    6555.2        28
+  Block reader, read-ahead 128, overlap rule                  1313.1    5129.3        21
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1315.4    5138.5        21
+  Block reader, read-ahead 32, MaxGap 32 KiB                   661.7    2584.9        34
+
+=== syscall, round 1
+Blocks known in advance: FPC Linux64, 2026-10-25 09:46
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1469.6    5740.7        14
+  pread                                                       1817.2    7098.4        11
+  pread, 8 threads                                            1716.0    6703.1        69
+  Block reader, read-ahead 1                                    44.1     172.5       462
+  Block reader, read-ahead 8                                   496.4    1939.1        52
+  Block reader, read-ahead 32                                 1435.6    5608.0        24
+  Block reader, read-ahead 128                                1572.8    6143.8        20
+  Block reader, read-ahead 128, 2 I/O threads                 2602.8   10167.2        20
+  Block reader, read-ahead 128, 4 I/O threads                 2726.3   10649.5        24
+  Block reader, read-ahead 128, overlap rule                  1211.4    4732.0        23
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1161.6    4537.7        24
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1530.8    5979.7        13
+  pread                                                       1914.6    7478.9        11
+  pread, 8 threads                                            1834.7    7166.8        63
+  Block reader, read-ahead 1                                    55.6     217.2       379
+  Block reader, read-ahead 8                                   805.3    3145.5        35
+  Block reader, read-ahead 32                                 1650.6    6447.6        21
+  Block reader, read-ahead 128                                1717.0    6707.2        19
+  Block reader, read-ahead 128, 2 I/O threads                 3188.3   12454.2        18
+  Block reader, read-ahead 128, 4 I/O threads                 2123.8    8296.2        26
+  Block reader, read-ahead 128, overlap rule                  1326.3    5181.0        21
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1319.3    5153.7        21
+  Block reader, read-ahead 32, MaxGap 32 KiB                   685.3    2677.0        34
+
+=== libc, round 2
+Blocks known in advance: FPC Linux64, 2026-10-25 09:47
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1446.7    5651.0        14
+  pread                                                       1795.7    7014.3        11
+  pread, 8 threads                                            1550.5    6056.7        57
+  Block reader, read-ahead 1                                    42.3     165.4       462
+  Block reader, read-ahead 8                                   503.1    1965.4        53
+  Block reader, read-ahead 32                                 1366.5    5337.9        24
+  Block reader, read-ahead 128                                1550.7    6057.6        20
+  Block reader, read-ahead 128, 2 I/O threads                 2810.2   10977.2        20
+  Block reader, read-ahead 128, 4 I/O threads                 2106.4    8228.0        28
+  Block reader, read-ahead 128, overlap rule                  1175.8    4593.2        23
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1151.4    4497.7        24
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1535.6    5998.5        13
+  pread                                                       1955.4    7638.3        10
+  pread, 8 threads                                            1368.7    5346.6        91
+  Block reader, read-ahead 1                                    53.9     210.4       380
+  Block reader, read-ahead 8                                   599.2    2340.6        43
+  Block reader, read-ahead 32                                 1575.8    6155.5        21
+  Block reader, read-ahead 128                                1729.2    6754.7        18
+  Block reader, read-ahead 128, 2 I/O threads                 3135.8   12249.1        17
+  Block reader, read-ahead 128, 4 I/O threads                 2363.5    9232.5        25
+  Block reader, read-ahead 128, overlap rule                  1315.0    5136.8        21
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1302.9    5089.6        22
+  Block reader, read-ahead 32, MaxGap 32 KiB                   711.0    2777.4        32
+
+=== syscall, round 2
+Blocks known in advance: FPC Linux64, 2026-10-25 09:47
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1480.9    5784.9        14
+  pread                                                       1838.1    7179.9        11
+  pread, 8 threads                                            1545.0    6035.1        70
+  Block reader, read-ahead 1                                    43.7     170.8       466
+  Block reader, read-ahead 8                                   443.9    1734.0        55
+  Block reader, read-ahead 32                                 1445.9    5648.1        24
+  Block reader, read-ahead 128                                1569.7    6131.8        20
+  Block reader, read-ahead 128, 2 I/O threads                 3096.5   12095.5        19
+  Block reader, read-ahead 128, 4 I/O threads                 2121.3    8286.5        28
+  Block reader, read-ahead 128, overlap rule                  1171.3    4575.4        24
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1163.3    4544.0        24
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1528.4    5970.1        13
+  pread                                                       1914.6    7478.9        11
+  pread, 8 threads                                            1765.4    6896.0        62
+  Block reader, read-ahead 1                                    53.1     207.3       391
+  Block reader, read-ahead 8                                   579.7    2264.4        44
+  Block reader, read-ahead 32                                 1642.6    6416.3        21
+  Block reader, read-ahead 128                                1745.4    6817.8        18
+  Block reader, read-ahead 128, 2 I/O threads                 3288.4   12845.3        18
+  Block reader, read-ahead 128, 4 I/O threads                 1727.3    6747.1        28
+  Block reader, read-ahead 128, overlap rule                  1294.2    5055.7        22
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1323.9    5171.4        21
+  Block reader, read-ahead 32, MaxGap 32 KiB                   709.1    2770.0        33
+
+=== libc, round 3
+Blocks known in advance: FPC Linux64, 2026-10-25 09:47
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1500.5    5861.3        14
+  pread                                                       1804.7    7049.7        11
+  pread, 8 threads                                            1198.0    4679.5        88
+  Block reader, read-ahead 1                                    43.7     170.8       457
+  Block reader, read-ahead 8                                   480.5    1877.1        52
+  Block reader, read-ahead 32                                 1396.7    5456.0        24
+  Block reader, read-ahead 128                                1517.1    5926.2        21
+  Block reader, read-ahead 128, 2 I/O threads                 2675.2   10450.1        20
+  Block reader, read-ahead 128, 4 I/O threads                 1800.5    7033.2        29
+  Block reader, read-ahead 128, overlap rule                  1174.3    4587.2        24
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1178.0    4601.5        24
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1604.8    6268.6        13
+  pread                                                       1978.2    7727.5        10
+  pread, 8 threads                                            1506.1    5883.3        67
+  Block reader, read-ahead 1                                    55.9     218.3       372
+  Block reader, read-ahead 8                                   583.0    2277.2        44
+  Block reader, read-ahead 32                                 1592.0    6218.7        21
+  Block reader, read-ahead 128                                1747.8    6827.3        19
+  Block reader, read-ahead 128, 2 I/O threads                 3328.3   13001.3        17
+  Block reader, read-ahead 128, 4 I/O threads                 1931.6    7545.4        26
+  Block reader, read-ahead 128, overlap rule                  1320.5    5158.1        21
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1341.9    5241.9        21
+  Block reader, read-ahead 32, MaxGap 32 KiB                   709.1    2769.8        32
+
+=== syscall, round 3
+Blocks known in advance: FPC Linux64, 2026-10-25 09:47
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1415.3    5528.6        14
+  pread                                                       1752.5    6845.9        12
+  pread, 8 threads                                            1880.2    7344.6        60
+  Block reader, read-ahead 1                                    46.9     183.1       438
+  Block reader, read-ahead 8                                   433.6    1693.7        57
+  Block reader, read-ahead 32                                 1432.0    5593.9        24
+  Block reader, read-ahead 128                                1549.7    6053.4        21
+  Block reader, read-ahead 128, 2 I/O threads                 3114.8   12167.1        19
+  Block reader, read-ahead 128, 4 I/O threads                 2729.6   10662.6        25
+  Block reader, read-ahead 128, overlap rule                  1130.7    4416.8        24
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1155.4    4513.3        24
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1553.3    6067.5        13
+  pread                                                       1961.0    7660.1        10
+  pread, 8 threads                                            1924.6    7517.8        59
+  Block reader, read-ahead 1                                    53.3     208.4       387
+  Block reader, read-ahead 8                                   777.3    3036.5        36
+  Block reader, read-ahead 32                                 1659.1    6480.7        21
+  Block reader, read-ahead 128                                1685.6    6584.5        19
+  Block reader, read-ahead 128, 2 I/O threads                 3400.2   13282.0        17
+  Block reader, read-ahead 128, 4 I/O threads                 2830.5   11056.5        22
+  Block reader, read-ahead 128, overlap rule                  1329.3    5192.4        21
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1339.0    5230.3        21
+  Block reader, read-ahead 32, MaxGap 32 KiB                   716.7    2799.7        32
+
+=== libc, round 4
+Blocks known in advance: FPC Linux64, 2026-10-25 09:48
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1478.1    5773.8        14
+  pread                                                       1832.0    7156.3        11
+  pread, 8 threads                                            1579.9    6171.5        61
+  Block reader, read-ahead 1                                    42.1     164.5       470
+  Block reader, read-ahead 8                                   476.2    1860.3        53
+  Block reader, read-ahead 32                                 1394.0    5445.4        24
+  Block reader, read-ahead 128                                1539.1    6011.9        21
+  Block reader, read-ahead 128, 2 I/O threads                 3085.0   12050.7        19
+  Block reader, read-ahead 128, 4 I/O threads                 2335.6    9123.6        26
+  Block reader, read-ahead 128, overlap rule                  1141.8    4460.2        24
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1156.3    4516.9        24
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1563.4    6106.9        13
+  pread                                                       1978.0    7726.7        10
+  pread, 8 threads                                            1475.7    5764.4        65
+  Block reader, read-ahead 1                                    49.1     192.0       407
+  Block reader, read-ahead 8                                   650.7    2541.6        40
+  Block reader, read-ahead 32                                 1580.8    6174.9        21
+  Block reader, read-ahead 128                                1729.2    6754.7        18
+  Block reader, read-ahead 128, 2 I/O threads                 3336.7   13033.9        18
+  Block reader, read-ahead 128, 4 I/O threads                 3291.1   12855.8        21
+  Block reader, read-ahead 128, overlap rule                  1288.2    5032.2        22
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1341.5    5240.1        21
+  Block reader, read-ahead 32, MaxGap 32 KiB                   723.0    2824.4        32
+
+=== syscall, round 4
+Blocks known in advance: FPC Linux64, 2026-10-25 09:48
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1490.1    5820.7        14
+  pread                                                       1841.6    7193.8        11
+  pread, 8 threads                                            1713.4    6692.8        64
+  Block reader, read-ahead 1                                    41.1     160.4       482
+  Block reader, read-ahead 8                                   429.5    1677.8        57
+  Block reader, read-ahead 32                                 1521.6    5943.8        23
+  Block reader, read-ahead 128                                1545.0    6035.1        21
+  Block reader, read-ahead 128, 2 I/O threads                 3160.1   12344.0        19
+  Block reader, read-ahead 128, 4 I/O threads                 2956.8   11550.1        24
+  Block reader, read-ahead 128, overlap rule                  1140.7    4455.9        24
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1132.4    4423.3        24
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1560.9    6097.3        13
+  pread                                                       1980.8    7737.4        10
+  pread, 8 threads                                            1397.4    5458.7        58
+  Block reader, read-ahead 1                                    50.6     197.7       402
+  Block reader, read-ahead 8                                   761.9    2976.1        37
+  Block reader, read-ahead 32                                 1652.9    6456.6        21
+  Block reader, read-ahead 128                                1741.4    6802.4        18
+  Block reader, read-ahead 128, 2 I/O threads                 3351.8   13092.8        17
+  Block reader, read-ahead 128, 4 I/O threads                 2672.4   10438.9        23
+  Block reader, read-ahead 128, overlap rule                  1303.0    5089.9        22
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1307.6    5107.9        22
+  Block reader, read-ahead 32, MaxGap 32 KiB                   718.5    2806.5        32
+
+=== libc, round 5
+Blocks known in advance: FPC Linux64, 2026-10-25 09:48
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1437.8    5616.5        14
+  pread                                                       1812.9    7081.7        11
+  pread, 8 threads                                            2194.4    8572.0        49
+  Block reader, read-ahead 1                                    48.9     191.2       423
+  Block reader, read-ahead 8                                   491.2    1918.7        51
+  Block reader, read-ahead 32                                 1417.5    5537.2        24
+  Block reader, read-ahead 128                                1561.9    6101.1        20
+  Block reader, read-ahead 128, 2 I/O threads                 3062.8   11964.0        19
+  Block reader, read-ahead 128, 4 I/O threads                 2758.6   10775.9        26
+  Block reader, read-ahead 128, overlap rule                  1135.1    4434.1        24
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1111.0    4340.0        25
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1569.1    6129.4        13
+  pread                                                       1986.7    7760.5        10
+  pread, 8 threads                                            1364.0    5328.0        60
+  Block reader, read-ahead 1                                    50.3     196.6       403
+  Block reader, read-ahead 8                                   610.3    2383.9        43
+  Block reader, read-ahead 32                                 1556.4    6079.8        22
+  Block reader, read-ahead 128                                1709.5    6677.9        19
+  Block reader, read-ahead 128, 2 I/O threads                 3278.7   12807.4        18
+  Block reader, read-ahead 128, 4 I/O threads                 3131.4   12231.9        22
+  Block reader, read-ahead 128, overlap rule                  1305.2    5098.5        21
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1324.6    5174.2        21
+  Block reader, read-ahead 32, MaxGap 32 KiB                   716.8    2800.0        32
+
+=== syscall, round 5
+Blocks known in advance: FPC Linux64, 2026-10-25 09:48
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1475.8    5764.8        14
+  pread                                                       1828.3    7141.9        11
+  pread, 8 threads                                            1537.2    6004.5        63
+  Block reader, read-ahead 1                                    44.3     173.2       462
+  Block reader, read-ahead 8                                   418.5    1634.8        58
+  Block reader, read-ahead 32                                 1427.6    5576.4        24
+  Block reader, read-ahead 128                                1483.0    5793.0        21
+  Block reader, read-ahead 128, 2 I/O threads                 2926.1   11430.1        20
+  Block reader, read-ahead 128, 4 I/O threads                 2454.9    9589.4        26
+  Block reader, read-ahead 128, overlap rule                  1109.4    4333.8        25
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1138.9    4448.8        24
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1536.1    6000.4        13
+  pread                                                       1957.1    7645.1        10
+  pread, 8 threads                                            1632.8    6378.1        63
+  Block reader, read-ahead 1                                    49.5     193.4       405
+  Block reader, read-ahead 8                                   823.0    3214.9        36
+  Block reader, read-ahead 32                                 1422.4    5556.1        23
+  Block reader, read-ahead 128                                1689.8    6600.6        19
+  Block reader, read-ahead 128, 2 I/O threads                 3257.3   12723.9        18
+  Block reader, read-ahead 128, 4 I/O threads                 3081.2   12035.9        23
+  Block reader, read-ahead 128, overlap rule                  1295.8    5061.9        22
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1326.5    5181.7        21
+  Block reader, read-ahead 32, MaxGap 32 KiB                   704.6    2752.5        33
+
+=== libc, round 6
+Blocks known in advance: FPC Linux64, 2026-10-25 09:48
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1447.2    5653.0        14
+  pread                                                       1828.0    7140.6        11
+  pread, 8 threads                                            1788.4    6986.1        73
+  Block reader, read-ahead 1                                    51.1     199.6       409
+  Block reader, read-ahead 8                                   428.4    1673.3        57
+  Block reader, read-ahead 32                                 1475.7    5764.4        24
+  Block reader, read-ahead 128                                1593.5    6224.6        20
+  Block reader, read-ahead 128, 2 I/O threads                 3214.9   12558.3        18
+  Block reader, read-ahead 128, 4 I/O threads                 2414.6    9432.0        24
+  Block reader, read-ahead 128, overlap rule                  1148.8    4487.4        24
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1193.2    4660.8        23
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1574.1    6148.7        13
+  pread                                                       1992.8    7784.5        10
+  pread, 8 threads                                            2773.9   10835.6        38
+  Block reader, read-ahead 1                                    53.9     210.7       380
+  Block reader, read-ahead 8                                   589.6    2302.9        43
+  Block reader, read-ahead 32                                 1659.5    6482.3        21
+  Block reader, read-ahead 128                                1752.2    6844.7        18
+  Block reader, read-ahead 128, 2 I/O threads                 3375.0   13183.4        17
+  Block reader, read-ahead 128, 4 I/O threads                 2578.0   10070.3        23
+  Block reader, read-ahead 128, overlap rule                  1334.1    5211.5        21
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1352.4    5283.0        21
+  Block reader, read-ahead 32, MaxGap 32 KiB                   722.7    2822.9        32
+
+=== syscall, round 6
+Blocks known in advance: FPC Linux64, 2026-10-25 09:48
+20000 blocks of 4096 bytes per list; median of 5 runs
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1446.2    5649.4        14
+  pread                                                       1853.7    7241.2        11
+  pread, 8 threads                                            1532.8    5987.5        64
+  Block reader, read-ahead 1                                    45.9     179.3       452
+  Block reader, read-ahead 8                                   558.5    2181.5        47
+  Block reader, read-ahead 32                                 1566.3    6118.3        23
+  Block reader, read-ahead 128                                1608.1    6281.7        20
+  Block reader, read-ahead 128, 2 I/O threads                 3195.4   12482.0        18
+  Block reader, read-ahead 128, 4 I/O threads                 2628.1   10266.1        25
+  Block reader, read-ahead 128, overlap rule                  1159.1    4527.7        24
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1164.2    4547.7        24
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                    1576.4    6157.9        13
+  pread                                                       1976.5    7720.6        10
+  pread, 8 threads                                            1244.6    4861.5        69
+  Block reader, read-ahead 1                                    52.1     203.4       396
+  Block reader, read-ahead 8                                   676.7    2643.3        40
+  Block reader, read-ahead 32                                 1673.4    6536.6        21
+  Block reader, read-ahead 128                                1765.4    6896.0        18
+  Block reader, read-ahead 128, 2 I/O threads                 3347.3   13075.3        17
+  Block reader, read-ahead 128, 4 I/O threads                 2898.1   11320.8        22
+  Block reader, read-ahead 128, overlap rule                  1345.4    5255.3        21
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule      1342.3    5243.3        21
+  Block reader, read-ahead 32, MaxGap 32 KiB                   725.3    2833.3        32
+

@@ -62,9 +62,6 @@ const
   IORING_POOL_DEFAULT_SPIN_MICROSECONDS = 4;
 
 type
-  TCardinalArray = array[0..MaxInt div SizeOf(Cardinal) - 1] of Cardinal;
-  PCardinalArray = ^TCardinalArray;
-
   {
     Lock-free stack of the indices 0..Capacity-1 (a Treiber stack).
 
@@ -76,9 +73,14 @@ type
   }
   TIORingFreeList = record
   private
+    type
+      TIndexArray = array[0..MaxInt div SizeOf(Cardinal) - 1] of Cardinal;
+      PIndexArray = ^TIndexArray;
+
+  private
     FMemory: Pointer;          // as allocated
     FHead: PUInt64;            // tag (upper 32 bits) | top index (lower 32 bits); its own cache line
-    FNext: PCardinalArray;     // FNext[Index]: the index below Index
+    FNext: PIndexArray;        // FNext[Index]: the index below Index
     FCapacity: Cardinal;
   public
 {$IFDEF FPC}
@@ -268,7 +270,7 @@ begin
 
   // The head alone on the first cache line, the links after it
   FHead := IORingAllocCacheAligned(IORING_CACHE_LINE_SIZE + NativeUInt(ACapacity) * SizeOf(Cardinal), FMemory);
-  FNext := PCardinalArray(PByte(FHead) + IORING_CACHE_LINE_SIZE);
+  FNext := PIndexArray(PByte(FHead) + IORING_CACHE_LINE_SIZE);
   FCapacity := ACapacity;
 
   if AFull then

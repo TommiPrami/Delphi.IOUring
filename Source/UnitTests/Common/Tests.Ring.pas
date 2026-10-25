@@ -830,7 +830,7 @@ var
 begin
   LFile := TIORingFileRef.FromHandle(FResources.OpenFile(PatternFile));
   LRing.Open(8);
-  AssertEquals('Bytes', Int64(SizeOf(LBuffer)), Int64(ReadAt(LRing, LFile, LBuffer, SizeOf(LBuffer), 12345)));
+  AssertEquals('Bytes', Int64(SizeOf(LBuffer)), Int64(IORingReadAt(LRing, LFile, LBuffer, SizeOf(LBuffer), 12345)));
   CheckPattern(12345, @LBuffer, SizeOf(LBuffer));
 end;
 
@@ -848,10 +848,10 @@ begin
   LFile := TIORingFileRef.FromHandle(FResources.OpenFile(LFileName));
   LRing.Open(8);
 
-  AssertEquals('Crossing EOF', Int64(FILE_SIZE - 50), Int64(ReadAt(LRing, LFile, LBuffer, SizeOf(LBuffer), 50)));
+  AssertEquals('Crossing EOF', Int64(FILE_SIZE - 50), Int64(IORingReadAt(LRing, LFile, LBuffer, SizeOf(LBuffer), 50)));
   CheckPattern(50, @LBuffer, FILE_SIZE - 50);
-  AssertEquals('At EOF', Int64(0), Int64(ReadAt(LRing, LFile, LBuffer, SizeOf(LBuffer), FILE_SIZE)));
-  AssertEquals('After EOF', Int64(0), Int64(ReadAt(LRing, LFile, LBuffer, SizeOf(LBuffer), 10 * FILE_SIZE)));
+  AssertEquals('At EOF', Int64(0), Int64(IORingReadAt(LRing, LFile, LBuffer, SizeOf(LBuffer), FILE_SIZE)));
+  AssertEquals('After EOF', Int64(0), Int64(IORingReadAt(LRing, LFile, LBuffer, SizeOf(LBuffer), 10 * FILE_SIZE)));
 end;
 
 procedure TIORingTests.ReadAt_OnBusyRing_Raises;
@@ -869,13 +869,13 @@ begin
   LRaised := False;
 
   try
-    ReadAt(LRing, LFile, LBuffer, SizeOf(LBuffer), 0);
+    IORingReadAt(LRing, LFile, LBuffer, SizeOf(LBuffer), 0);
   except
     on EIORingError do
       LRaised := True;
   end;
 
-  AssertTrue('ReadAt must refuse a ring with a prepared entry', LRaised);
+  AssertTrue('IORingReadAt must refuse a ring with a prepared entry', LRaised);
 
   LRing.Submit(1);
   AssertTrue('Completion', LRing.TryPopCompletion(LCompletion));
@@ -894,8 +894,8 @@ begin
   TTestFileHelpers.FillPattern(777, LWriteBuffer, DATA_SIZE);
   LRing.Open(8);
 
-  AssertEquals('Written', Int64(DATA_SIZE), Int64(WriteAt(LRing, LFile, LWriteBuffer, DATA_SIZE, 777)));
-  AssertEquals('Read', Int64(DATA_SIZE), Int64(ReadAt(LRing, LFile, LReadBuffer, DATA_SIZE, 777)));
+  AssertEquals('Written', Int64(DATA_SIZE), Int64(IORingWriteAt(LRing, LFile, LWriteBuffer, DATA_SIZE, 777)));
+  AssertEquals('Read', Int64(DATA_SIZE), Int64(IORingReadAt(LRing, LFile, LReadBuffer, DATA_SIZE, 777)));
   CheckPattern(777, @LReadBuffer, DATA_SIZE);
 end;
 

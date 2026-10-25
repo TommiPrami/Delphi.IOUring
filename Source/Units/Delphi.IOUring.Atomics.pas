@@ -83,13 +83,14 @@
 
 interface
 
+uses
+  // IORING_INFINITE: the timeout of WaitWhileEqual that means no time limit
+  Delphi.IOUring.Backend.Custom;
+
 const
   { Cache line size of x86/x64 CPUs (and most ARM ones). Values that different threads write often are kept at least
     this far apart, so they do not share a cache line ("false sharing"). }
   IORING_CACHE_LINE_SIZE = 64;
-
-  // Timeout for TAtomic.WaitWhileEqual: no time limit
-  IORING_WAIT_INFINITE = Cardinal($FFFFFFFF);
 
   { The longest wait of TAtomic.BackOff, in CPU pauses: ~35 µs on a recent Intel performance core
     (Docs/Benchmarks.md, "Engine structures") }
@@ -199,9 +200,9 @@ type
       always check the value again. False: timed out.
     }
     class function WaitWhileEqual(var ATarget: Integer; AExpected: Integer;
-      ATimeoutMilliseconds: Cardinal = IORING_WAIT_INFINITE): Boolean; overload; static;
+      ATimeoutMilliseconds: Cardinal = IORING_INFINITE): Boolean; overload; static;
     class function WaitWhileEqual(var ATarget: Cardinal; AExpected: Cardinal;
-      ATimeoutMilliseconds: Cardinal = IORING_WAIT_INFINITE): Boolean; overload; static;
+      ATimeoutMilliseconds: Cardinal = IORING_INFINITE): Boolean; overload; static;
 
     { Wakes one / all threads sleeping in WaitWhileEqual on ATarget. Change the value first, with an atomic operation
       (Exchange, CompareExchange, FetchAdd ...), then wake. }
@@ -795,7 +796,7 @@ var
   LTimeout: TTimeSpec;
   LTimeoutPointer: PTimeSpec;
 begin
-  if ATimeoutMilliseconds = IORING_WAIT_INFINITE then
+  if ATimeoutMilliseconds = IORING_INFINITE then
     LTimeoutPointer := nil
   else
   begin

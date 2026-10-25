@@ -9,7 +9,9 @@ with the block reader: [Blocks known in advance](#blocks-known-in-advance-phase-
 [Overlap rule](#overlap-rule-phase-16); writing has its own:
 [Writing](#writing-phase-17). A first look at Linux (in WSL2):
 [Linux in WSL2](#linux-in-wsl2--a-first-look-phase-21); and GitHub's runners,
-x64 and ARM64: [GitHub's runners](#githubs-runners-phase-23).
+x64 and ARM64: [GitHub's runners](#githubs-runners-phase-23). All four
+Windows benchmarks again after Phase 28:
+[The Windows numbers again](#the-windows-numbers-again-phase-28).
 
 ## Short version
 
@@ -91,6 +93,9 @@ On this machine (fast NVMe disk, 64 GB RAM), reading a big file from start to en
   Cold, on Linux 11–22 % faster; on Windows as before, except 64 MiB calls
   about 2 % slower. Calls up to the buffers' size (64 KiB, 1 MiB) are
   unchanged.
+- **The Windows numbers again (Phase 28):** after Phases 21–28 the four
+  Windows benchmarks give the same results as before, or better; nothing
+  the library does got slower.
 
 ## Machine
 
@@ -876,10 +881,11 @@ Thousand blocks per second, 20 000 blocks of 4 KiB from a 4 GiB file:
 - **[open] On Linux, read-ahead 8 beats 32 and 128** (27 against 20
   thousand blocks per second, on both CPUs; `pread` on 8 threads also gets
   27). Not on Windows. Not explained yet – maybe the cloud disk slows down
-  deep queues.
+  deep queues. Parked in Phase 28 (Design §13).
 - **[open] Unbuffered on Windows** the block reader got no more than
   `ReadFile` (6.2 against 5.8 thousand random blocks per second), while
-  buffered it got 20. Not explained yet either.
+  buffered it got 20. Not explained yet either. Parked in Phase 28 (Design
+  §13).
 
 ### Blocks known in advance, cached
 
@@ -990,6 +996,56 @@ runs each, each the median of 3. MiB/s:
   in one call, so they get this; `CopyFrom` reads 1 MiB at a time (one
   buffer), so it does not.
 
+## The Windows numbers again (Phase 28)
+
+The shared benchmark code and the library changed in Phases 21–28, so the
+four benchmarks ran again on this machine, 2026-10-25: Delphi 13, Win64
+Release, the same options as before, one after the other (raw output:
+[2026-10-25-windows-win64.txt](BenchmarkResults/2026-10-25-windows-win64.txt)).
+Before = the Win64 numbers in the sections above.
+
+| Benchmark, case | Before | Now |
+| --- | ---: | ---: |
+| *Reading a file, MiB/s* | | |
+| 10 GiB cold, IoRing stream | 6 757 | 6 676 |
+| 10 GiB cold, IoRing reader, zero-copy | 6 759 | 6 715 |
+| 10 GiB cold, IoRing reader, unbuffered | 6 779 | 6 787 |
+| 10 GiB cold, `TFileStream` 1 MiB reads | 2 509 | 2 485 |
+| 10 GiB warm, IoRing stream | 6 258 | 6 084 |
+| 10 GiB warm, `TFileStream` 1 MiB reads | 7 489 | 7 408 |
+| 1 GiB with work, cold, IoRing stream (s) | 0.288 | 0.289 |
+| 1 GiB with work, cold, IoRing reader (s) | 0.271 | 0.273 |
+| *Engine structures, lock-free, Mops/s* | | |
+| Free list, tight, 1 / 8 / 28 threads | 62.2 / 27.7 / 13.1 | 64.9 / 44.4 / 16.3 |
+| Free list, work 1 µs, 8 / 28 threads | 5.52 / 3.26 | 4.30 / 2.90 |
+| Queue, tight, 1 / 8 / 27 producers | 94.4 / 55.3 / 18.3 | 94.1 / 47.4 / 18.9 |
+| Queue, work 1 µs, 8 / 27 producers | 6.76 / 4.67 | 5.57 / 3.81 |
+| *Blocks known in advance, thousand blocks/s* | | |
+| Random, cold, block reader 128 | 140.6 | 142.5 |
+| Random, warm, block reader 128 / `ReadFile` | 250.1 / 282.5 | 274.1 / 326.4 |
+| Random, warm, 4 I/O threads | 405.7 | 439.7 |
+| Random, unbuffered, 1 / 4 I/O threads | 124.3 / 397.7 | 129.9 / 407.9 |
+| Sorted, cold, block reader 128 | 164.8 | 171.0 |
+| Sorted, cold, `MaxGap` 32 KiB | 363.6 | 337.7 |
+| Sorted, warm, 4 I/O threads | 715.9 | 805.4 |
+| *Writing, seconds until written* | | |
+| 1 GiB with work, write stream / `TFileStream` 1 MiB | 0.43 / 0.57 | 0.23 / 0.40 |
+| 10 GiB with work, write stream / `TFileStream` 1 MiB | 4.49 / 5.05 | 4.90 / 5.45 |
+| 1 GiB, unbuffered write stream, + flush | 0.26 | 0.25 |
+
+- **Nothing got slower that the library does.** Reading from the disk is at
+  the disk's limit as before (±1 %); warm, everything is 1–4 % lower,
+  `ReadFile` and `TFileStream` too – the machine, not the library. The
+  block reader is the same or faster everywhere except `MaxGap` on sorted
+  cold blocks (−7 %, one run of 3; `ReadFile` there −2 %).
+- **The lock-free structures still win everywhere** (free list 1.00–7.3×
+  the SRW lock, queue 1.00–255×). Tight loops with several threads are
+  faster than in Phase 11, work loops with 8 or more threads 4–22 % slower,
+  for the lock too: which threads land on the E-cores changes such numbers
+  (see "Fast and slow cores" below).
+- **The write stream with work** finished 1 GiB 42 % sooner than
+  `TFileStream` (before: 25 %), 10 GiB 10 % sooner (before: 11 %).
+
 ## Known limits of these measurements
 
 - **One machine, one very fast disk.** The NVMe drive has low latency, so
@@ -1056,7 +1112,8 @@ Source\Build-FPC.ps1 -Project Structures -Platform Win64 -Run
 
 Blocks known in advance (about 1.5 minutes per build; options `--dir`,
 `--size-gib` (default 4), `--blocks` (default 20 000), `--runs`, `--csv`,
-`--keep`):
+`--cache cold|warm|unbuffered` (only that cache state; may be given more
+than once), `--keep`):
 
 ```
 Source\Benchmarks\Win64\Release\Delphi.IOUring.Benchmarks.Blocks.exe --runs 3 --csv blocks.csv

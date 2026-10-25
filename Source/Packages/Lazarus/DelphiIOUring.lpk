@@ -15,7 +15,7 @@
     <Description Value="File I/O with the operating system's I/O rings: Windows IoRing (Win32, Win64) and Linux io_uring (x86-64, AArch64). The backend units (Windows, Posix) are not in the package's main unit: each system compiles only its own."/>
     <License Value="MIT"/>
     <Version Minor="1"/>
-    <Files Count="15">
+    <Files Count="17">
       <Item1>
         <Filename Value="../../Units/Delphi.IOUring.pas"/>
         <UnitName Value="Delphi.IOUring"/>
@@ -67,19 +67,29 @@
         <UnitName Value="Delphi.IOUring.Backend.Windows"/>
       </Item12>
       <Item13>
+        <Filename Value="../../Units/Delphi.IOUring.Backend.Windows.Platform.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="Delphi.IOUring.Backend.Windows.Platform"/>
+      </Item13>
+      <Item14>
         <Filename Value="../../Units/Delphi.IOUring.Backend.Posix.API.pas"/>
         <AddToUsesPkgSection Value="False"/>
         <UnitName Value="Delphi.IOUring.Backend.Posix.API"/>
-      </Item13>
-      <Item14>
+      </Item14>
+      <Item15>
         <Filename Value="../../Units/Delphi.IOUring.Backend.Posix.pas"/>
         <AddToUsesPkgSection Value="False"/>
         <UnitName Value="Delphi.IOUring.Backend.Posix"/>
-      </Item14>
-      <Item15>
+      </Item15>
+      <Item16>
+        <Filename Value="../../Units/Delphi.IOUring.Backend.Posix.Platform.pas"/>
+        <AddToUsesPkgSection Value="False"/>
+        <UnitName Value="Delphi.IOUring.Backend.Posix.Platform"/>
+      </Item16>
+      <Item17>
         <Filename Value="../../Units/Delphi.IOUring.inc"/>
         <Type Value="Include"/>
-      </Item15>
+      </Item17>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>

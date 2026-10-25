@@ -38,6 +38,7 @@
     --blocks <n>       blocks per list (default 20000)
     --runs <n>         runs per contender and case; the median is reported (default 3)
     --csv <file>       append every single run to this CSV file
+    --cache <state>    only this cache state: cold, warm or unbuffered (may be given more than once; default all)
     --keep             keep the test file
 }
 
@@ -143,6 +144,7 @@ var
   GRuns: Integer = 3;
   GCsvFile: string;
   GKeep: Boolean;
+  GCaches: set of TCacheState = [csCold, csWarm, csUnbuffered];
   // Engines with 1, 2 and 4 I/O threads
   GEngine: TIORingEngine;
   GEngine2: TIORingEngine;
@@ -501,10 +503,32 @@ procedure ParseOptions;
     RaiseError(Exception, '--runs, --blocks and --size-gib must be at least 1');
   end;
 
+  procedure RaiseUnknownCache(const AName: string); {$IFNDEF FPC} noreturn; {$ENDIF}
+  begin
+    RaiseErrorFmt(Exception, 'Unknown cache state: %s (cold, warm or unbuffered)', [AName]);
+  end;
+
+  procedure IncludeCache(const AName: string);
+  var
+    LState: TCacheState;
+  begin
+    for LState := Low(TCacheState) to High(TCacheState) do
+      if CACHE_NAMES[LState] = AName then
+      begin
+        Include(GCaches, LState);
+
+        Exit;
+      end;
+
+    RaiseUnknownCache(AName);
+  end;
+
 var
   LIndex: Integer;
   LName: string;
+  LCachesGiven: Boolean;
 begin
+  LCachesGiven := False;
   GFolder := DefaultBenchFolder;
   LIndex := 1;
 
@@ -536,6 +560,16 @@ begin
     begin
       Inc(LIndex);
       GCsvFile := ParamStr(LIndex);
+    end
+    else if (LName = '--cache') and (LIndex < ParamCount) then
+    begin
+      Inc(LIndex);
+
+      if not LCachesGiven then
+        GCaches := [];
+
+      LCachesGiven := True;
+      IncludeCache(LowerCase(ParamStr(LIndex)));
     end
     else if LName = '--keep' then
       GKeep := True
@@ -599,6 +633,9 @@ begin
 
       for LCache := Low(TCacheState) to High(TCacheState) do
       begin
+        if not (LCache in GCaches) then
+          Continue;
+
         Writeln;
         Writeln(Format('%s, %s cache', [LIST_NAMES[LKind], CACHE_NAMES[LCache]]));
         Writeln(Format('  %-54s %11s %9s %9s', ['Contender', 'K blocks/s', 'MiB/s', 'CPU ms'], GInvariant));

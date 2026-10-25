@@ -52,26 +52,28 @@ type
 
   TIORingSequentialWriterOptions = set of TIORingSequentialWriterOption;
 
-  TIORingWriterStats = record
+  TIORingSequentialWriterStats = record
     WritesIssued: UInt64;
     BytesWritten: UInt64;         // bytes the completed writes wrote (also again after a Flush)
     Waits: UInt64;                // times the caller had to wait for a free buffer
     WaitMicroseconds: UInt64;     // total time spent in those waits
   end;
 
-  // One buffer (internal)
-  PIORingWriterSlot = ^TIORingWriterSlot;
-
-  TIORingWriterSlot = record
-    Data: PByte;
-    FileOffset: Int64;
-    Length: Cardinal;             // bytes of its write in flight
-    Request: TIORingRequestHandle;
-  end;
-
   { Custom managed record: owns the file handle (if asked), its engine (if it made one) and the buffer memory, and
     releases them at the end of scope. Not copyable. }
   TIORingSequentialWriter = record
+  private
+    type
+      // One buffer
+      PSlot = ^TSlot;
+
+      TSlot = record
+        Data: PByte;
+        FileOffset: Int64;
+        Length: Cardinal;         // bytes of its write in flight
+        Request: TIORingRequestHandle;
+      end;
+
   private
     FEngine: TIORingEngine;
     FOwnsEngine: Boolean;
@@ -82,7 +84,7 @@ type
     FSectorSize: Cardinal;
     FMemory: PByte;
     FMemorySize: NativeUInt;      // for FreePages
-    FSlots: array of TIORingWriterSlot;
+    FSlots: array of TSlot;
     FBufferSize: Cardinal;
     FBufferCount: Cardinal;
     { The slots in flight are the oldest FInFlight ones from FInFlightHead; the slot after them is being
@@ -98,13 +100,13 @@ type
     FFailCode: Integer;           // native code; 0: a short write
     FFailContext: string;
     FErrorReported: Boolean;
-    FStats: TIORingWriterStats;
+    FStats: TIORingSequentialWriterStats;
 
     procedure CheckOpen;
     procedure CheckUsable;
     procedure RaiseFailure; {$IFNDEF FPC} noreturn; {$ENDIF}
-    function CurrentSlot: PIORingWriterSlot;
-    function WaitedFor(const ASlot: PIORingWriterSlot; const AWait: Boolean): Boolean;
+    function CurrentSlot: PSlot;
+    function WaitedFor(const ASlot: PSlot; const AWait: Boolean): Boolean;
     procedure CollectFinished;
     procedure WaitForOldest;
     procedure MakeCurrentFree;
@@ -162,7 +164,7 @@ type
     property Position: Int64 read FPosition;    // bytes accepted so far
     property BufferSize: Cardinal read FBufferSize;
     property BufferCount: Cardinal read FBufferCount;
-    property Stats: TIORingWriterStats read FStats;
+    property Stats: TIORingSequentialWriterStats read FStats;
   end;
 
 implementation
@@ -245,30 +247,9 @@ procedure TIORingSequentialWriter.Open(const AHandle: THandle; const AOwnsHandle
   const AOptions: TIORingSequentialWriterOptions; const ABufferSize, ABufferCount: Cardinal;
   const AEngine: TIORingEngine);
 
-  procedure RaiseBufferSizeNotMultiple(const ASize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
-  begin
-    RaiseIORingErrorFmt('Buffer size %d is not a multiple of %d', [ASize, IORING_WRITER_BUFFER_SIZE_UNIT]);
-  end;
-
-  procedure RaiseBufferCountOutOfRange(const ACount: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
-  begin
-    RaiseIORingErrorFmt('Buffer count %d is not between 1 and %d', [ACount, IORING_WRITER_MAX_BUFFER_COUNT]);
-  end;
-
-  procedure RaiseBuffersTooBig(const ACount: Cardinal; const ASize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
-  begin
-    RaiseIORingErrorFmt('%d buffers of %d bytes do not fit in memory', [ACount, ASize]);
-  end;
-
   procedure RaiseEngineTooSmall(const ACount: Cardinal; const AMaxRequests: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
   begin
     RaiseIORingErrorFmt('%d buffers need an engine of at least %d requests, not %d', [ACount, ACount, AMaxRequests]);
-  end;
-
-  procedure RaiseNotSectorMultiple(const ASectorSize: Cardinal); {$IFNDEF FPC} noreturn; {$ENDIF}
-  begin
-    RaiseIORingErrorFmt('Unbuffered writing needs a buffer size that is a multiple of the sector size %d',
-      [ASectorSize]);
   end;
 
 var
@@ -283,16 +264,8 @@ begin
   FOwnsFile := AOwnsHandle;
 
   try
-    if (ABufferSize = 0) or (ABufferSize mod IORING_WRITER_BUFFER_SIZE_UNIT <> 0) then
-      RaiseBufferSizeNotMultiple(ABufferSize);
-
-    if (ABufferCount = 0) or (ABufferCount > IORING_WRITER_MAX_BUFFER_COUNT) then
-      RaiseBufferCountOutOfRange(ABufferCount);
-
-    LTotalSize := UInt64(ABufferSize) * ABufferCount;
-
-    if LTotalSize > UInt64(High(NativeInt) div 2) then
-      RaiseBuffersTooBig(ABufferCount, ABufferSize);
+    LTotalSize := IORingCheckBufferArguments(ABufferSize, ABufferCount, IORING_WRITER_BUFFER_SIZE_UNIT,
+      IORING_WRITER_MAX_BUFFER_COUNT);
 
     if (AEngine <> nil) and (AEngine.MaxRequests < ABufferCount) then
       RaiseEngineTooSmall(ABufferCount, AEngine.MaxRequests);
@@ -302,9 +275,7 @@ begin
     if FUnbuffered then
     begin
       FSectorSize := TIORingPlatform.GetSectorSize(AHandle);
-
-      if ABufferSize mod FSectorSize <> 0 then
-        RaiseNotSectorMultiple(FSectorSize);
+      IORingCheckSectorMultiple(ABufferSize, FSectorSize);
     end;
 
     FBufferSize := ABufferSize;
@@ -449,12 +420,12 @@ end;
 
 { TIORingSequentialWriter - the buffers }
 
-function TIORingSequentialWriter.CurrentSlot: PIORingWriterSlot;
+function TIORingSequentialWriter.CurrentSlot: TIORingSequentialWriter.PSlot;
 begin
   Result := @FSlots[(FInFlightHead + FInFlight) mod FBufferCount];
 end;
 
-function TIORingSequentialWriter.WaitedFor(const ASlot: PIORingWriterSlot; const AWait: Boolean): Boolean;
+function TIORingSequentialWriter.WaitedFor(const ASlot: TIORingSequentialWriter.PSlot; const AWait: Boolean): Boolean;
 var
   LCompletion: TIORingCompletion;
 begin
@@ -523,7 +494,7 @@ end;
 
 procedure TIORingSequentialWriter.SubmitCurrent;
 var
-  LSlot: PIORingWriterSlot;
+  LSlot: PSlot;
 begin
   // A full buffer: written in the background; the next one is filled meanwhile
   LSlot := CurrentSlot;
@@ -545,7 +516,7 @@ end;
 
 procedure TIORingSequentialWriter.WritePartOfCurrent;
 var
-  LSlot: PIORingWriterSlot;
+  LSlot: PSlot;
   LLength: Cardinal;
 begin
   { The buffer stays the current one: when it is full, it is written again, whole, at the same offset - so every write

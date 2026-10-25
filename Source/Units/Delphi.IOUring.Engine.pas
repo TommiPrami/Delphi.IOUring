@@ -131,12 +131,13 @@ type
 
     function StartRequest(const AOperation: TIORingOp; const AFile: THandle; const ABuffer: Pointer;
       const ACount: Cardinal; const AOffset: UInt64; const AFlushMode: TIORingFlushMode;
-      const AUserData: NativeUInt; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
+      const AUserData: TIORingUserData; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
     function AcquireSlot: TIORingRequestHandle;
     procedure SlotReleased;
     procedure WakeIOThread;
     function WakeSleepingIOThread(const AExceptIndex: Integer): Boolean;
     function GetIOThreadCount: Integer;
+    function GetStats: TIORingEngineStats;
   public
     {
       AMaxRequests: requests that can be started and not yet waited for (or whose callback has not run);
@@ -158,11 +159,11 @@ type
       engine is being destroyed.
     }
     function ReadAsync(const AFile: THandle; var ABuffer; const ACount: Cardinal; const AOffset: UInt64;
-      const AUserData: NativeUInt = 0; const AOnComplete: TIORingCompletionEvent = nil): TIORingRequestHandle;
+      const AUserData: TIORingUserData = 0; const AOnComplete: TIORingCompletionEvent = nil): TIORingRequestHandle;
     function WriteAsync(const AFile: THandle; const ABuffer; const ACount: Cardinal; const AOffset: UInt64;
-      const AUserData: NativeUInt = 0; const AOnComplete: TIORingCompletionEvent = nil): TIORingRequestHandle;
+      const AUserData: TIORingUserData = 0; const AOnComplete: TIORingCompletionEvent = nil): TIORingRequestHandle;
     function FlushAsync(const AFile: THandle; const AMode: TIORingFlushMode = rfmDefault;
-      const AUserData: NativeUInt = 0; const AOnComplete: TIORingCompletionEvent = nil): TIORingRequestHandle;
+      const AUserData: TIORingUserData = 0; const AOnComplete: TIORingCompletionEvent = nil): TIORingRequestHandle;
 
     {
       Waits until the request has completed and returns its completion (UserData = the caller's value); the request is
@@ -181,13 +182,13 @@ type
     procedure BeginBatch;
     procedure EndBatch;
 
-    // All I/O threads added up
-    function Stats: TIORingEngineStats;
     // One I/O thread, 0..IOThreadCount - 1
     function IOThreadStats(const AIndex: Integer): TIORingEngineStats;
     // True if AThreadId is one of the engine's I/O threads
     function IsIOThread(const AThreadId: TThreadID): Boolean;
 
+    // All I/O threads added up
+    property Stats: TIORingEngineStats read GetStats;
     property MaxRequests: Cardinal read FMaxRequests;
     property IOThreadCount: Integer read GetIOThreadCount;
     property OverlapRule: TIORingOverlapRule read FOverlapRule;
@@ -216,7 +217,7 @@ type
     Buffer: Pointer;
     Count: Cardinal;
     Offset: UInt64;
-    UserData: NativeUInt;          // the caller's, back in the completion
+    UserData: TIORingUserData;     // the caller's, back in the completion
     OnComplete: TIORingCompletionEvent;
     NativeResult: Integer;
     BytesTransferred: NativeUInt;
@@ -245,6 +246,7 @@ type
     FRing: TIORing;
     FWakeEvent: THandle;          // auto-reset: "new requests" (or Destroy)
     FHasWakeEvent: Boolean;       // (on Linux, 0 is a valid file descriptor)
+    FCompletionEvent: THandle;    // the ring's, taken before anything is submitted
     FSleeping: PInteger;          // 1: sleeps (or is about to); on its own cache line
     FEnded: Integer;              // 1: Execute has ended (for WaitUntilEnded)
     // orKeepOrder: the requests of the file handles routed to this thread
@@ -416,6 +418,9 @@ begin
   end;
 
   FRing.Open(ASubmissionQueueSize);
+  { Now, before the first submission: on Linux the first call registers an eventfd, and a completion posted before
+    that would never signal it - the I/O thread then slept for good (a hang in a writer test, Phase 28) }
+  FCompletionEvent := FRing.CompletionEventHandle;
   FWakeEvent := TIORingPlatform.CreateWakeEvent;      // auto-reset
   FHasWakeEvent := True;
 end;
@@ -932,7 +937,7 @@ begin
   if not LStayAwake then
   begin
     CountStat(FStats.Sleeps);
-    TIORingPlatform.WaitForEvents(FWakeEvent, FRing.CompletionEventHandle);
+    TIORingPlatform.WaitForEvents(FWakeEvent, FCompletionEvent);
   end;
 
   // (If a producer claimed the wake-up meanwhile, its event comes later: one extra round, harmless)
@@ -1147,19 +1152,19 @@ end;
 { TIORingEngine - starting requests (any thread) }
 
 function TIORingEngine.ReadAsync(const AFile: THandle; var ABuffer; const ACount: Cardinal; const AOffset: UInt64;
-  const AUserData: NativeUInt; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
+  const AUserData: TIORingUserData; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
 begin
   Result := StartRequest(ioRead, AFile, @ABuffer, ACount, AOffset, rfmDefault, AUserData, AOnComplete);
 end;
 
 function TIORingEngine.WriteAsync(const AFile: THandle; const ABuffer; const ACount: Cardinal; const AOffset: UInt64;
-  const AUserData: NativeUInt; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
+  const AUserData: TIORingUserData; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
 begin
   Result := StartRequest(ioWrite, AFile, @ABuffer, ACount, AOffset, rfmDefault, AUserData, AOnComplete);
 end;
 
 function TIORingEngine.FlushAsync(const AFile: THandle; const AMode: TIORingFlushMode;
-  const AUserData: NativeUInt; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
+  const AUserData: TIORingUserData; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
 begin
   Result := StartRequest(ioFlush, AFile, nil, 0, 0, AMode, AUserData, AOnComplete);
 end;
@@ -1176,7 +1181,7 @@ end;
 
 function TIORingEngine.StartRequest(const AOperation: TIORingOp; const AFile: THandle; const ABuffer: Pointer;
   const ACount: Cardinal; const AOffset: UInt64; const AFlushMode: TIORingFlushMode;
-  const AUserData: NativeUInt; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
+  const AUserData: TIORingUserData; const AOnComplete: TIORingCompletionEvent): TIORingRequestHandle;
 var
   LHandle: TIORingRequestHandle;
   LRequest: PEngineRequest;
@@ -1415,7 +1420,7 @@ begin
     Wait(AHandles[LIndex], ACompletions[LIndex]);
 end;
 
-function TIORingEngine.Stats: TIORingEngineStats;
+function TIORingEngine.GetStats: TIORingEngineStats;
 var
   LIndex: Integer;
   LOne: TIORingEngineStats;

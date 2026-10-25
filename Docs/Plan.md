@@ -127,7 +127,7 @@ Source/
 
 - [x] `Delphi.IOUring.Backend.Custom`: neutral plain records, `EIORingError` (readable texts for `IORING_E_*`), `EIORingNotSupported`, `TIORingCompletion` helpers.
 - [x] `TWindowsIORing` **custom managed record** per Design §5.2: `Open`/`Close`, not copyable, ref conversion, all `Prepare*`, `Submit` with CQ-space guard, `TryPopCompletion`, `PopCompletions`, `WaitForCompletions`, completion event (pop-until-empty rule), pending-count tracking. `Close` **waits** for in-flight I/O (`CloseIoRing` does not cancel it – found in this phase).
-- [x] `Delphi.IOUring`: `TIORing` alias, `Available`, `QueryCapabilities`, blocking `ReadAt` / `WriteAt`.
+- [x] `Delphi.IOUring`: `TIORing` alias, `Available`, `QueryCapabilities`, blocking `IORingReadAt` / `IORingWriteAt`.
 - [x] Check generated code (Design §4.1 [VERIFY]): cost of a managed-record local (+2.3 ns Win32, +1.2 ns Win64), `const` passing by reference (yes), inlining of the public methods (dropped, Design §4).
 - [x] Tests (`Tests.Ring`, 26 tests, written against `TIORing`, so they can later run on Linux; files/pipes come from the new shared `TestPlatformHelpers`):
   - [x] Assigning one ring to another raises; ring is closed automatically at end of scope.
@@ -380,17 +380,80 @@ Only what a benchmark has already shown:
 
   **Done 2026-10-25** – ARM64: lock-free 1.00–8.76× the mutex (before: down to 0.67). x86 unchanged: Delphi 252 tests (Win32, Win64), FPC 251 (Win64), Linux 249 (WSL2).
 
-Small things, any time: run the Windows benchmarks once more (the shared
-benchmark code changed in Phase 21); close the last open question (Design
-§14); take the Linux build files under `Source/Benchmarks/FPC/Linux64` out
-of git (they are ignored now, but still tracked).
+## Milestone 7 – proposal (2026-10-25)
+
+Everything planned so far is built, tested on three systems and measured.
+What comes next depends most on how the library will be used, so this
+proposal has one tidy-up phase that is worth doing in any case, and then a
+choice.
+
+- **Phase 28 – Tidy up** (small things, collected; with the review, the
+  proposal is in Design §12.10 and waits for the decisions marked [DECIDE]):
+  - Old [VERIFY] markers that are answered: the AArch64 atomics and the
+    Linux API unit on ARM (Design §5.7, Phase 20 notes, and §6.4) –
+    verified in CI in Phases 23 and 27.
+  - The last open question of Design §14 (neutral `TIORingFileRef` /
+    `TIORingBufferRef` records against records with the OS's layout).
+    Proposed: close it – keep the neutral records; the conversion is a few
+    register moves and never showed in a benchmark.
+  - Run the Windows benchmarks again, locally (the shared benchmark code
+    changed in Phases 21–27), and bring Benchmarks.md up to date. (The
+    Linux build files are already out of git.)
+  - Coding style rule 3 (parameter records): look for groups of
+    parameters passed through many routines on the hot paths; change one
+    only where a benchmark shows a gain.
+
+- **[DECIDE] 1. The main direction after Phase 28** (one or more, in
+  order):
+  - a. **Linux sockets with typed methods** (Design §13): `PrepareSend`,
+    `PrepareRecv`, `PrepareAccept`, `PrepareConnect` on `TLinuxIORing`,
+    maybe through the engine – for servers on Linux. Linux only: Windows
+    IoRing has no socket operations.
+  - b. **Delphi for Linux** (Delphi's Linux64 compiler): the Linux backend
+    is Free Pascal only today (its units, its assembler). Needs Delphi
+    Enterprise and a Linux machine with PAServer – a bigger port.
+  - c. **A first tagged version, 0.1.0**, with a change log and an API
+    overview – you said not yet; perhaps when someone else starts to use it.
+  - d. **A real program of yours first:** take what a program you have in
+    mind needs from the library, build that, and measure there.
+
+  Proposed: Phase 28 first, then d. if you have such a program, otherwise a.
+
+  **Decided (2026-10-25):** Phase 28 first, with a wider scope: besides
+  the small things, a review of code quality, the API and its names, code
+  structure (easier to read), and small measurable gains in the atomics.
+  The review's findings come as a proposal first. Then **d.**: the library
+  goes into a real program of the owner's, to see whether the API fits or
+  needs more – after Phase 28. **a.** Linux sockets: low priority, a part of
+  the library of its own – a plan for it is enough for now. **b.** Delphi for
+  Linux: not now (no license here; open to someone who contributes it).
+  **c.** Tag 0.1.0 as the last step of Phase 28. The library may be renamed
+  **Pascal.IOUring** before that tag (it is as much Free Pascal as Delphi
+  now) – to be asked before it is done; GitHub keeps redirects from the old
+  name.
+- **[DECIDE] 2. The two unexplained findings on GitHub's runners**
+  (Benchmarks.md, [open]: on Linux read-ahead 8 beats 128; unbuffered, the
+  block reader on Windows is no faster than `ReadFile`). They can only be
+  looked into with benchmarks on the runners. Proposed: park them (Design
+  §13) – slow cloud disks, not the machines the library is for. Other choice:
+  look into them with a hand-started workflow, as in Phase 27.
+
+- **Phase 28** – Tidy up before 0.1.0: review of code, API, names and structure. Decided: Design §12.10 – all six points as proposed.
+  - [x] API names (2): `ATimeoutMilliseconds`, only `IORING_INFINITE`, `TIORingSequentialReaderStats` / `TIORingSequentialWriterStats`, `TIORingEngine.Stats` a property, `IORingReadAt` / `IORingWriteAt`, `TIORingUserData` in the engine.
+  - [x] Internal types nested in the records that use them (3): slots of the readers and the writer, the queue's cells, the free list's links.
+  - [x] Platform units of their own (4): `Delphi.IOUring.Backend.Windows.Platform`, `Delphi.IOUring.Backend.Posix.Platform` (in the Lazarus package); one buffer check for the reader and the writer (`IORingCheckBufferArguments`, `IORingCheckSectorMultiple`).
+  - [x] The Linux clock (5): measured in WSL2 with the Blocks benchmark (new option `--cache`), six rounds – no gain, FPC's clock stays; `IORING_CLOCK_LIBC` for comparing. The ARM64 workflow ("ARM64 benchmarks") can measure it on the runner (`benchmark: clock`).
+  - [x] Found on the way: a rare hang of the engine on Linux (a completion before the ring's eventfd was registered) – fixed; the Linux tests then passed 10 runs in a row.
+  - [x] Small things (6): §14 closed (neutral ref records stay); answered [VERIFY] and [DECIDE later] markers removed; the two findings of GitHub's runners parked (§13); a plan for Linux sockets (§13).
+  - [x] The Windows benchmarks again, locally (Delphi Win64; Benchmarks.md, "The Windows numbers again"): the same as before or better; nothing the library does got slower.
+  - [x] Tests (2026-10-25): Delphi 252 (Win32 and Win64, Debug and Release), FPC 251 (Win32 and Win64, with and without `-O3`; trunk on Win64), Linux 249 (WSL2, debug and `-O3`, 10 runs in a row after the fix); the demos run on Win64 and Linux; the benchmarks and the Lazarus package compile.
+  - [ ] Unit names and the library's new name (1) – asked first; then the tag 0.1.0 (by the owner).
 
 ---
 
 ## Immediate next step
 
-Milestone 6 is done: big `Read` calls read straight into the caller's
-memory (Phase 26, Design §12.8), and the atomics on AArch64 are assembler
-routines with an `isb` spin hint – lock-free now beats the mutex everywhere
-on ARM64 (Phase 27, Design §12.9). Next: a proposal for what comes after
-Milestone 6 (and the small things listed above).
+Phase 28 (Milestone 7) is built and tested, except its last step: the new
+names (the library Pascal.IOUring and the unit names of Design §12.10,
+decision 1) are to be asked before they are done, then the owner tags
+0.1.0. After that the library goes into a real program (decided d.).

@@ -1,18 +1,26 @@
-# The atomics on AArch64 (Docs/Design.md §12.9, Phase 27). Started by hand only (Actions > ARM64 atomics > Run
-# workflow): the only AArch64 machine at hand is GitHub's ARM64 runner. The tests (debug build and -O3), then the
-# Structures benchmark built with each way of doing the atomics and run in turns. The tables become annotations of
-# the run and the job summary; the outputs are an artifact. The CI on every push runs no benchmarks.
+# Benchmarks on AArch64, started by hand only (Actions > ARM64 benchmarks > Run workflow): the only AArch64 machine at
+# hand is GitHub's ARM64 runner. The tests (debug build and -O3), then one benchmark built in several variants and run
+# in turns: the atomics (Docs/Design.md §12.9, Phase 27) or the clock of the engine's wait spin (§12.10, Phase 28).
+# The tables become annotations of the run and the job summary; the outputs are an artifact. The CI on every push runs
+# no benchmarks.
 
-name: ARM64 atomics
+name: ARM64 benchmarks
 
 on:
   workflow_dispatch:
     inputs:
+      benchmark:
+        description: 'What to measure'
+        type: choice
+        options:
+          - atomics
+          - clock
+        default: atomics
       rounds:
         description: 'How many times each variant runs'
         default: '2'
       threads:
-        description: 'Thread counts'
+        description: 'Thread counts (atomics only)'
         default: '1,2,4'
 
 permissions:
@@ -50,11 +58,16 @@ jobs:
         run: ./.github/scripts/Invoke-Tests.ps1 -Optimize
 
       - name: Structures benchmark, the atomics variants in turns
-        run: ./.github/scripts/Measure-Atomics.ps1 -Rounds ${{ inputs.rounds }} -Threads '${{ inputs.threads }}' -OutputFolder "$env:RUNNER_TEMP/atomics"
+        if: inputs.benchmark == 'atomics'
+        run: ./.github/scripts/Measure-Atomics.ps1 -Rounds ${{ inputs.rounds }} -Threads '${{ inputs.threads }}' -OutputFolder "$env:RUNNER_TEMP/results"
+
+      - name: Blocks benchmark, the two clocks in turns
+        if: inputs.benchmark == 'clock'
+        run: ./.github/scripts/Measure-Clock.ps1 -Rounds ${{ inputs.rounds }} -OutputFolder "$env:RUNNER_TEMP/results"
 
       - name: Keep the outputs
         if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
-          name: arm64-atomics
-          path: ${{ runner.temp }}/atomics/*.txt
+          name: arm64-${{ inputs.benchmark }}
+          path: ${{ runner.temp }}/results/*.txt

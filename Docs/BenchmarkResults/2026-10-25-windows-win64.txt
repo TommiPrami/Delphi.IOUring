@@ -1,0 +1,490 @@
+Phase 28 (Docs/Benchmarks.md, "The Windows numbers again"): the four benchmarks, Delphi 13, Win64 Release, 2026-10-25, one after the other on an otherwise idle machine.
+  Delphi.IOUring.Benchmarks.exe --sizes 1,10 --runs 3
+  Delphi.IOUring.Benchmarks.Structures.exe --runs 3
+  Delphi.IOUring.Benchmarks.Blocks.exe --runs 3
+  Delphi.IOUring.Benchmarks.Writes.exe --sizes 1,10 --runs 3
+
+=== readers
+Platform:  Win64, Delphi compiler 37.0
+CPU:       Intel(R) Core(TM) i7-14700, 28 logical processors
+Memory:    63.6 GiB
+Windows:   10.0 build 26300
+IoRing:    version 400, max SQ 65536, emulated False
+Files in:  C:\Users\TOMMI~1.PRA\AppData\Local\Temp\Delphi.IOUring.Bench
+
+Creating C:\Users\TOMMI~1.PRA\AppData\Local\Temp\Delphi.IOUring.Bench\Bench-1GiB.bin ... 0.8 s
+Creating C:\Users\TOMMI~1.PRA\AppData\Local\Temp\Delphi.IOUring.Bench\Bench-10GiB.bin ... 8.0 s
+Cache purge check (TFileStream 64 KiB reads): warm 0.153 s, after purge 0.581 s -> purge works
+
+--- 1 GiB, read-through, cold cache ---
+  run 1  TFileStream 64 KiB reads                           0.591 s
+  run 1  TFileStream 1 MiB reads                            0.424 s
+  run 1  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.306 s
+  run 1  ReadFile 1 MiB, sequential scan                    0.289 s
+  run 1  ReadFile 1 MiB, no sequential-scan hint            0.290 s
+  run 1  Overlapped ReadFile 1 MiB x 8                      0.153 s
+  run 1  4 threads, ReadFile 1 MiB                          0.160 s
+  run 1  IoRing stream, 64 KiB reads                        0.153 s
+  run 1  IoRing reader, zero-copy                           0.153 s
+  run 1  IoRing reader, zero-copy, no seq.-scan hint        0.153 s
+  run 1  Overlapped ReadFile 1 MiB x 8, unbuffered          0.282 s
+  run 1  IoRing stream, 64 KiB reads, unbuffered            0.258 s
+  run 1  IoRing reader, zero-copy, unbuffered               0.154 s
+  run 2  TFileStream 64 KiB reads                           0.711 s
+  run 2  TFileStream 1 MiB reads                            0.288 s
+  run 2  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.288 s
+  run 2  ReadFile 1 MiB, sequential scan                    0.286 s
+  run 2  ReadFile 1 MiB, no sequential-scan hint            0.287 s
+  run 2  Overlapped ReadFile 1 MiB x 8                      0.154 s
+  run 2  4 threads, ReadFile 1 MiB                          0.163 s
+  run 2  IoRing stream, 64 KiB reads                        0.153 s
+  run 2  IoRing reader, zero-copy                           0.152 s
+  run 2  IoRing reader, zero-copy, no seq.-scan hint        0.152 s
+  run 2  Overlapped ReadFile 1 MiB x 8, unbuffered          0.281 s
+  run 2  IoRing stream, 64 KiB reads, unbuffered            0.279 s
+  run 2  IoRing reader, zero-copy, unbuffered               0.169 s
+  run 3  TFileStream 64 KiB reads                           0.700 s
+  run 3  TFileStream 1 MiB reads                            0.305 s
+  run 3  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.306 s
+  run 3  ReadFile 1 MiB, sequential scan                    0.321 s
+  run 3  ReadFile 1 MiB, no sequential-scan hint            0.303 s
+  run 3  Overlapped ReadFile 1 MiB x 8                      0.159 s
+  run 3  4 threads, ReadFile 1 MiB                          0.169 s
+  run 3  IoRing stream, 64 KiB reads                        0.157 s
+  run 3  IoRing reader, zero-copy                           0.154 s
+  run 3  IoRing reader, zero-copy, no seq.-scan hint        0.153 s
+  run 3  Overlapped ReadFile 1 MiB x 8, unbuffered          0.282 s
+  run 3  IoRing stream, 64 KiB reads, unbuffered            0.281 s
+  run 3  IoRing reader, zero-copy, unbuffered               0.158 s
+                                                                               
+Win64, 1 GiB, read-through, cold cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.700      1463        63        94       0
+  TFileStream 1 MiB reads                             0.305      3354        31       109       0
+  TBufferedFileStream 1 MiB buffer, 64 KiB reads      0.306      3350        47       109       0
+  ReadFile 1 MiB, sequential scan                     0.289      3541        31       109       0
+  ReadFile 1 MiB, no sequential-scan hint             0.290      3527        16       109       0
+  Overlapped ReadFile 1 MiB x 8                       0.154      6657        31        47       0
+  Overlapped ReadFile 1 MiB x 8, unbuffered           0.282      3637        16        16       0
+  4 threads, ReadFile 1 MiB                           0.163      6269        31        78       0
+  IoRing stream, 64 KiB reads                         0.153      6707        31        47     930
+  IoRing stream, 64 KiB reads, unbuffered             0.279      3670        31         0    1024
+  IoRing reader, zero-copy                            0.153      6693        16        31     937
+  IoRing reader, zero-copy, no seq.-scan hint         0.153      6712        31        16     949
+  IoRing reader, zero-copy, unbuffered                0.158      6461        47        16    1016
+
+--- 1 GiB, read-through, warm cache ---
+  run 1  TFileStream 64 KiB reads                           0.153 s
+  run 1  TFileStream 1 MiB reads                            0.146 s
+  run 1  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.161 s
+  run 1  ReadFile 1 MiB, sequential scan                    0.140 s
+  run 1  ReadFile 1 MiB, no sequential-scan hint            0.134 s
+  run 1  Overlapped ReadFile 1 MiB x 8                      0.150 s
+  run 1  4 threads, ReadFile 1 MiB                          0.056 s
+  run 1  IoRing stream, 64 KiB reads                        0.176 s
+  run 1  IoRing reader, zero-copy                           0.148 s
+  run 1  IoRing reader, zero-copy, no seq.-scan hint        0.151 s
+  run 2  TFileStream 64 KiB reads                           0.155 s
+  run 2  TFileStream 1 MiB reads                            0.135 s
+  run 2  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.153 s
+  run 2  ReadFile 1 MiB, sequential scan                    0.136 s
+  run 2  ReadFile 1 MiB, no sequential-scan hint            0.136 s
+  run 2  Overlapped ReadFile 1 MiB x 8                      0.143 s
+  run 2  4 threads, ReadFile 1 MiB                          0.057 s
+  run 2  IoRing stream, 64 KiB reads                        0.166 s
+  run 2  IoRing reader, zero-copy                           0.148 s
+  run 2  IoRing reader, zero-copy, no seq.-scan hint        0.145 s
+  run 3  TFileStream 64 KiB reads                           0.152 s
+  run 3  TFileStream 1 MiB reads                            0.134 s
+  run 3  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.150 s
+  run 3  ReadFile 1 MiB, sequential scan                    0.133 s
+  run 3  ReadFile 1 MiB, no sequential-scan hint            0.135 s
+  run 3  Overlapped ReadFile 1 MiB x 8                      0.139 s
+  run 3  4 threads, ReadFile 1 MiB                          0.058 s
+  run 3  IoRing stream, 64 KiB reads                        0.164 s
+  run 3  IoRing reader, zero-copy                           0.146 s
+  run 3  IoRing reader, zero-copy, no seq.-scan hint        0.148 s
+                                                                               
+Win64, 1 GiB, read-through, warm cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.153      6713        16       141       0
+  TFileStream 1 MiB reads                             0.135      7575        16       109       0
+  TBufferedFileStream 1 MiB buffer, 64 KiB reads      0.153      6672        31       125       0
+  ReadFile 1 MiB, sequential scan                     0.136      7531        31       109       0
+  ReadFile 1 MiB, no sequential-scan hint             0.135      7558        16       125       0
+  Overlapped ReadFile 1 MiB x 8                       0.143      7153        47       109       0
+  4 threads, ReadFile 1 MiB                           0.057     17901        94        94       0
+  IoRing stream, 64 KiB reads                         0.166      6153        78        94       0
+  IoRing reader, zero-copy                            0.148      6925        31       125       0
+  IoRing reader, zero-copy, no seq.-scan hint         0.148      6924        31       125       0
+
+--- 1 GiB, work, cold cache ---
+  run 1  TFileStream 64 KiB reads                           0.724 s
+  run 1  TFileStream 1 MiB reads                            0.332 s
+  run 1  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.333 s
+  run 1  ReadFile 1 MiB, sequential scan                    0.329 s
+  run 1  ReadFile 1 MiB, no sequential-scan hint            0.322 s
+  run 1  Overlapped ReadFile 1 MiB x 8                      0.271 s
+  run 1  IoRing stream, 64 KiB reads                        0.302 s
+  run 1  IoRing reader, zero-copy                           0.273 s
+  run 1  IoRing reader, zero-copy, no seq.-scan hint        0.279 s
+  run 1  Overlapped ReadFile 1 MiB x 8, unbuffered          0.281 s
+  run 1  IoRing stream, 64 KiB reads, unbuffered            0.282 s
+  run 1  IoRing reader, zero-copy, unbuffered               0.268 s
+  run 2  TFileStream 64 KiB reads                           0.858 s
+  run 2  TFileStream 1 MiB reads                            0.314 s
+  run 2  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.322 s
+  run 2  ReadFile 1 MiB, sequential scan                    0.317 s
+  run 2  ReadFile 1 MiB, no sequential-scan hint            0.321 s
+  run 2  Overlapped ReadFile 1 MiB x 8                      0.270 s
+  run 2  IoRing stream, 64 KiB reads                        0.289 s
+  run 2  IoRing reader, zero-copy                           0.275 s
+  run 2  IoRing reader, zero-copy, no seq.-scan hint        0.273 s
+  run 2  Overlapped ReadFile 1 MiB x 8, unbuffered          0.269 s
+  run 2  IoRing stream, 64 KiB reads, unbuffered            0.271 s
+  run 2  IoRing reader, zero-copy, unbuffered               0.249 s
+  run 3  TFileStream 64 KiB reads                           0.855 s
+  run 3  TFileStream 1 MiB reads                            0.317 s
+  run 3  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.334 s
+  run 3  ReadFile 1 MiB, sequential scan                    0.318 s
+  run 3  ReadFile 1 MiB, no sequential-scan hint            0.319 s
+  run 3  Overlapped ReadFile 1 MiB x 8                      0.270 s
+  run 3  IoRing stream, 64 KiB reads                        0.287 s
+  run 3  IoRing reader, zero-copy                           0.270 s
+  run 3  IoRing reader, zero-copy, no seq.-scan hint        0.273 s
+  run 3  Overlapped ReadFile 1 MiB x 8, unbuffered          0.277 s
+  run 3  IoRing stream, 64 KiB reads, unbuffered            0.277 s
+  run 3  IoRing reader, zero-copy, unbuffered               0.277 s
+                                                                               
+Win64, 1 GiB, work, cold cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.855      1198       250       156       0
+  TFileStream 1 MiB reads                             0.317      3228       266        47       0
+  TBufferedFileStream 1 MiB buffer, 64 KiB reads      0.333      3076       234        94       0
+  ReadFile 1 MiB, sequential scan                     0.318      3217       250        63       0
+  ReadFile 1 MiB, no sequential-scan hint             0.321      3191       234        63       0
+  Overlapped ReadFile 1 MiB x 8                       0.270      3787       203        47       0
+  Overlapped ReadFile 1 MiB x 8, unbuffered           0.277      3692       219        31       0
+  IoRing stream, 64 KiB reads                         0.289      3548       250        31       1
+  IoRing stream, 64 KiB reads, unbuffered             0.277      3701       250         0     213
+  IoRing reader, zero-copy                            0.273      3751       250        31       3
+  IoRing reader, zero-copy, no seq.-scan hint         0.273      3746       250        31       3
+  IoRing reader, zero-copy, unbuffered                0.268      3828       219        16     421
+
+--- 1 GiB, work, warm cache ---
+  run 1  TFileStream 64 KiB reads                           0.360 s
+  run 1  TFileStream 1 MiB reads                            0.339 s
+  run 1  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.357 s
+  run 1  ReadFile 1 MiB, sequential scan                    0.339 s
+  run 1  ReadFile 1 MiB, no sequential-scan hint            0.342 s
+  run 1  Overlapped ReadFile 1 MiB x 8                      0.344 s
+  run 1  IoRing stream, 64 KiB reads                        0.372 s
+  run 1  IoRing reader, zero-copy                           0.353 s
+  run 1  IoRing reader, zero-copy, no seq.-scan hint        0.355 s
+  run 2  TFileStream 64 KiB reads                           0.365 s
+  run 2  TFileStream 1 MiB reads                            0.345 s
+  run 2  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.355 s
+  run 2  ReadFile 1 MiB, sequential scan                    0.338 s
+  run 2  ReadFile 1 MiB, no sequential-scan hint            0.344 s
+  run 2  Overlapped ReadFile 1 MiB x 8                      0.346 s
+  run 2  IoRing stream, 64 KiB reads                        0.371 s
+  run 2  IoRing reader, zero-copy                           0.351 s
+  run 2  IoRing reader, zero-copy, no seq.-scan hint        0.352 s
+  run 3  TFileStream 64 KiB reads                           0.358 s
+  run 3  TFileStream 1 MiB reads                            0.341 s
+  run 3  TBufferedFileStream 1 MiB buffer, 64 KiB reads     0.355 s
+  run 3  ReadFile 1 MiB, sequential scan                    0.339 s
+  run 3  ReadFile 1 MiB, no sequential-scan hint            0.340 s
+  run 3  Overlapped ReadFile 1 MiB x 8                      0.346 s
+  run 3  IoRing stream, 64 KiB reads                        0.372 s
+  run 3  IoRing reader, zero-copy                           0.349 s
+  run 3  IoRing reader, zero-copy, no seq.-scan hint        0.348 s
+                                                                               
+Win64, 1 GiB, work, warm cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            0.360      2847       234       125       0
+  TFileStream 1 MiB reads                             0.341      3003       266        78       0
+  TBufferedFileStream 1 MiB buffer, 64 KiB reads      0.355      2884       313        47       0
+  ReadFile 1 MiB, sequential scan                     0.339      3024       172       156       0
+  ReadFile 1 MiB, no sequential-scan hint             0.342      2992       250        94       0
+  Overlapped ReadFile 1 MiB x 8                       0.346      2963       234       109       0
+  IoRing stream, 64 KiB reads                         0.372      2756       250       125       0
+  IoRing reader, zero-copy                            0.351      2917       219       141       0
+  IoRing reader, zero-copy, no seq.-scan hint         0.352      2909       266        78       0
+
+--- 10 GiB, read-through, cold cache ---
+  run 1  TFileStream 64 KiB reads                           6.409 s
+  run 1  TFileStream 1 MiB reads                            4.130 s
+  run 1  TBufferedFileStream 1 MiB buffer, 64 KiB reads     4.156 s
+  run 1  ReadFile 1 MiB, sequential scan                    4.044 s
+  run 1  ReadFile 1 MiB, no sequential-scan hint            4.044 s
+  run 1  Overlapped ReadFile 1 MiB x 8                      1.522 s
+  run 1  4 threads, ReadFile 1 MiB                          1.561 s
+  run 1  IoRing stream, 64 KiB reads                        1.514 s
+  run 1  IoRing reader, zero-copy                           1.512 s
+  run 1  IoRing reader, zero-copy, no seq.-scan hint        1.543 s
+  run 1  Overlapped ReadFile 1 MiB x 8, unbuffered          1.509 s
+  run 1  IoRing stream, 64 KiB reads, unbuffered            1.510 s
+  run 1  IoRing reader, zero-copy, unbuffered               1.511 s
+  run 2  TFileStream 64 KiB reads                           5.932 s
+  run 2  TFileStream 1 MiB reads                            4.063 s
+  run 2  TBufferedFileStream 1 MiB buffer, 64 KiB reads     4.100 s
+  run 2  ReadFile 1 MiB, sequential scan                    4.064 s
+  run 2  ReadFile 1 MiB, no sequential-scan hint            4.049 s
+  run 2  Overlapped ReadFile 1 MiB x 8                      1.517 s
+  run 2  4 threads, ReadFile 1 MiB                          1.541 s
+  run 2  IoRing stream, 64 KiB reads                        1.534 s
+  run 2  IoRing reader, zero-copy                           1.525 s
+  run 2  IoRing reader, zero-copy, no seq.-scan hint        1.526 s
+  run 2  Overlapped ReadFile 1 MiB x 8, unbuffered          1.508 s
+  run 2  IoRing stream, 64 KiB reads, unbuffered            1.508 s
+  run 2  IoRing reader, zero-copy, unbuffered               1.509 s
+  run 3  TFileStream 64 KiB reads                           6.986 s
+  run 3  TFileStream 1 MiB reads                            4.121 s
+  run 3  TBufferedFileStream 1 MiB buffer, 64 KiB reads     4.098 s
+  run 3  ReadFile 1 MiB, sequential scan                    4.144 s
+  run 3  ReadFile 1 MiB, no sequential-scan hint            4.131 s
+  run 3  Overlapped ReadFile 1 MiB x 8                      1.526 s
+  run 3  4 threads, ReadFile 1 MiB                          1.593 s
+  run 3  IoRing stream, 64 KiB reads                        1.538 s
+  run 3  IoRing reader, zero-copy                           1.526 s
+  run 3  IoRing reader, zero-copy, no seq.-scan hint        1.536 s
+  run 3  Overlapped ReadFile 1 MiB x 8, unbuffered          1.509 s
+  run 3  IoRing stream, 64 KiB reads, unbuffered            1.518 s
+  run 3  IoRing reader, zero-copy, unbuffered               1.509 s
+                                                                               
+Win64, 10 GiB, read-through, cold cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            6.409      1598       281      1344       0
+  TFileStream 1 MiB reads                             4.121      2485       297       953       0
+  TBufferedFileStream 1 MiB buffer, 64 KiB reads      4.100      2498       391      1047       0
+  ReadFile 1 MiB, sequential scan                     4.064      2520       297       938       0
+  ReadFile 1 MiB, no sequential-scan hint             4.049      2529       250      1016       0
+  Overlapped ReadFile 1 MiB x 8                       1.522      6728       344       266       0
+  Overlapped ReadFile 1 MiB x 8, unbuffered           1.509      6787       250       266       0
+  4 threads, ReadFile 1 MiB                           1.561      6561       313      1219       0
+  IoRing stream, 64 KiB reads                         1.534      6676       594       219    6207
+  IoRing stream, 64 KiB reads, unbuffered             1.510      6780       531       188   10144
+  IoRing reader, zero-copy                            1.525      6715       422       250    6862
+  IoRing reader, zero-copy, no seq.-scan hint         1.536      6668       406       297    5913
+  IoRing reader, zero-copy, unbuffered                1.509      6787       359       109   10227
+
+--- 10 GiB, read-through, warm cache ---
+  run 1  TFileStream 64 KiB reads                           1.547 s
+  run 1  TFileStream 1 MiB reads                            1.382 s
+  run 1  TBufferedFileStream 1 MiB buffer, 64 KiB reads     1.528 s
+  run 1  ReadFile 1 MiB, sequential scan                    1.430 s
+  run 1  ReadFile 1 MiB, no sequential-scan hint            1.412 s
+  run 1  Overlapped ReadFile 1 MiB x 8                      1.472 s
+  run 1  4 threads, ReadFile 1 MiB                          0.565 s
+  run 1  IoRing stream, 64 KiB reads                        1.714 s
+  run 1  IoRing reader, zero-copy                           1.517 s
+  run 1  IoRing reader, zero-copy, no seq.-scan hint        1.531 s
+  run 2  TFileStream 64 KiB reads                           1.567 s
+  run 2  TFileStream 1 MiB reads                            1.407 s
+  run 2  TBufferedFileStream 1 MiB buffer, 64 KiB reads     1.527 s
+  run 2  ReadFile 1 MiB, sequential scan                    1.360 s
+  run 2  ReadFile 1 MiB, no sequential-scan hint            1.365 s
+  run 2  Overlapped ReadFile 1 MiB x 8                      1.527 s
+  run 2  4 threads, ReadFile 1 MiB                          0.556 s
+  run 2  IoRing stream, 64 KiB reads                        1.683 s
+  run 2  IoRing reader, zero-copy                           1.490 s
+  run 2  IoRing reader, zero-copy, no seq.-scan hint        1.486 s
+  run 3  TFileStream 64 KiB reads                           1.543 s
+  run 3  TFileStream 1 MiB reads                            1.376 s
+  run 3  TBufferedFileStream 1 MiB buffer, 64 KiB reads     1.537 s
+  run 3  ReadFile 1 MiB, sequential scan                    1.373 s
+  run 3  ReadFile 1 MiB, no sequential-scan hint            1.374 s
+  run 3  Overlapped ReadFile 1 MiB x 8                      1.436 s
+  run 3  4 threads, ReadFile 1 MiB                          0.537 s
+  run 3  IoRing stream, 64 KiB reads                        1.673 s
+  run 3  IoRing reader, zero-copy                           1.507 s
+  run 3  IoRing reader, zero-copy, no seq.-scan hint        1.500 s
+                                                                               
+Win64, 10 GiB, read-through, warm cache (median of 3 runs)
+  Contender                                         Seconds     MiB/s   User ms Kernel ms  Stalls
+  TFileStream 64 KiB reads                            1.547      6621       281      1297       0
+  TFileStream 1 MiB reads                             1.382      7408       250      1109       0
+  TBufferedFileStream 1 MiB buffer, 64 KiB reads      1.528      6702       484      1047       0
+  ReadFile 1 MiB, sequential scan                     1.373      7461       234      1125       0
+  ReadFile 1 MiB, no sequential-scan hint             1.374      7453       297      1078       0
+  Overlapped ReadFile 1 MiB x 8                       1.472      6956       281      1203       0
+  4 threads, ReadFile 1 MiB                           0.556     18425       406      1563       0
+  IoRing stream, 64 KiB reads                         1.683      6084       453      1172       0
+  IoRing reader, zero-copy                            1.507      6793       313      1141       0
+  IoRing reader, zero-copy, no seq.-scan hint         1.500      6828       219      1234       0
+
+
+=== structures
+Engine structures: Delphi Win64, 28 logical processors, 2026-10-25 10:30
+
+Free list: take one index, (work,) give it back.
+Mops/s = million take+give pairs per second, all threads; median of 3 runs.
+CPU ms = CPU time of all threads for the run (median).
+
+Scenario   Threads   lock-free    SRW lock    LF/SRW    LF CPU ms   SRW CPU ms
+                        Mops/s      Mops/s                                    
+tight            1       64.92       47.19      1.38           63           94
+tight            2       56.62       37.86      1.50          141          188
+tight            4       55.60       23.24      2.39          219          688
+tight            8       44.41       12.18      3.64          578         2609
+tight           16       35.60        4.88      7.30         1391        12844
+tight           28       16.26        2.99      5.43         5828        34359
+work 1 us        1        0.99        0.99      1.00          406          406
+work 1 us        2        1.99        1.97      1.01          406          406
+work 1 us        4        3.96        2.60      1.53          375          563
+work 1 us        8        4.30        2.70      1.60          641         1078
+work 1 us       16        3.62        1.82      1.99         1688         3078
+work 1 us       28        2.90        1.45      2.00         3453         6297
+
+Request queue: N producers put values in, one consumer takes them out.
+Threads = producers (plus the consumer). Mops/s = million values per second; median of 3 runs.
+CPU ms = CPU time of all threads for the run (median).
+
+Scenario   Threads   lock-free    SRW lock    LF/SRW    LF CPU ms   SRW CPU ms
+                        Mops/s      Mops/s                                    
+tight            1       94.10       22.97      4.10           94          344
+tight            2       65.88       14.37      4.58          188          844
+tight            4       61.91        3.72     16.64          297         5313
+tight            8       47.41        0.99     47.78          609        34469
+tight           16       28.28        0.14    197.77         1766       362828
+tight           27       18.89        0.07    255.23         4547      1109938
+work 1 us        1        0.99        0.99      1.00          813          813
+work 1 us        2        1.99        1.73      1.15          609          688
+work 1 us        4        3.86        2.32      1.67          531          844
+work 1 us        8        5.57        2.75      2.02          688         1266
+work 1 us       16        4.75        0.18     25.87         1250        29609
+work 1 us       27        3.81        0.08     50.35         2578       108500
+
+=== blocks
+Blocks known in advance: Delphi Win64, 2026-10-25 10:36
+Creating C:\Users\TOMMI~1.PRA\AppData\Local\Temp\Delphi.IOUring.Bench\blocks-4GiB.dat (4 GiB) ... done
+20000 blocks of 4096 bytes per list; median of 3 runs
+
+random 4 KiB, cold cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                      15.2      59.3       156
+  ReadFile at offset                                            15.1      59.1       203
+  ReadFile at offset, 8 threads                                114.7     448.2       281
+  Block reader, read-ahead 1                                    12.7      49.7       406
+  Block reader, read-ahead 8                                    76.7     299.7       234
+  Block reader, read-ahead 32                                   85.8     335.2       234
+  Block reader, read-ahead 128                                 142.5     556.8       172
+  Block reader, read-ahead 128, 2 I/O threads                  144.7     565.3       203
+  Block reader, read-ahead 128, 4 I/O threads                  142.8     558.0       203
+  Block reader, read-ahead 128, overlap rule                   144.1     562.9       156
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule       146.0     570.3       156
+  Block reader, read-ahead 32, synchronous handle               15.1      59.0       281
+
+random 4 KiB, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                     308.5    1205.0        63
+  ReadFile at offset                                           326.4    1274.8        63
+  ReadFile at offset, 8 threads                                452.8    1768.7       219
+  Block reader, read-ahead 1                                   102.8     401.4       328
+  Block reader, read-ahead 8                                   242.2     946.1       125
+  Block reader, read-ahead 32                                  273.5    1068.2        78
+  Block reader, read-ahead 128                                 274.1    1070.6        63
+  Block reader, read-ahead 128, 2 I/O threads                  367.1    1433.9       141
+  Block reader, read-ahead 128, 4 I/O threads                  439.7    1717.7       188
+  Block reader, read-ahead 128, overlap rule                   264.9    1035.0        78
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule       265.3    1036.4        63
+  Block reader, read-ahead 32, synchronous handle              269.9    1054.4        78
+
+random 4 KiB, unbuffered cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  ReadFile at offset                                            19.3      75.6       109
+  ReadFile at offset, 8 threads                                118.3     462.3       125
+  Block reader, read-ahead 1                                    14.8      57.9       469
+  Block reader, read-ahead 8                                   100.8     393.9       203
+  Block reader, read-ahead 32                                  127.6     498.4       109
+  Block reader, read-ahead 128                                 129.9     507.5       125
+  Block reader, read-ahead 128, 2 I/O threads                  226.6     885.1       141
+  Block reader, read-ahead 128, 4 I/O threads                  407.9    1593.3       141
+  Block reader, read-ahead 128, overlap rule                   129.0     504.0       109
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule       129.3     505.2        78
+  Block reader, read-ahead 32, synchronous handle               19.8      77.2        78
+
+sorted, gaps, cold cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                      16.7      65.1       156
+  ReadFile at offset                                            16.4      63.9       109
+  ReadFile at offset, 8 threads                                116.0     453.1       219
+  Block reader, read-ahead 1                                    14.4      56.4       281
+  Block reader, read-ahead 8                                    86.8     339.2       234
+  Block reader, read-ahead 32                                  100.5     392.8       156
+  Block reader, read-ahead 128                                 171.0     668.1       109
+  Block reader, read-ahead 128, 2 I/O threads                  170.8     667.2       172
+  Block reader, read-ahead 128, 4 I/O threads                  169.0     660.2       203
+  Block reader, read-ahead 128, overlap rule                   172.2     672.5       125
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule       173.8     678.9       109
+  Block reader, read-ahead 32, MaxGap 32 KiB                   337.7    1319.3        16
+  Block reader, read-ahead 32, synchronous handle               17.4      68.1       156
+
+sorted, gaps, warm cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  TFileStream, Seek + Read                                     430.6    1682.1        47
+  ReadFile at offset                                           471.6    1842.3        47
+  ReadFile at offset, 8 threads                                618.8    2417.2       156
+  Block reader, read-ahead 1                                   133.2     520.2       219
+  Block reader, read-ahead 8                                   371.5    1451.1       109
+  Block reader, read-ahead 32                                  406.6    1588.4        63
+  Block reader, read-ahead 128                                 415.0    1621.1        47
+  Block reader, read-ahead 128, 2 I/O threads                  589.1    2301.3        94
+  Block reader, read-ahead 128, 4 I/O threads                  805.4    3146.1        63
+  Block reader, read-ahead 128, overlap rule                   389.6    1521.7        63
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule       392.6    1533.7        63
+  Block reader, read-ahead 32, MaxGap 32 KiB                   393.7    1537.8        63
+  Block reader, read-ahead 32, synchronous handle              395.3    1544.1        47
+
+sorted, gaps, unbuffered cache
+  Contender                                               K blocks/s     MiB/s    CPU ms
+  ReadFile at offset                                            17.6      68.9       109
+  ReadFile at offset, 8 threads                                125.8     491.3       203
+  Block reader, read-ahead 1                                    16.8      65.8       344
+  Block reader, read-ahead 8                                   107.4     419.4       203
+  Block reader, read-ahead 32                                  150.0     585.9        94
+  Block reader, read-ahead 128                                 150.9     589.5        78
+  Block reader, read-ahead 128, 2 I/O threads                  263.1    1027.9       125
+  Block reader, read-ahead 128, 4 I/O threads                  462.6    1807.1       141
+  Block reader, read-ahead 128, overlap rule                   148.4     579.7        78
+  Block reader, read-ahead 128, 4 I/O thr., overlap rule       149.8     585.2        94
+  Block reader, read-ahead 32, MaxGap 32 KiB                   339.6    1326.7        31
+  Block reader, read-ahead 32, synchronous handle               20.4      79.8       109
+
+=== writes
+Writing a file front to back: Delphi Win64, 2026-10-25 10:37
+Median of 3 runs; work: 200 us of CPU time per MiB
+
+1 GiB, writing only
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               0.26     4005       0.60     1715       344
+  TFileStream, 1 MiB writes                                0.20     5097       0.53     1934       281
+  TBufferedFileStream, 1 MiB buffer, 64 KiB writes         0.22     4681       0.55     1850       313
+  Write stream, 64 KiB writes                              0.21     4979       0.56     1820       281
+  Write stream, unbuffered, 64 KiB writes                  0.25     4169       0.25     4145        94
+
+1 GiB, with work
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               0.46     2244       0.82     1256       531
+  TFileStream, 1 MiB writes                                0.40     2531       0.72     1421       469
+  TBufferedFileStream, 1 MiB buffer, 64 KiB writes         0.44     2320       0.77     1327       531
+  Write stream, 64 KiB writes                              0.23     4410       0.54     1883       531
+  Write stream, unbuffered, 64 KiB writes                  0.25     4164       0.25     4139       297
+
+10 GiB, writing only
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               4.99     2051       6.27     1634      2844
+  TFileStream, 1 MiB writes                                5.59     1833       6.49     1579      1984
+  TBufferedFileStream, 1 MiB buffer, 64 KiB writes         5.29     1937       6.14     1668      2578
+  Write stream, 64 KiB writes                              4.83     2120       6.14     1667      1625
+  Write stream, unbuffered, 64 KiB writes                  5.21     1966       5.21     1964       609
+
+10 GiB, with work
+  Contender                                           written s    MiB/s  + flush s    MiB/s    CPU ms
+  TFileStream, 64 KiB writes                               5.88     1741       6.77     1512      4563
+  TFileStream, 1 MiB writes                                5.45     1878       6.35     1613      4000
+  TBufferedFileStream, 1 MiB buffer, 64 KiB writes         5.35     1912       6.41     1596      4484
+  Write stream, 64 KiB writes                              4.90     2091       6.04     1696      3391
+  Write stream, unbuffered, 64 KiB writes                  4.96     2066       4.96     2065      2797
+

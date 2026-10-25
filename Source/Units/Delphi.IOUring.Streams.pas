@@ -39,7 +39,7 @@ type
   private
     FReader: TIORingSequentialReader;
     FFileName: string;
-    function GetStats: TIORingReaderStats;
+    function GetStats: TIORingSequentialReaderStats;
     procedure RaiseReadOnly;
   protected
     function GetSize: Int64; override;
@@ -68,7 +68,7 @@ type
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; overload; override;
 
     property FileName: string read FFileName;
-    property Stats: TIORingReaderStats read GetStats;
+    property Stats: TIORingSequentialReaderStats read GetStats;
   end;
 
   {
@@ -93,7 +93,7 @@ type
   private
     FWriter: TIORingSequentialWriter;
     FFileName: string;
-    function GetStats: TIORingWriterStats;
+    function GetStats: TIORingSequentialWriterStats;
     procedure RaiseWriteOnly;
     procedure OpenWriter(const AFileName: string; const AOptions: TIORingSequentialWriterOptions;
       const ABufferSize, ABufferCount: Cardinal; const AEngine: TIORingEngine);
@@ -134,7 +134,7 @@ type
     procedure Flush(const AToDisk: Boolean = False);
 
     property FileName: string read FFileName;
-    property Stats: TIORingWriterStats read GetStats;
+    property Stats: TIORingSequentialWriterStats read GetStats;
   end;
 
 implementation
@@ -178,7 +178,7 @@ begin
   inherited Destroy;
 end;
 
-function TSequentialReadOnlyFileStream.GetStats: TIORingReaderStats;
+function TSequentialReadOnlyFileStream.GetStats: TIORingSequentialReaderStats;
 begin
   Result := FReader.Stats;
 end;
@@ -341,7 +341,7 @@ begin
   inherited Destroy;
 end;
 
-function TSequentialWriteOnlyFileStream.GetStats: TIORingWriterStats;
+function TSequentialWriteOnlyFileStream.GetStats: TIORingSequentialWriterStats;
 begin
   Result := FWriter.Stats;
 end;

@@ -43,20 +43,22 @@ const
   IORING_QUEUE_MAX_CAPACITY = 1 shl 20;
 
 type
-  TIORingQueueCell = record
-    Sequence: NativeUInt;
-    Value: NativeUInt;
-  end;
-
-  TIORingQueueCellArray = array[0..MaxInt div SizeOf(TIORingQueueCell) - 1] of TIORingQueueCell;
-  PIORingQueueCellArray = ^TIORingQueueCellArray;
-
   TIORingRequestQueue = record
+  private
+    type
+      TCell = record
+        Sequence: NativeUInt;
+        Value: NativeUInt;
+      end;
+
+      TCellArray = array[0..MaxInt div SizeOf(TCell) - 1] of TCell;
+      PCellArray = ^TCellArray;
+
   private
     FMemory: Pointer;                 // as allocated
     FEnqueuePosition: ^NativeUInt;    // its own cache line
     FDequeuePosition: ^NativeUInt;    // its own cache line
-    FCells: PIORingQueueCellArray;
+    FCells: PCellArray;
     FMask: NativeUInt;                // Capacity - 1
     FCapacity: Cardinal;
   public
@@ -162,7 +164,7 @@ begin
     LCapacity := LCapacity * 2;
 
   // Line 0: enqueue position, line 1: dequeue position, then the cells
-  LBlock := IORingAllocCacheAligned(2 * IORING_CACHE_LINE_SIZE + NativeUInt(LCapacity) * SizeOf(TIORingQueueCell),
+  LBlock := IORingAllocCacheAligned(2 * IORING_CACHE_LINE_SIZE + NativeUInt(LCapacity) * SizeOf(TCell),
     FMemory);
   FEnqueuePosition := Pointer(LBlock);
   FDequeuePosition := Pointer(LBlock + IORING_CACHE_LINE_SIZE);
@@ -199,7 +201,7 @@ end;
 function TIORingRequestQueue.TryEnqueue(const AValue: NativeUInt): Boolean;
 var
   LPosition: NativeUInt;
-  LCell: ^TIORingQueueCell;
+  LCell: ^TCell;
   LDifference: NativeInt;
   LBackoff: Integer;
 begin
@@ -239,7 +241,7 @@ end;
 function TIORingRequestQueue.TryDequeue(out AValue: NativeUInt): Boolean;
 var
   LPosition: NativeUInt;
-  LCell: ^TIORingQueueCell;
+  LCell: ^TCell;
   LDifference: NativeInt;
   LBackoff: Integer;
 begin

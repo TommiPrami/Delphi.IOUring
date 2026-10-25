@@ -16,6 +16,7 @@ uses
   DUnitX.TestFramework, Delphi.IOUring.Backend.Windows.API in '..\Units\Delphi.IOUring.Backend.Windows.API.pas',
   Delphi.IOUring.Backend.Custom in '..\Units\Delphi.IOUring.Backend.Custom.pas',
   Delphi.IOUring.Backend.Windows in '..\Units\Delphi.IOUring.Backend.Windows.pas',
+  Delphi.IOUring.Backend.Windows.Platform in '..\Units\Delphi.IOUring.Backend.Windows.Platform.pas',
   Delphi.IOUring in '..\Units\Delphi.IOUring.pas',
   Delphi.IOUring.SequentialReader in '..\Units\Delphi.IOUring.SequentialReader.pas',
   Delphi.IOUring.Streams in '..\Units\Delphi.IOUring.Streams.pas',
