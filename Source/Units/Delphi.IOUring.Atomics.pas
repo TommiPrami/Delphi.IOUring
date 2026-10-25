@@ -28,8 +28,9 @@
   On x86 and x64 the CPU keeps the acquire/release order by itself, so LoadAcquire and StoreRelease are plain moves;
   only where a compiler would split a 64-bit value into two 32-bit moves is the move a tiny assembler routine. Neither
   compiler moves or caches reads and writes of shared memory across them (the tests check this with optimization on,
-  too). AArch64 (Linux, Free Pascal) does not keep that order by itself: there every operation gets real barriers (DMB).
-  Tested on ARM64 in CI, with the stress tests, debug and -O3 (Docs/Design.md §5.7, §12.5).
+  too). AArch64 (Linux, Free Pascal) does not keep that order by itself: there the operations are small assembler
+  routines - LDXR/STLXR loops with a full barrier (DMB) after them, LDAR and STLR for LoadAcquire and StoreRelease
+  (Docs/Design.md §12.9). Tested on ARM64 in CI, with the stress tests, debug and -O3 (Docs/Design.md §5.7, §12.5).
 
   Sleeping and waking: WaitOnAddress on Windows, the futex on Linux.
 }
@@ -64,6 +65,14 @@
 {$ELSEIF defined(CPUAARCH64) and defined(FPC)}
   // The CPU may reorder reads and writes: barriers around the operations
   {$DEFINE IORING_ATOMICS_AARCH64}
+  {
+    Small assembler routines (Docs/Design.md §12.9). IORING_ATOMICS_AARCH64_RTL keeps the way before Phase 27 – FPC's
+    Interlocked routines with a full barrier on each side – for comparing them in the benchmark.
+    IORING_ATOMICS_AARCH64_ISB: CpuPause is an ISB instead of a YIELD.
+  }
+  {$IFNDEF IORING_ATOMICS_AARCH64_RTL}
+    {$DEFINE IORING_ATOMICS_AARCH64_ASM}
+  {$ENDIF}
 {$ELSE}
   {$MESSAGE ERROR 'Delphi.IOUring.Atomics supports x86, x64 and (Free Pascal) AArch64'}
 {$ENDIF}
@@ -94,6 +103,22 @@ type
     NativeUInt variables use the 32-bit or 64-bit versions automatically.
   }
   TAtomic = record
+{$IFDEF IORING_ATOMICS_AARCH64_ASM}
+  private
+    { AArch64 assembler (Docs/Design.md §12.9): the inline methods below call these, so each operation is one call.
+      Read-modify-write: an LDXR/STLXR loop and a full barrier (DMB ISH) after it, so they stay full barriers. }
+    class function A64CompareExchange32(var ATarget: Integer; ANewValue, AComparand: Integer): Integer; static;
+    class function A64CompareExchange64(var ATarget: Int64; ANewValue, AComparand: Int64): Int64; static;
+    class function A64Exchange32(var ATarget: Integer; AValue: Integer): Integer; static;
+    class function A64Exchange64(var ATarget: Int64; AValue: Int64): Int64; static;
+    class function A64FetchAdd32(var ATarget: Integer; ADelta: Integer): Integer; static;
+    class function A64FetchAdd64(var ATarget: Int64; ADelta: Int64): Int64; static;
+    // LDAR and STLR: one instruction each
+    class function A64LoadAcquire32(var ATarget: Integer): Integer; static;
+    class function A64LoadAcquire64(var ATarget: Int64): Int64; static;
+    class procedure A64StoreRelease32(var ATarget: Integer; AValue: Integer); static;
+    class procedure A64StoreRelease64(var ATarget: Int64; AValue: Int64); static;
+{$ENDIF}
   public
     {
       If ATarget = AComparand, sets ATarget := ANewValue. Returns the old
@@ -212,9 +237,108 @@ const
 { Only the Integer and Int64 versions have their own code; Cardinal, UInt64 and Pointer use them through a
   typecast of the same size. }
 
+{$IFDEF IORING_ATOMICS_AARCH64_ASM}
+{
+  AArch64 (Docs/Design.md §12.9). Arguments in x0 (ATarget's address), x1/w1 and x2/w2; the result in x0/w0.
+  The read-modify-write routines are the fully ordered pattern of the Linux kernel: LDXR, then STLXR (a release store),
+  then DMB ISH (written "dmb #11", as in FPC's RTL). The compare-exchange always stores (the old value back when it does
+  not match, as FPC's own InterlockedCompareExchange does), so it orders like the others also when it fails.
+}
+
+class function TAtomic.A64CompareExchange32(var ATarget: Integer; ANewValue, AComparand: Integer): Integer;
+  assembler; nostackframe;
+asm
+.LCompareExchange32Loop:
+  ldxr   w3, [x0]
+  cmp    w3, w2
+  csel   w4, w1, w3, eq
+  stlxr  w5, w4, [x0]
+  cbnz   w5, .LCompareExchange32Loop
+  dmb    #11
+  mov    w0, w3
+end;
+
+class function TAtomic.A64CompareExchange64(var ATarget: Int64; ANewValue, AComparand: Int64): Int64;
+  assembler; nostackframe;
+asm
+.LCompareExchange64Loop:
+  ldxr   x3, [x0]
+  cmp    x3, x2
+  csel   x4, x1, x3, eq
+  stlxr  w5, x4, [x0]
+  cbnz   w5, .LCompareExchange64Loop
+  dmb    #11
+  mov    x0, x3
+end;
+
+class function TAtomic.A64Exchange32(var ATarget: Integer; AValue: Integer): Integer; assembler; nostackframe;
+asm
+.LExchange32Loop:
+  ldxr   w2, [x0]
+  stlxr  w3, w1, [x0]
+  cbnz   w3, .LExchange32Loop
+  dmb    #11
+  mov    w0, w2
+end;
+
+class function TAtomic.A64Exchange64(var ATarget: Int64; AValue: Int64): Int64; assembler; nostackframe;
+asm
+.LExchange64Loop:
+  ldxr   x2, [x0]
+  stlxr  w3, x1, [x0]
+  cbnz   w3, .LExchange64Loop
+  dmb    #11
+  mov    x0, x2
+end;
+
+class function TAtomic.A64FetchAdd32(var ATarget: Integer; ADelta: Integer): Integer; assembler; nostackframe;
+asm
+.LFetchAdd32Loop:
+  ldxr   w2, [x0]
+  add    w3, w2, w1
+  stlxr  w4, w3, [x0]
+  cbnz   w4, .LFetchAdd32Loop
+  dmb    #11
+  mov    w0, w2
+end;
+
+class function TAtomic.A64FetchAdd64(var ATarget: Int64; ADelta: Int64): Int64; assembler; nostackframe;
+asm
+.LFetchAdd64Loop:
+  ldxr   x2, [x0]
+  add    x3, x2, x1
+  stlxr  w4, x3, [x0]
+  cbnz   w4, .LFetchAdd64Loop
+  dmb    #11
+  mov    x0, x2
+end;
+
+class function TAtomic.A64LoadAcquire32(var ATarget: Integer): Integer; assembler; nostackframe;
+asm
+  ldar   w0, [x0]
+end;
+
+class function TAtomic.A64LoadAcquire64(var ATarget: Int64): Int64; assembler; nostackframe;
+asm
+  ldar   x0, [x0]
+end;
+
+class procedure TAtomic.A64StoreRelease32(var ATarget: Integer; AValue: Integer); assembler; nostackframe;
+asm
+  stlr   w1, [x0]
+end;
+
+class procedure TAtomic.A64StoreRelease64(var ATarget: Int64; AValue: Int64); assembler; nostackframe;
+asm
+  stlr   x1, [x0]
+end;
+{$ENDIF}
+
 class function TAtomic.CompareExchange(var ATarget: Integer; ANewValue, AComparand: Integer): Integer;
 begin
-{$IFDEF FPC}
+{$IF defined(IORING_ATOMICS_AARCH64_ASM)}
+  Result := A64CompareExchange32(ATarget, ANewValue, AComparand);
+{$ELSEIF defined(FPC)}
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedCompareExchange(ATarget, ANewValue, AComparand);
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
@@ -247,7 +371,9 @@ end;
 {$ELSE}
 class function TAtomic.CompareExchange(var ATarget: Int64; ANewValue, AComparand: Int64): Int64;
 begin
-{$IFDEF FPC}
+{$IF defined(IORING_ATOMICS_AARCH64_ASM)}
+  Result := A64CompareExchange64(ATarget, ANewValue, AComparand);
+{$ELSEIF defined(FPC)}
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedCompareExchange64(ATarget, ANewValue, AComparand);
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
@@ -294,7 +420,9 @@ end;
 
 class function TAtomic.Exchange(var ATarget: Integer; AValue: Integer): Integer;
 begin
-{$IFDEF FPC}
+{$IF defined(IORING_ATOMICS_AARCH64_ASM)}
+  Result := A64Exchange32(ATarget, AValue);
+{$ELSEIF defined(FPC)}
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedExchange(ATarget, AValue);
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
@@ -328,7 +456,9 @@ begin
 end;
 {$ELSE}
 begin
-{$IFDEF FPC}
+{$IF defined(IORING_ATOMICS_AARCH64_ASM)}
+  Result := A64Exchange64(ATarget, AValue);
+{$ELSEIF defined(FPC)}
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedExchange64(ATarget, AValue);
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
@@ -350,7 +480,9 @@ end;
 
 class function TAtomic.FetchAdd(var ATarget: Integer; ADelta: Integer): Integer;
 begin
-{$IFDEF FPC}
+{$IF defined(IORING_ATOMICS_AARCH64_ASM)}
+  Result := A64FetchAdd32(ATarget, ADelta);
+{$ELSEIF defined(FPC)}
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedExchangeAdd(ATarget, ADelta);
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
@@ -383,7 +515,9 @@ begin
 end;
 {$ELSE}
 begin
-{$IFDEF FPC}
+{$IF defined(IORING_ATOMICS_AARCH64_ASM)}
+  Result := A64FetchAdd64(ATarget, ADelta);
+{$ELSEIF defined(FPC)}
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
   Result := InterlockedExchangeAdd64(ATarget, ADelta);
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
@@ -441,15 +575,22 @@ end;
 // AArch64: a barrier after the read keeps the later reads and writes after it (on x86/x64 the CPU does that by itself)
 class function TAtomic.LoadAcquire(var ATarget: Integer): Integer;
 begin
+{$IFDEF IORING_ATOMICS_AARCH64_ASM}
+  Result := A64LoadAcquire32(ATarget);
+{$ELSE}
   Result := ATarget;
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
+{$ENDIF}
 end;
 
 class function TAtomic.LoadAcquire(var ATarget: Cardinal): Cardinal;
 begin
+{$IFDEF IORING_ATOMICS_AARCH64_ASM}
+  Result := Cardinal(A64LoadAcquire32(Integer(ATarget)));
+{$ELSE}
   Result := ATarget;
-
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
+{$ENDIF}
 end;
 
 {$IFDEF IORING_ATOMICS_X86}
@@ -465,9 +606,12 @@ end;
 {$ELSE}
 class function TAtomic.LoadAcquire(var ATarget: Int64): Int64;
 begin
+{$IFDEF IORING_ATOMICS_AARCH64_ASM}
+  Result := A64LoadAcquire64(ATarget);
+{$ELSE}
   Result := ATarget;
-
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
+{$ENDIF}
 end;
 {$ENDIF}
 
@@ -484,16 +628,24 @@ end;
 // AArch64: a barrier before the write keeps the earlier reads and writes before it
 class procedure TAtomic.StoreRelease(var ATarget: Integer; AValue: Integer);
 begin
+{$IFDEF IORING_ATOMICS_AARCH64_ASM}
+  A64StoreRelease32(ATarget, AValue);
+{$ELSE}
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 
   ATarget := AValue;
+{$ENDIF}
 end;
 
 class procedure TAtomic.StoreRelease(var ATarget: Cardinal; AValue: Cardinal);
 begin
+{$IFDEF IORING_ATOMICS_AARCH64_ASM}
+  A64StoreRelease32(Integer(ATarget), Integer(AValue));
+{$ELSE}
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 
   ATarget := AValue;
+{$ENDIF}
 end;
 
 {$IF defined(IORING_ATOMICS_X86)}
@@ -512,9 +664,13 @@ end;
 {$ELSE}
 class procedure TAtomic.StoreRelease(var ATarget: Int64; AValue: Int64);
 begin
+{$IFDEF IORING_ATOMICS_AARCH64_ASM}
+  A64StoreRelease64(ATarget, AValue);
+{$ELSE}
   {$IFDEF IORING_ATOMICS_AARCH64}ReadWriteBarrier;{$ENDIF}
 
   ATarget := AValue;
+{$ENDIF}
 end;
 {$ENDIF}
 
@@ -528,7 +684,12 @@ begin
   StoreRelease(NativeInt(ATarget), NativeInt(AValue));
 end;
 
-{$IF defined(IORING_ATOMICS_AARCH64)}
+{$IF defined(IORING_ATOMICS_AARCH64_ASM)}
+class procedure TAtomic.FullBarrier; assembler; nostackframe;
+asm
+  dmb    #11                             // DMB ISH
+end;
+{$ELSEIF defined(IORING_ATOMICS_AARCH64)}
 class procedure TAtomic.FullBarrier;
 begin
   ReadWriteBarrier;   // DMB ISH
@@ -551,13 +712,21 @@ begin
 end;
 {$ENDIF}
 
-{$IF defined(IORING_ATOMICS_AARCH64)}
+{$IF defined(IORING_ATOMICS_AARCH64_ASM)}
+{ YIELD is the hint for a spinning thread; on many ARM cores it does almost nothing, so some runtimes use ISB (a short
+  real wait) instead. Both are measured (Docs/Design.md §12.9). }
+class procedure TAtomic.CpuPause; assembler; nostackframe;
+asm
+{$IFDEF IORING_ATOMICS_AARCH64_ISB}
+  isb
+{$ELSE}
+  yield
+{$ENDIF}
+end;
+{$ELSEIF defined(IORING_ATOMICS_AARCH64)}
+// The way before Phase 27: no hint at all
 class procedure TAtomic.CpuPause;
 begin
-  {
-    [VERIFY] A YIELD instruction would be the hint here; without it the spin
-    loops only spin
-  }
 end;
 {$ELSEIF defined(FPC)}
 class procedure TAtomic.CpuPause;

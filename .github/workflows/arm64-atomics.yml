@@ -1,0 +1,60 @@
+# The atomics on AArch64 (Docs/Design.md §12.9, Phase 27). Started by hand only (Actions > ARM64 atomics > Run
+# workflow): the only AArch64 machine at hand is GitHub's ARM64 runner. The tests (debug build and -O3), then the
+# Structures benchmark built with each way of doing the atomics and run in turns. The tables become annotations of
+# the run and the job summary; the outputs are an artifact. The CI on every push runs no benchmarks.
+
+name: ARM64 atomics
+
+on:
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: 'How many times each variant runs'
+        default: '2'
+      threads:
+        description: 'Thread counts'
+        default: '1,2,4'
+
+permissions:
+  contents: read
+
+jobs:
+  arm64:
+    name: Linux ARM64
+    runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Free Pascal
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fpc
+
+      - name: The system
+        shell: bash
+        run: |
+          uname -a
+          grep PRETTY_NAME /etc/os-release
+          echo "Free Pascal: $(fpc -iV)"
+          echo "CPU: $(lscpu | grep -E 'Model name|^CPU\(s\)|Flags' | tr -s ' ')"
+
+      - name: Tests (debug build)
+        run: ./.github/scripts/Invoke-Tests.ps1
+
+      - name: Tests (-O3)
+        if: success() || failure()
+        run: ./.github/scripts/Invoke-Tests.ps1 -Optimize
+
+      - name: Structures benchmark, the atomics variants in turns
+        run: ./.github/scripts/Measure-Atomics.ps1 -Rounds ${{ inputs.rounds }} -Threads '${{ inputs.threads }}' -OutputFolder "$env:RUNNER_TEMP/atomics"
+
+      - name: Keep the outputs
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-atomics
+          path: ${{ runner.temp }}/atomics/*.txt

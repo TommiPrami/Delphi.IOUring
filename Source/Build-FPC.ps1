@@ -57,6 +57,10 @@
 .PARAMETER RunArguments
     Arguments for the program when -Run is given (e.g. '--sizes', '1').
 
+.PARAMETER Define
+    Symbols to define for the compiler (-d), e.g. IORING_ATOMICS_AARCH64_RTL
+    (the atomics as before Phase 27, for comparing; Docs/Design.md §12.9).
+
 .EXAMPLE
     .\Build-FPC.ps1 -Project Tests -Platform Win32 -Run
 
@@ -86,7 +90,8 @@ param(
     [string] $Distribution = '',
     [switch] $Optimize,
     [switch] $Run,
-    [string[]] $RunArguments = @()
+    [string[]] $RunArguments = @(),
+    [string[]] $Define = @()
 )
 
 Set-StrictMode -Version Latest
@@ -294,6 +299,9 @@ foreach ($build in $builds) {
     )
     foreach ($unitDir in $build.Units) {
         $arguments += "-Fu$(ConvertTo-CompilerPath $unitDir)"
+    }
+    foreach ($symbol in $Define) {
+        $arguments += "-d$symbol"
     }
     if ($isLinuxTarget -and $linuxLibraryPath) {
         $arguments += "-Fl$linuxLibraryPath"
