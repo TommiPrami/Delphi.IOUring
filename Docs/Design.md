@@ -3338,8 +3338,10 @@ work 0.88. On x86-64 they always win.
   `yield` does almost nothing on many ARM cores.
 - FPC's trunk has single-instruction atomics (LSE, ARMv8.1: `casal`,
   `swpal`, `ldaddal`, under `CPUAARCH64_HAS_LSE`) and a `yield` intrinsic;
-  FPC 3.2.2 – the version in CI – has neither. Whether its assembler accepts
-  the LSE instructions is not known [VERIFY].
+  FPC 3.2.2 – the version in CI – has neither. Its AArch64 instruction
+  table (`compiler/aarch64/a64att.inc` of the 3.2.2 release) has `ldxr`,
+  `stlxr`, `ldar`, `stlr`, `dmb`, `isb` and `yield`, but no LSE
+  instructions (`cas`, `casal` …).
 - The only AArch64 machine at hand is GitHub's ARM64 runner. The CI no
   longer runs benchmarks (§12.6, Phase 24).
 
