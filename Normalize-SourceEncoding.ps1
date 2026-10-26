@@ -45,7 +45,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [string]   $Root           = '.',
-    [string[]] $Extensions     = @('.pas', '.inc', '.dpr', '.dpk', '.dproj', '.iss', '.md', '.csv'),
+    [string[]] $Extensions     = @('.pas', '.inc', '.dpr', '.dpk', '.dproj', '.iss', '.md', '.csv', '.lpr', 'lpi'),
     [string]   $ExcludePattern = '(?i)(thirdparty|3rdparty|[\\/]Packages[\\/]Lazarus[\\/]PascalIOUring\.pas$)'
 )
 
