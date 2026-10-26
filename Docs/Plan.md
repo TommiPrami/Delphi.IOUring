@@ -444,10 +444,26 @@ choice.
 
 ---
 
+## Milestone 8 – What the first real program needs
+
+The library went into the owner's PiFalseStartSearcher (2026-10-26): a
+search through a 100 GB file of Pi's digits, with every read method side by
+side. The IoRing stream and the engine fit as they are; the engine with 12
+workers read the file at 6.1 GB/s, against 1.6 GB/s for `ReadFile`. What
+was missing:
+
+- **Phase 29** – Several chunks at once from the zero-copy reader (Design §12.11). Decided (2026-10-26): new overloads on `TIORingSequentialReader`, thread-safe.
+  - [x] `TIORingReaderChunk` (Data, Length, FileOffset); `TryAcquireChunk(out AChunk, AWait)` and `ReleaseChunk(const AChunk)`: chunks in file order, released in any order, from several threads; waits for a release when all buffers are out.
+  - [x] The buffers: a free stack and a ring of the slots in flight or ready, in file order, instead of the circular queue; `Read` and the one-chunk calls unchanged.
+  - [x] The lock: three states on `TAtomic.WaitWhileEqual`/`WakeOne`, no new dependency; mixing the two kinds of chunks, or `Read`, raises.
+  - [x] Tests: 7 new ones in `PIRUnit.SequentialReader.Tests`, among them 6 threads on one reader, buffered and unbuffered.
+  - [x] Tests (2026-10-26): Delphi 259 (Win32 and Win64, Debug and Release), FPC 258 (Win32 and Win64, with and without `-O3`; trunk on Win64), Linux 256 (WSL2, debug and `-O3`); the Lazarus package compiles.
+  - [x] Measured in PiFalseStartSearcher (100 GB file, cache flushed, 12 workers, 8 MiB blocks; the runs while the disk was not slowed down by heat): unbuffered, the reader 16.4 s (twice) and the engine 16.4–16.7 s – both at the disk's 6.1 GB/s; buffered, the reader 18.4–18.6 s and the engine 20.6 s. After a few minutes of reading every method dropped to about 3.5 GB/s (the disk got hot).
+
+---
+
 ## Immediate next step
 
-Phase 28 is done and the first version, **0.1.0**, is tagged. Next, as
-decided for Milestone 7 (d.): the library goes into a real program of the
-owner's, to see whether the API fits or needs more. What that program needs
-decides the next phase. Later, and only when needed: Linux sockets (the plan
-in Design §13).
+Phase 29 is done (not committed yet). Next: what PiFalseStartSearcher still
+needs, if anything. Later, and only when needed: Linux
+sockets (the plan in Design §13).

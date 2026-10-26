@@ -23,6 +23,20 @@
   Big Read calls (Docs/Design.md §12.8): the part of a call that the buffers have not asked for yet is read straight
   into the caller's memory - one copy less. The buffers read ahead after the end of the call once all of those
   reads have started. Unbuffered, only when the caller's memory and the part's length are whole sectors.
+
+  Several chunks at once (Docs/Design.md §12.11): TryAcquireChunk(out AChunk) and ReleaseChunk(const AChunk) can be
+  called from several threads. The chunks come in file order, each with its file offset, and go back in any order;
+  a released buffer is read into again at once. For workers that each take the next piece of the file:
+
+     // on each worker thread
+     while LReader.TryAcquireChunk(LChunk) do
+     begin
+       Process(LChunk.Data, LChunk.Length, LChunk.FileOffset);
+       LReader.ReleaseChunk(LChunk);
+     end;
+
+  The free buffers are kept in a list, and the reads started are queued in file order, so a buffer can be released
+  while the ones before it are still out.
 }
 
 {$I PIRInclude.Compiler.inc}
@@ -65,13 +79,25 @@ type
     DirectBytes: UInt64;          // bytes those reads returned
   end;
 
+  { A chunk of TIORingSequentialReader.TryAcquireChunk(out AChunk): the reader's own buffer, valid until
+    ReleaseChunk(AChunk) }
+  TIORingReaderChunk = record
+  private
+    FSlot: Cardinal;
+  public
+    Data: PByte;
+    Length: NativeInt;
+    // Where Data starts in the file
+    FileOffset: Int64;
+  end;
+
   { Custom managed record: owns the file handle (if asked), the ring and the buffer memory, and releases them at the
     end of scope. Not copyable. }
   TIORingSequentialReader = record
   private
     type
-      // One buffer of the circular queue
-      TSlotState = (rssFree, rssInFlight, rssReady);
+      // One buffer. rssTaken: out as a chunk of TryAcquireChunk(out AChunk).
+      TSlotState = (rssFree, rssInFlight, rssReady, rssTaken);
       PSlot = ^TSlot;
 
       TSlot = record
@@ -108,11 +134,22 @@ type
     FEnd: Int64;              // FSize, or less if the file turned out shorter
     FPosition: Int64;
     FNextReadOffset: Int64;
-    FHead: Cardinal;          // slot holding the data at FPosition
-    FHeadOffset: Cardinal;    // bytes of the head slot already delivered
-    FOutstanding: Cardinal;   // slots in flight or ready, not yet consumed
-    FReadAhead: Cardinal;     // how many slots may be outstanding
+    // The slots in flight or ready, not yet delivered, in file order (a ring). The first holds the data at FPosition.
+    FOrder: array of Cardinal;
+    FOrderFirst: Cardinal;
+    FOrderCount: Cardinal;
+    // The free slots (a stack: the one freed last is read into first, its memory is warm)
+    FFree: array of Cardinal;
+    FFreeCount: Cardinal;
+    FHeadOffset: Cardinal;    // bytes of the first slot in FOrder already delivered
+    FReadAhead: Cardinal;     // how many slots may be in FOrder
     FChunkAcquired: Boolean;
+    // Several chunks at once: how many are out; the lock (0 free, 1 taken, 2 taken and maybe waited for); counts the
+    // releases, so a thread that waits for a free buffer can sleep on it
+    FTakenCount: Cardinal;
+    FLockState: Integer;
+    FReleaseCount: Integer;
+    FReleaseWaiters: Integer;
     FStats: TIORingSequentialReaderStats;
     // Big Read calls: the reads straight into the caller's memory
     FAlignment: Cardinal;         // unbuffered: the sector size; buffered: 1
@@ -131,7 +168,10 @@ type
     procedure ProcessCompletions;
     procedure Stall;
     function PrepareHead(const AWait: Boolean): Boolean;
+    function PopHead: Cardinal;
     procedure ReleaseHead;
+    procedure Lock;
+    procedure Unlock;
     function CopyFromBuffers(var ATarget: PByte; const AMaxCount: NativeInt): NativeInt;
     function PlanDirectRead(const ATarget: PByte; const ACount: NativeInt; var AStart, AEnd: Int64): Boolean;
     procedure IssueDirectReads;
@@ -170,8 +210,17 @@ type
 
     { Zero-copy: the rest of the current buffer, valid until ReleaseChunk. False at the end of the file, or (AWait =
       False) when the data is not there yet - check Eof to tell them apart. }
-    function TryAcquireChunk(out AData: PByte; out ALength: NativeInt; const AWait: Boolean = True): Boolean;
-    procedure ReleaseChunk;
+    function TryAcquireChunk(out AData: PByte; out ALength: NativeInt; const AWait: Boolean = True): Boolean; overload;
+    procedure ReleaseChunk; overload;
+
+    {
+      Several chunks at once, from several threads: the next chunk in file order, a buffer of its own, valid until
+      ReleaseChunk(AChunk). Release them in any order; the buffer is read into again at once. When every buffer is out
+      as a chunk, waits for a release (AWait = False: returns False). False at the end of the file - check Eof. Do not
+      mix with Read or the chunks above while chunks of these are out; Close only after all are released.
+    }
+    function TryAcquireChunk(out AChunk: TIORingReaderChunk; const AWait: Boolean = True): Boolean; overload;
+    procedure ReleaseChunk(const AChunk: TIORingReaderChunk); overload;
 
     // True if the next Read returns at once (data is there, or end of file)
     function DataReady: Boolean;
@@ -187,7 +236,7 @@ type
 implementation
 
 uses
-  PIRUnit.Types;
+  PIRUnit.Types, PIRUnit.Atomics;
 
 const
   // UserData of the registration entries; slot indexes are below IORING_READER_MAX_BUFFER_COUNT
@@ -217,11 +266,16 @@ begin
   ADest.FEnd := 0;
   ADest.FPosition := 0;
   ADest.FNextReadOffset := 0;
-  ADest.FHead := 0;
+  ADest.FOrderFirst := 0;
+  ADest.FOrderCount := 0;
+  ADest.FFreeCount := 0;
   ADest.FHeadOffset := 0;
-  ADest.FOutstanding := 0;
   ADest.FReadAhead := 0;
   ADest.FChunkAcquired := False;
+  ADest.FTakenCount := 0;
+  ADest.FLockState := 0;
+  ADest.FReleaseCount := 0;
+  ADest.FReleaseWaiters := 0;
   FillChar(ADest.FStats, SizeOf(ADest.FStats), 0);
   ADest.FAlignment := 1;
   ADest.FDirectTarget := nil;
@@ -309,12 +363,18 @@ begin
     FMemory := TIORingPlatform.AllocPages(FMemorySize);
 
     SetLength(FSlots, ABufferCount);
+    SetLength(FOrder, ABufferCount);
+    SetLength(FFree, ABufferCount);
 
     for LIndex := 0 to ABufferCount - 1 do
     begin
       FSlots[LIndex].State := rssFree;
       FSlots[LIndex].Data := FMemory + NativeUInt(LIndex) * ABufferSize;
+      // Slot 0 on top: the first reads go to the slots in order
+      FFree[LIndex] := ABufferCount - 1 - LIndex;
     end;
+
+    FFreeCount := ABufferCount;
 
     // As many reads straight into a caller's memory as there are buffers
     SetLength(FDirectReads, ABufferCount);
@@ -351,10 +411,11 @@ begin
     FEnd := FSize;
     FPosition := 0;
     FNextReadOffset := 0;
-    FHead := 0;
+    FOrderFirst := 0;
+    FOrderCount := 0;
     FHeadOffset := 0;
-    FOutstanding := 0;
     FChunkAcquired := False;
+    FTakenCount := 0;
     FillChar(FStats, SizeOf(FStats), 0);
     FStats.MaxReadAhead := FReadAhead;
     FDirectNext := 0;
@@ -377,6 +438,8 @@ begin
   FRing.Close;
 
   FSlots := nil;
+  FOrder := nil;
+  FFree := nil;
   FDirectReads := nil;
   FDirectInFlight := 0;
   TIORingPlatform.FreePages(FMemory, FMemorySize);
@@ -391,8 +454,11 @@ begin
 
   FBufferSize := 0;
   FBufferCount := 0;
-  FOutstanding := 0;
+  FOrderFirst := 0;
+  FOrderCount := 0;
+  FFreeCount := 0;
   FChunkAcquired := False;
+  FTakenCount := 0;
 end;
 
 function TIORingSequentialReader.IsOpen: Boolean;
@@ -426,9 +492,9 @@ begin
   if FDirectNext < FDirectEnd then
     Exit;
 
-  while (FOutstanding < FReadAhead) and (FNextReadOffset < FEnd) do
+  while (FOrderCount < FReadAhead) and (FFreeCount > 0) and (FNextReadOffset < FEnd) do
   begin
-    LIndex := (FHead + FOutstanding) mod FBufferCount;
+    LIndex := FFree[FFreeCount - 1];
     LSlot := @FSlots[LIndex];
 
     { Always the whole buffer: unbuffered reads need sector multiples, and the read at the end of the file
@@ -454,8 +520,10 @@ begin
     LSlot.BytesRead := 0;
     LSlot.NativeResult := 0;
 
+    Dec(FFreeCount);
+    FOrder[(FOrderFirst + FOrderCount) mod FBufferCount] := LIndex;
+    Inc(FOrderCount);
     Inc(FNextReadOffset, FBufferSize);
-    Inc(FOutstanding);
     Inc(FStats.ReadsIssued);
   end;
 
@@ -534,8 +602,8 @@ begin
     IssueReads;
   end;
 
-  // All completions were popped, so this waits for a new one
-  while FSlots[FHead].State = rssInFlight do
+  // All completions were popped, so this waits for a new one. FOrder is not empty here.
+  while FSlots[FOrder[FOrderFirst]].State = rssInFlight do
   begin
     FRing.WaitForCompletions(1);
     ProcessCompletions;
@@ -561,10 +629,16 @@ begin
   if FPosition >= FEnd then
     Exit(False);
 
-  LSlot := @FSlots[FHead];
-
-  if LSlot.State = rssFree then
+  if FOrderCount = 0 then
+  begin
     IssueReads;
+
+    // Every buffer is out as a chunk (several chunks at once): the caller waits for a release
+    if FOrderCount = 0 then
+      Exit(False);
+  end;
+
+  LSlot := @FSlots[FOrder[FOrderFirst]];
 
   if LSlot.State = rssInFlight then
   begin
@@ -589,13 +663,42 @@ begin
   Result := FHeadOffset < LSlot.BytesRead;
 end;
 
-procedure TIORingSequentialReader.ReleaseHead;
+// Takes the first slot out of FOrder (its data is delivered) and returns it
+function TIORingSequentialReader.PopHead: Cardinal;
 begin
-  FSlots[FHead].State := rssFree;
-  FHead := (FHead + 1) mod FBufferCount;
+  Result := FOrder[FOrderFirst];
+  FOrderFirst := (FOrderFirst + 1) mod FBufferCount;
+  Dec(FOrderCount);
   FHeadOffset := 0;
-  Dec(FOutstanding);
+end;
+
+procedure TIORingSequentialReader.ReleaseHead;
+var
+  LIndex: Cardinal;
+begin
+  LIndex := PopHead;
+  FSlots[LIndex].State := rssFree;
+  FFree[FFreeCount] := LIndex;
+  Inc(FFreeCount);
   IssueReads;
+end;
+
+{ The lock of the chunks from several threads: 0 free, 1 taken, 2 taken and maybe waited for (Ulrich Drepper,
+  "Futexes Are Tricky"). It is held while a thread waits for a read in flight - that read completes without any other
+  thread - but never while waiting for a release. }
+procedure TIORingSequentialReader.Lock;
+begin
+  if TAtomic.CompareExchange(FLockState, 1, 0) = 0 then
+    Exit;
+
+  while TAtomic.Exchange(FLockState, 2) <> 0 do
+    TAtomic.WaitWhileEqual(FLockState, 2);
+end;
+
+procedure TIORingSequentialReader.Unlock;
+begin
+  if TAtomic.Exchange(FLockState, 0) = 2 then
+    TAtomic.WakeOne(FLockState);
 end;
 
 { TIORingSequentialReader - reading }
@@ -612,7 +715,7 @@ begin
 
   while (LRemaining > 0) and PrepareHead(True) do
   begin
-    LSlot := @FSlots[FHead];
+    LSlot := @FSlots[FOrder[FOrderFirst]];
     LChunk := LSlot.BytesRead - FHeadOffset;
 
     if LChunk > LRemaining then
@@ -817,6 +920,11 @@ begin
   RaiseIORingError('An earlier big Read failed; the reader cannot continue');
 end;
 
+procedure RaiseChunksOut; { FPC} noreturn; {}
+begin
+  RaiseError(EInvalidOpException, 'Release the chunks of TryAcquireChunk(AChunk) first');
+end;
+
 function TIORingSequentialReader.Read(var ABuffer; const ACount: NativeInt): NativeInt;
 
   procedure RaiseChunkAcquired; {$IFNDEF FPC} noreturn; {$ENDIF}
@@ -834,6 +942,9 @@ begin
 
   if FChunkAcquired then
     RaiseChunkAcquired;
+
+  if FTakenCount > 0 then
+    RaiseChunksOut;
 
   if FDirectFailed then
     RaiseDirectFailure;
@@ -905,13 +1016,16 @@ begin
   if FChunkAcquired then
     RaiseChunkAcquired;
 
+  if FTakenCount > 0 then
+    RaiseChunksOut;
+
   AData := nil;
   ALength := 0;
 
   if not PrepareHead(AWait) then
     Exit(False);
 
-  LSlot := @FSlots[FHead];
+  LSlot := @FSlots[FOrder[FOrderFirst]];
   AData := LSlot.Data + FHeadOffset;
   ALength := LSlot.BytesRead - FHeadOffset;
   FChunkAcquired := True;
@@ -931,7 +1045,7 @@ begin
     RaiseNoChunk;
 
   FChunkAcquired := False;
-  Inc(FPosition, FSlots[FHead].BytesRead - FHeadOffset);
+  Inc(FPosition, FSlots[FOrder[FOrderFirst]].BytesRead - FHeadOffset);
   ReleaseHead;
 end;
 
@@ -944,7 +1058,101 @@ begin
 
   ProcessCompletions;
 
-  Result := FSlots[FHead].State = rssReady;
+  Result := (FOrderCount > 0) and (FSlots[FOrder[FOrderFirst]].State = rssReady);
+end;
+
+function TIORingSequentialReader.TryAcquireChunk(out AChunk: TIORingReaderChunk; const AWait: Boolean): Boolean;
+
+  procedure RaiseOneChunkAcquired; { FPC} noreturn; {}
+  begin
+    RaiseError(EInvalidOpException, 'Release the chunk of TryAcquireChunk(AData, ALength) first');
+  end;
+
+var
+  LIndex: Cardinal;
+  LReleases: Integer;
+  LSlot: PSlot;
+begin
+  CheckOpen;
+
+  AChunk.FSlot := 0;
+  AChunk.Data := nil;
+  AChunk.Length := 0;
+  AChunk.FileOffset := 0;
+
+  Lock;
+  try
+    if FChunkAcquired then
+      RaiseOneChunkAcquired;
+
+    // Every buffer is out as a chunk: wait for a release, without the lock (the release needs it)
+    while (FPosition < FEnd) and (FOrderCount = 0) and (FFreeCount = 0) do
+    begin
+      if not AWait then
+        Exit(False);
+
+      LReleases := FReleaseCount;
+      Inc(FReleaseWaiters);
+      Unlock;
+      try
+        TAtomic.WaitWhileEqual(FReleaseCount, LReleases);
+      finally
+        Lock;
+        Dec(FReleaseWaiters);
+      end;
+    end;
+
+    if not PrepareHead(AWait) then
+      Exit(False);
+
+    LSlot := @FSlots[FOrder[FOrderFirst]];
+    AChunk.Data := LSlot.Data + FHeadOffset;
+    AChunk.Length := LSlot.BytesRead - FHeadOffset;
+    AChunk.FileOffset := LSlot.FileOffset + FHeadOffset;
+    Inc(FPosition, AChunk.Length);
+
+    LIndex := PopHead;
+    LSlot.State := rssTaken;
+    AChunk.FSlot := LIndex;
+    Inc(FTakenCount);
+    IssueReads;
+
+    Result := True;
+  finally
+    Unlock;
+  end;
+end;
+
+procedure TIORingSequentialReader.ReleaseChunk(const AChunk: TIORingReaderChunk);
+
+  procedure RaiseNotAcquired; { FPC} noreturn; {}
+  begin
+    RaiseError(EInvalidOpException, 'The chunk is not acquired');
+  end;
+
+var
+  LWake: Boolean;
+begin
+  CheckOpen;
+
+  Lock;
+  try
+    if (AChunk.FSlot >= FBufferCount) or (FSlots[AChunk.FSlot].State <> rssTaken) then
+      RaiseNotAcquired;
+
+    FSlots[AChunk.FSlot].State := rssFree;
+    FFree[FFreeCount] := AChunk.FSlot;
+    Inc(FFreeCount);
+    Dec(FTakenCount);
+    TAtomic.Increment(FReleaseCount);
+    LWake := FReleaseWaiters > 0;
+    IssueReads;
+  finally
+    Unlock;
+  end;
+
+  if LWake then
+    TAtomic.WakeAll(FReleaseCount);
 end;
 
 function TIORingSequentialReader.Eof: Boolean;

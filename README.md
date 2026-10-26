@@ -153,6 +153,24 @@ begin
 end;
 ```
 
+Several workers on one reader: each takes the next chunk, a buffer of its
+own, and gives it back when done – in any order. The chunks come in file
+order, with their file offset; these two calls are thread-safe. When every
+buffer is out, `TryAcquireChunk` waits for one to come back.
+
+```pascal
+// On each worker thread, with one LReader shared by all of them
+var
+  LChunk: TIORingReaderChunk;
+begin
+  while LReader.TryAcquireChunk(LChunk) do
+  begin
+    Process(LChunk.Data, LChunk.Length, LChunk.FileOffset);
+    LReader.ReleaseChunk(LChunk);
+  end;
+end;
+```
+
 ### Writing in the background
 
 ```pascal

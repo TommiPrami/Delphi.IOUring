@@ -5,7 +5,8 @@
 
   The main tests read pattern files of awkward sizes (around buffer and queue
   boundaries) with awkward read sizes, in every reader mode, and check every
-  byte.
+  byte. The tests of several chunks at once also run several threads on one
+  reader.
 }
 
 {$I PIRInclude.Compiler.inc}
@@ -16,9 +17,23 @@ uses
   PIRUnit.SequentialReader, PIRUnit.Test.PlatformHelpers, PIRUnit.Test.Support;
 
 type
+  // A chunk a worker thread got: where it starts and how long it is
+  TSeenChunk = record
+    FileOffset: Int64;
+    Length: NativeInt;
+  end;
+
   TSequentialReaderTests = class(TIORingTestCase)
   private
     FResources: TTestResources;
+    // Several chunks from several threads: the reader they share, what each thread got, and the bad chunks
+    FSharedReader: ^TIORingSequentialReader;
+    FSeen: array of array of TSeenChunk;
+    FSeenCounts: array of Integer;
+    FBadChunks: Integer;
+    procedure CheckChunksFromThreads(const AOptions: TIORingSequentialReaderOptions);
+    procedure RecordSeenChunk(const AIndex: Integer; const AChunk: TIORingReaderChunk);
+    procedure WorkChunks(AIndex: Integer);
     function CheckReadAll(const ASize: Int64; const AOptions: TIORingSequentialReaderOptions;
       const ABufferSize, ABufferCount: Cardinal; const AChunkSize: Integer): TIORingSequentialReaderStats;
     procedure CheckSizeAndChunkMatrix(const AOptions: TIORingSequentialReaderOptions;
@@ -57,6 +72,13 @@ type
     procedure ReleaseChunk_WithoutChunk_Raises;
     procedure TryAcquireChunk_WithoutWait_GetsDataEventually;
     procedure Stats_AreConsistent;
+    procedure Chunks_SeveralAtOnce_ReleasedInAnyOrder;
+    procedure Chunks_AllOut_WithoutWait_ReturnsFalse;
+    procedure Chunks_EmptyFile_IsEndOfFileAtOnce;
+    procedure Chunks_MixedWithReadOrOneChunk_Raises;
+    procedure Chunks_ReleasedTwice_Raises;
+    procedure Chunks_ManyThreads_Buffered;
+    procedure Chunks_ManyThreads_Unbuffered;
   end;
 
 implementation
@@ -70,7 +92,7 @@ uses
 {$ELSE}
   Winapi.Windows, System.SysUtils, System.Classes,
 {$ENDIF}
-  PIRUnit.IORing, PIRUnit.Test.FileHelpers;
+  PIRUnit.Atomics, PIRUnit.IORing, PIRUnit.Test.FileHelpers;
 
 const
   SMALL_BUFFER = 64 * 1024;
@@ -821,6 +843,271 @@ begin
   LStats := LReader.Stats;
   AssertEquals('Fixed read-ahead', Int64(4), Int64(LStats.MaxReadAhead));
   CheckEqualsU64('Bytes', FILE_SIZE, LStats.BytesFromDisk);
+end;
+
+{ Several chunks at once }
+
+procedure TSequentialReaderTests.Chunks_SeveralAtOnce_ReleasedInAnyOrder;
+const
+  B = SMALL_BUFFER;
+  BUFFER_COUNT = 4;
+  FILE_SIZE = 10 * B + 5;
+var
+  LReader: TIORingSequentialReader;
+  LChunks: array[0..BUFFER_COUNT - 1] of TIORingReaderChunk;
+  LCount: Integer;
+  LExpectedOffset: Int64;
+  LIndex: Integer;
+  LRound: Integer;
+begin
+  LReader.Open(SharedPatternFile(FILE_SIZE), [], B, BUFFER_COUNT);
+  LExpectedOffset := 0;
+  LRound := 0;
+
+  repeat
+    // Up to all buffers out at once, each chunk the next part of the file
+    LCount := 0;
+
+    while (LCount < BUFFER_COUNT) and LReader.TryAcquireChunk(LChunks[LCount]) do
+    begin
+      AssertEquals('Offset', LExpectedOffset, LChunks[LCount].FileOffset);
+      CheckPattern(UInt64(LChunks[LCount].FileOffset), LChunks[LCount].Data, LChunks[LCount].Length, 'Chunk');
+      Inc(LExpectedOffset, LChunks[LCount].Length);
+      Inc(LCount);
+    end;
+
+    // Back in a different order each round: last first, or every second one first
+    if Odd(LRound) then
+    begin
+      for LIndex := LCount - 1 downto 0 do
+        LReader.ReleaseChunk(LChunks[LIndex]);
+    end
+    else
+    begin
+      for LIndex := 0 to LCount - 1 do
+        if Odd(LIndex) then
+          LReader.ReleaseChunk(LChunks[LIndex]);
+
+      for LIndex := 0 to LCount - 1 do
+        if not Odd(LIndex) then
+          LReader.ReleaseChunk(LChunks[LIndex]);
+    end;
+
+    Inc(LRound);
+  until LCount < BUFFER_COUNT;
+
+  AssertEquals('All of the file', Int64(FILE_SIZE), LExpectedOffset);
+  AssertEquals('Position', Int64(FILE_SIZE), LReader.Position);
+  AssertTrue('Eof', LReader.Eof);
+end;
+
+procedure TSequentialReaderTests.Chunks_AllOut_WithoutWait_ReturnsFalse;
+const
+  B = SMALL_BUFFER;
+  BUFFER_COUNT = 4;
+var
+  LReader: TIORingSequentialReader;
+  LChunks: array[0..BUFFER_COUNT - 1] of TIORingReaderChunk;
+  LNext: TIORingReaderChunk;
+  LIndex: Integer;
+begin
+  LReader.Open(SharedPatternFile(10 * B), [], B, BUFFER_COUNT);
+
+  for LIndex := 0 to BUFFER_COUNT - 1 do
+    AssertTrue('Acquire', LReader.TryAcquireChunk(LChunks[LIndex]));
+
+  AssertFalse('All buffers out: no chunk without waiting', LReader.TryAcquireChunk(LNext, False));
+  AssertFalse('Not the end of the file', LReader.Eof);
+
+  // The second one back: its buffer reads the next part
+  LReader.ReleaseChunk(LChunks[1]);
+  AssertTrue('Acquire after a release', LReader.TryAcquireChunk(LNext));
+  AssertEquals('The next part of the file', Int64(BUFFER_COUNT * B), LNext.FileOffset);
+  CheckPattern(UInt64(LNext.FileOffset), LNext.Data, LNext.Length, 'Chunk after a release');
+
+  LReader.ReleaseChunk(LNext);
+  LReader.ReleaseChunk(LChunks[0]);
+  LReader.ReleaseChunk(LChunks[2]);
+  LReader.ReleaseChunk(LChunks[3]);
+end;
+
+procedure TSequentialReaderTests.Chunks_EmptyFile_IsEndOfFileAtOnce;
+var
+  LReader: TIORingSequentialReader;
+  LChunk: TIORingReaderChunk;
+begin
+  LReader.Open(SharedPatternFile(0), [], SMALL_BUFFER, 4);
+  AssertFalse('No chunk', LReader.TryAcquireChunk(LChunk));
+  AssertTrue('Eof', LReader.Eof);
+end;
+
+procedure TSequentialReaderTests.Chunks_MixedWithReadOrOneChunk_Raises;
+var
+  LReader: TIORingSequentialReader;
+  LChunk: TIORingReaderChunk;
+  LData: PByte;
+  LLength: NativeInt;
+  LBuffer: array[0..15] of Byte;
+  LRaised: Boolean;
+begin
+  LReader.Open(SharedPatternFile(4 * SMALL_BUFFER), [], SMALL_BUFFER, 4);
+  AssertTrue('Acquire', LReader.TryAcquireChunk(LChunk));
+
+  LRaised := False;
+
+  try
+    LReader.Read(LBuffer, SizeOf(LBuffer));
+  except
+    on EInvalidOpException do
+      LRaised := True;
+  end;
+
+  AssertTrue('Read raises while a chunk is out', LRaised);
+  LRaised := False;
+
+  try
+    LReader.TryAcquireChunk(LData, LLength);
+  except
+    on EInvalidOpException do
+      LRaised := True;
+  end;
+
+  AssertTrue('The one-chunk acquire raises while a chunk is out', LRaised);
+  LReader.ReleaseChunk(LChunk);
+
+  // And the other way round
+  AssertTrue('Acquire one chunk', LReader.TryAcquireChunk(LData, LLength));
+  LRaised := False;
+
+  try
+    LReader.TryAcquireChunk(LChunk);
+  except
+    on EInvalidOpException do
+      LRaised := True;
+  end;
+
+  AssertTrue('Several-chunks acquire raises while the one chunk is out', LRaised);
+  LReader.ReleaseChunk;
+end;
+
+procedure TSequentialReaderTests.Chunks_ReleasedTwice_Raises;
+var
+  LReader: TIORingSequentialReader;
+  LChunk: TIORingReaderChunk;
+  LRaised: Boolean;
+begin
+  LReader.Open(SharedPatternFile(4 * SMALL_BUFFER), [], SMALL_BUFFER, 4);
+  AssertTrue('Acquire', LReader.TryAcquireChunk(LChunk));
+  LReader.ReleaseChunk(LChunk);
+  LRaised := False;
+
+  try
+    LReader.ReleaseChunk(LChunk);
+  except
+    on EInvalidOpException do
+      LRaised := True;
+  end;
+
+  AssertTrue('Second release raises', LRaised);
+end;
+
+{ Each thread takes chunks, checks them and gives them back, sometimes holding two at once. Fewer threads than buffers,
+  so that a thread waiting for its second chunk always gets one in the end. }
+procedure TSequentialReaderTests.WorkChunks(AIndex: Integer);
+var
+  LChunk: TIORingReaderChunk;
+  LSecond: TIORingReaderChunk;
+  LHoldTwo: Boolean;
+  LHasSecond: Boolean;
+begin
+  LHoldTwo := False;
+
+  while FSharedReader^.TryAcquireChunk(LChunk) do
+  begin
+    RecordSeenChunk(AIndex, LChunk);
+    LHasSecond := LHoldTwo and FSharedReader^.TryAcquireChunk(LSecond);
+
+    if LHasSecond then
+    begin
+      RecordSeenChunk(AIndex, LSecond);
+      // The later one first
+      FSharedReader^.ReleaseChunk(LSecond);
+    end;
+
+    FSharedReader^.ReleaseChunk(LChunk);
+    LHoldTwo := not LHoldTwo;
+  end;
+end;
+
+// On thread AIndex: checks the chunk's bytes and notes where it was
+procedure TSequentialReaderTests.RecordSeenChunk(const AIndex: Integer; const AChunk: TIORingReaderChunk);
+var
+  LBadOffset: UInt64;
+begin
+  if not TTestFileHelpers.CheckPattern(UInt64(AChunk.FileOffset), AChunk.Data^, AChunk.Length, LBadOffset) then
+    TAtomic.Increment(FBadChunks);
+
+  if FSeenCounts[AIndex] >= Length(FSeen[AIndex]) then
+    SetLength(FSeen[AIndex], 2 * Length(FSeen[AIndex]) + 16);
+
+  FSeen[AIndex][FSeenCounts[AIndex]].FileOffset := AChunk.FileOffset;
+  FSeen[AIndex][FSeenCounts[AIndex]].Length := AChunk.Length;
+  Inc(FSeenCounts[AIndex]);
+end;
+
+{ THREAD_COUNT threads share one reader. Every buffer-sized part of the file must have come exactly once, whole, with
+  the right bytes. }
+procedure TSequentialReaderTests.CheckChunksFromThreads(const AOptions: TIORingSequentialReaderOptions);
+const
+  B = SMALL_BUFFER;
+  BUFFER_COUNT = 8;
+  THREAD_COUNT = 6;
+  PART_COUNT = 300;
+  FILE_SIZE = PART_COUNT * B + 123;
+var
+  LReader: TIORingSequentialReader;
+  LTimesSeen: array of Integer;
+  LPart: Int64;
+  LThread: Integer;
+  LIndex: Integer;
+  LTotal: Int64;
+begin
+  LReader.Open(SharedPatternFile(FILE_SIZE), AOptions, B, BUFFER_COUNT);
+  FSharedReader := @LReader;
+  SetLength(FSeen, THREAD_COUNT);
+  SetLength(FSeenCounts, THREAD_COUNT);
+  FBadChunks := 0;
+
+  RunThreads(THREAD_COUNT, WorkChunks);
+
+  AssertEquals('Chunks with wrong bytes', 0, FBadChunks);
+  AssertTrue('Eof', LReader.Eof);
+  SetLength(LTimesSeen, PART_COUNT + 1);
+  LTotal := 0;
+
+  for LThread := 0 to THREAD_COUNT - 1 do
+    for LIndex := 0 to FSeenCounts[LThread] - 1 do
+    begin
+      LPart := FSeen[LThread][LIndex].FileOffset div B;
+      AssertEquals('A chunk starts at a buffer boundary', LPart * B, FSeen[LThread][LIndex].FileOffset);
+      Inc(LTimesSeen[LPart]);
+      Inc(LTotal, FSeen[LThread][LIndex].Length);
+    end;
+
+  for LIndex := 0 to PART_COUNT do
+    AssertEquals(Format('Part %d came', [LIndex]), 1, LTimesSeen[LIndex]);
+
+  AssertEquals('All of the file', Int64(FILE_SIZE), LTotal);
+end;
+
+procedure TSequentialReaderTests.Chunks_ManyThreads_Buffered;
+begin
+  CheckChunksFromThreads([]);
+end;
+
+procedure TSequentialReaderTests.Chunks_ManyThreads_Unbuffered;
+begin
+  CheckChunksFromThreads([sroUnbuffered]);
 end;
 
 initialization

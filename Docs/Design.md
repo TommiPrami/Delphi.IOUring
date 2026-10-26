@@ -3625,6 +3625,75 @@ the small things (6).
   x64, Linux ARM64), and the owner tagged **0.1.0** on commit `766b35c`.
   Not run: the clock comparison on the ARM64 runner (optional).
 
+### 12.11 Several chunks at once, from several threads (Phase 29)
+
+**Why.** The first real program (the owner's PiFalseStartSearcher, a
+search through a 100 GB file of Pi's digits) showed what the zero-copy
+reader is missing. Its work per chunk (dropping non-digits, scanning) is
+too much for one thread when the disk delivers 6 GB/s, so several workers
+should each take the next chunk. But `TryAcquireChunk` handed out one chunk
+at a time, and the buffers came back in order: a worker could not hold a
+chunk while another worker took the next one. The program went around it
+with the engine and its own blocks; this makes the reader do it.
+
+**Decided (2026-10-26, the owner):** new overloads on
+`TIORingSequentialReader` (not a new type), and thread-safe.
+
+```pascal
+type
+  TIORingReaderChunk = record
+    Data: PByte;
+    Length: NativeInt;
+    FileOffset: Int64;      // where Data starts in the file
+  end;
+
+function TryAcquireChunk(out AChunk: TIORingReaderChunk; const AWait: Boolean = True): Boolean; overload;
+procedure ReleaseChunk(const AChunk: TIORingReaderChunk); overload;
+```
+
+- The chunks come **in file order**, each a buffer of its own, with its
+  file offset. They go back **in any order**; the released buffer is read
+  into again at once.
+- **From several threads:** these two calls take a lock. `Read` and the
+  one-chunk calls stay as they were (one thread, no lock); they raise
+  `EInvalidOpException` while chunks of the new calls are out, and the new
+  calls raise while the one chunk is out.
+- **All buffers out:** `TryAcquireChunk` waits for a release (with
+  `AWait = False` it returns False, and `Eof` is still False). It waits
+  without the lock, because the release needs it.
+- `Close` only after all chunks are back (its buffers go).
+
+**How.** The buffers were a circular queue: the slot of the next read was
+`(head + outstanding) mod count`, which only works when the buffers come
+back in order. Now:
+
+- **The free slots** are a stack. The slot freed last is read into first
+  (its memory is warm); at Open the stack is filled so that the first reads
+  go to slots 0, 1, 2 … as before.
+- **The slots in flight or ready**, not yet delivered, are a ring of slot
+  indexes in file order (`FOrder`). The first one holds the data at
+  `Position`; `Read` and the one-chunk calls use it the way they used the
+  head slot.
+- A chunk of the new calls takes its slot out of `FOrder` (state
+  `rssTaken`); releasing it puts the slot on the free stack.
+- Read-ahead counts the slots in `FOrder` (in flight or ready) against the
+  adaptive limit; slots out as chunks do not count.
+- **The lock** is three states on an `Integer` (0 free, 1 taken, 2 taken and
+  maybe waited for – Drepper, "Futexes Are Tricky") on
+  `TAtomic.WaitWhileEqual`/`WakeOne`: no new dependency, the same on Windows
+  and Linux. A thread that has to wait for a read in flight keeps the lock:
+  that read completes without any other thread, and only one thread may
+  wait on the ring anyway. A thread that waits for a free buffer sleeps on
+  a release counter instead, after counting itself as a waiter; a release
+  wakes the waiters only if there are any.
+
+**Tested** (`PIRUnit.SequentialReader.Tests`, 7 new tests): all buffers out
+at once and released in different orders (offsets and bytes checked); all
+out without waiting; an empty file; the mixing rules; a chunk released
+twice; and 6 threads sharing a reader of 8 buffers, each sometimes holding
+two chunks, buffered and unbuffered – every buffer-sized part of the file
+must arrive exactly once, whole and with the right bytes.
+
 ---
 
 ## 13. Ideas parked for later
