@@ -1,4 +1,4 @@
-timestamp,compiler,platform,size_gib,scenario,contender,run,written_s,flushed_s,cpu_ms
+﻿timestamp,compiler,platform,size_gib,scenario,contender,run,written_s,flushed_s,cpu_ms
 2026-10-23 13:50:07,Delphi,Win64,1,writing only,"TFileStream, 64 KiB writes",1,0.2924,0.6153,390.6
 2026-10-23 13:50:07,Delphi,Win64,1,writing only,"TFileStream, 1 MiB writes",1,0.2321,0.5453,296.9
 2026-10-23 13:50:08,Delphi,Win64,1,writing only,"TBufferedFileStream, 1 MiB buffer, 64 KiB writes",1,0.2497,0.5499,359.4

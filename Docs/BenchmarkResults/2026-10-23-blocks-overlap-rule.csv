@@ -1,4 +1,4 @@
-timestamp,compiler,platform,blocks,scenario,cache,contender,run,seconds,blocks_per_s,mib_per_s,cpu_ms,checksum_ok
+﻿timestamp,compiler,platform,blocks,scenario,cache,contender,run,seconds,blocks_per_s,mib_per_s,cpu_ms,checksum_ok
 2026-10-23 12:15:39,Delphi,Win64,20000,random 4 KiB,cold,"TFileStream, Seek + Read",1,1.3676,14624,57.1,281.3,True
 2026-10-23 12:15:40,Delphi,Win64,20000,random 4 KiB,cold,"ReadFile at offset",1,1.3499,14816,57.9,187.5,True
 2026-10-23 12:15:40,Delphi,Win64,20000,random 4 KiB,cold,"ReadFile at offset, 8 threads",1,0.1780,112329,438.8,343.8,True
